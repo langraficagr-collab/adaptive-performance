@@ -22,3 +22,12 @@ Official references:
 - https://developers.google.com/admob/android/quick-start
 - https://developers.google.com/admob/android/banner
 - https://developers.google.com/admob/android/privacy
+
+## Validation (2026-10-06)
+
+- Gradle assembleDebug: successful.
+- Update installed over v1.4.6 without removing app data.
+- Apoiar navigation opened SupportActivity.
+- Google demo banner loaded on the Poco X7; log: `SupportAds: Banner loaded; test=true`.
+- Production consent flow awaits the publisher's AdMob IDs and privacy-message configuration; it has not been verified against a live publisher account.
+- Test APK is approximately 6.9 MB, compared with the previous approximately 1.24 MB.

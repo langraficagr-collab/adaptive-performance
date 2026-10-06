@@ -905,7 +905,7 @@ public class MainActivity extends Activity {
 
         int sel=prefs.getStringSet("manual_freeze_selected",Collections.emptySet()).size();
         int active=prefs.getInt("manual_frozen_active_count",0);
-        if(freezeStateText!=null) freezeStateText.setText(sel+" selecionado(s) • "+active+" congelado(s) agora\n"+prefs.getString("last_effectiveness_summary", ""));
+        if(freezeStateText!=null) freezeStateText.setText(sel+" selecionado(s) • "+active+" congelado(s) agora\n"+prefs.getString("manual_freeze_last_reason", "Aguardando verificação dos apps selecionados"));
         if(limitingDashboardText!=null) limitingDashboardText.setText(prefs.getString("limiting_dashboard", "Nenhuma limitação ativa"));
 
         if(cpuPressureText!=null) {

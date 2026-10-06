@@ -11,20 +11,23 @@ if (productionAds) {
     require(!admobAppId.contains("3940256099942544") && !admobBannerId.contains("3940256099942544"))
 }
 
+val sideBySide = providers.gradleProperty("sideBySide").orElse("false").get() == "true"
+
 android {
     buildFeatures { buildConfig = true; resValues = true }
     namespace = "com.mauricio.adaptiveperformance"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.mauricio.adaptiveperformance"
+        applicationId = if (sideBySide) "com.mauricio.adaptiveperformance.adstest" else "com.mauricio.adaptiveperformance"
         minSdk = 26
         targetSdk = 35
         manifestPlaceholders["admobAppId"] = admobAppId
+        manifestPlaceholders["appLabel"] = if (sideBySide) "Adaptive Performance Ads Test" else "Adaptive Performance"
         resValue("string", "admob_banner_id", admobBannerId)
         buildConfigField("boolean", "ADS_TEST_MODE", (!productionAds).toString())
-        versionCode = 32
-        versionName = "1.4.8"
+        versionCode = 34
+        versionName = if (sideBySide) "1.4.9-ads-test" else "1.4.9"
     }
 
     buildTypes {

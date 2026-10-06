@@ -13,7 +13,7 @@ public class PrivilegedService extends IPrivilegedService.Stub {
     private void cleanupSiblingServices() {
         try {
             int self = Process.myPid();
-            String name = "com.mauricio.adaptiveperformance:optimizer";
+            String name = BuildConfig.APPLICATION_ID + ":optimizer";
             String cmd = "for p in $(ps -A -o PID,NAME 2>/dev/null | awk '$2==\"" + name + "\"{print $1}'); do " +
                     "[ \"$p\" = \"" + self + "\" ] || kill \"$p\" 2>/dev/null; done";
             java.lang.Process proc = new ProcessBuilder("/system/bin/sh", "-c", cmd).start();

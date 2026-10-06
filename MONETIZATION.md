@@ -31,3 +31,11 @@ Official references:
 - Google demo banner loaded on the Poco X7; log: `SupportAds: Banner loaded; test=true`.
 - Production consent flow awaits the publisher's AdMob IDs and privacy-message configuration; it has not been verified against a live publisher account.
 - Test APK is approximately 6.9 MB, compared with the previous approximately 1.24 MB.
+
+## Publisher app registered (2026-10-06)
+
+- AdMob app: Adaptive Performance (Android, not yet listed in a supported store).
+- App ID: `ca-app-pub-6594966604456519~9008375832`
+- Banner Apoiar ID: `ca-app-pub-6594966604456519/1610986134`
+- Registration and ad-unit creation confirmed in the AdMob console.
+- Payment profile submission, privacy-message configuration, store listing and app-ads.txt remain pending. The installed APK still uses demo ads.

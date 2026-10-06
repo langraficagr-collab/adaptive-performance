@@ -10,6 +10,14 @@ Demonstração com gravação real do aplicativo, narração em português e cen
 
 [Baixar o APK](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 
+## Prints do aplicativo
+
+| Painel e proteção térmica | Ajustes e ações inteligentes | Limpeza de armazenamento |
+|---|---|---|
+| <img src="docs/screenshots/painel.png" alt="Painel com temperatura, RAM, CPU e proteção térmica" width="260"> | <img src="docs/screenshots/ajustes.png" alt="Ajustes de diagnóstico, perfis e ações inteligentes" width="260"> | <img src="docs/screenshots/limpeza.png" alt="Tela de análise e limpeza de armazenamento" width="260"> |
+
+Capturas reais da versão instalada no Poco X7. Valores e opções variam conforme o aparelho e a versão.
+
 ## Main features
 
 - RAM, CPU, LMKD/zRAM and pressure monitoring.

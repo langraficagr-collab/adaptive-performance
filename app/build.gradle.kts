@@ -2,7 +2,17 @@ plugins {
     id("com.android.application")
 }
 
+val productionAds = providers.gradleProperty("productionAds").orNull == "true"
+val admobAppId = if (productionAds) providers.gradleProperty("admobAppId").get() else "ca-app-pub-3940256099942544~3347511713"
+val admobBannerId = if (productionAds) providers.gradleProperty("admobBannerId").get() else "ca-app-pub-3940256099942544/9214589741"
+require(admobAppId.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}")))
+require(admobBannerId.matches(Regex("ca-app-pub-[0-9]{16}/[0-9]{10}")))
+if (productionAds) {
+    require(!admobAppId.contains("3940256099942544") && !admobBannerId.contains("3940256099942544"))
+}
+
 android {
+    buildFeatures { buildConfig = true; resValues = true }
     namespace = "com.mauricio.adaptiveperformance"
     compileSdk = 35
 
@@ -10,8 +20,11 @@ android {
         applicationId = "com.mauricio.adaptiveperformance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 30
-        versionName = "1.4.6"
+        manifestPlaceholders["admobAppId"] = admobAppId
+        resValue("string", "admob_banner_id", admobBannerId)
+        buildConfigField("boolean", "ADS_TEST_MODE", (!productionAds).toString())
+        versionCode = 31
+        versionName = "1.4.7-admob-test"
     }
 
     buildTypes {
@@ -28,6 +41,8 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
 }

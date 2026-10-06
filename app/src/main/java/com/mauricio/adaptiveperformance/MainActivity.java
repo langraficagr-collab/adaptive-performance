@@ -732,6 +732,9 @@ public class MainActivity extends Activity {
         nav.addView(apps,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(clean,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(settings,new LinearLayout.LayoutParams(0,-1,1f));
+        TextView support = navItem("♡\nApoiar",MUTED,false);
+        support.setOnClickListener(v -> startActivity(new Intent(this,SupportActivity.class)));
+        nav.addView(support,new LinearLayout.LayoutParams(0,-1,1f));
         return nav;
     }
 

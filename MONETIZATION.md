@@ -45,3 +45,9 @@ Official references:
 Version 1.4.8 (versionCode 32) built successfully and installed over the previous version. The UMP request used the correct publisher app ID. UMP reported missing publisher privacy forms; banner request returned error 3 (no fill). Live ad delivery and revenue are not verified. Configure Privacy & messaging and complete AdMob app readiness before expecting live inventory. The publisher phone is registered in RequestConfiguration as a test device.
 
 The AdSense (Brasil) payment profile was submitted and confirmed in the console. Identity verification is not currently requested.
+
+## AdMob console diagnosis (2026-10-06)
+
+App overview shows Requires review. Payment profile exists. Privacy policy published at https://github.com/langraficagr-collab/adaptive-performance/blob/feature/admob-banner/PRIVACY.md . The privacy URL was saved in the app selection dialog. Attempts to reopen app selection returned Cannot make these changes / An error occurred. Try again later. No consent message was successfully published; recheck the URL and publish the message after the console allows changes.
+
+Live serving additionally requires supported-store linkage, app-ads.txt verification and app readiness approval: https://support.google.com/admob/answer/10564477 and https://support.google.com/admob/answer/14538460 . GitHub Releases is not a supported-store listing.

@@ -1,0 +1,39 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs / temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+
+# Local backups generated during development
+*.bak
+*.bak-*
+*.bak2
+*.orig
+*~
+
+# Credentials / local secrets
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Reports generated locally
+build/reports/

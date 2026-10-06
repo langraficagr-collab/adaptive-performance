@@ -53,6 +53,8 @@ public final class RestrictionGuard {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("__AP_RC__([0-9]+)").matcher(out);
         int rc = m.find() ? Integer.parseInt(m.group(1)) : -1;
 
+        if (low.matches("(?s).*(exception|permission denial|unknown command|failed|error).*")) return false;
+
         if (cmd.startsWith("cmd activity freeze ")) {
             if (rc == 0) return true;
             if (rc == 255 && low.contains("freezing process")) return true;

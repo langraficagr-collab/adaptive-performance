@@ -10,8 +10,8 @@ android {
         applicationId = "com.mauricio.adaptiveperformance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 30
-        versionName = "1.4.6"
+        versionCode = 33
+        versionName = "1.4.9-noads"
     }
 
     buildTypes {

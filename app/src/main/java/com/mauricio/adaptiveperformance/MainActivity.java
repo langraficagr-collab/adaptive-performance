@@ -20,6 +20,9 @@ public class MainActivity extends Activity {
     private TextView thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto;
     private Switch autoRepairSwitch, effectivenessSwitch, profilesSwitch, restrictionGuardSwitch, emergencySwitch, startupSwitch;
     private Switch refreshSwitch, cleanupSwitch, aggressiveMemorySwitch, bugCleanupSwitch, unusedRestrictSwitch, cpuPressureSwitch, manualFreezeSwitch, notifySwitch;
+    private Switch memoryCompactionSwitch;
+    private TextView memoryCompactionLabel;
+    private SeekBar memoryCompactionSeekBar;
     private Switch advancedAdaptiveSwitch, screenOffSwitch, wakeupGuardSwitch;
     private Switch healthGuardSwitch, autoCalibrationSwitch, appLearningSwitch, antiStallSwitch, historySwitch, rollbackSwitch, crashLoopSwitch;
     private Switch extendedDiagnosticsSwitch, thermalPredictionSwitch, diagnosticBurstSwitch, adaptiveAggressivenessSwitch, abTestingSwitch, sensorModemSwitch, storageGuardSwitch, duplicateDetectionSwitch, safeModeManualSwitch;
@@ -512,6 +515,15 @@ public class MainActivity extends Activity {
 
         refreshSwitch = actionSwitch("Reduzir a tela para 60 Hz somente com aquecimento","adaptive_refresh",true);
         cleanupSwitch = actionSwitch("Liberar processos em cache quando RAM livre < 7%","critical_cleanup",true);
+        memoryCompactionSwitch = actionSwitch("Compactação automática de RAM", "memory_compaction_enabled", true);
+        memoryCompactionLabel = text("", 12, MUTED, false);
+        memoryCompactionLabel.setPadding(dp(12), dp(4), dp(8), 0);
+        memoryCompactionSeekBar = new SeekBar(this);
+        memoryCompactionSeekBar.setMax(45);
+        int compactionThreshold = Math.max(50, Math.min(95,
+                prefs.getInt("memory_compaction_threshold_pct", 50)));
+        memoryCompactionSeekBar.setProgress(compactionThreshold - 50);
+        memoryCompactionLabel.setText("Compactar quando RAM livre ≤ " + compactionThreshold + "%");
         aggressiveMemorySwitch = actionSwitch("Modo RAM agressivo: agir quando RAM livre < 20%","aggressive_memory_cleanup",false);
         bugCleanupSwitch = actionSwitch("Finalizar apps anormais travados em segundo plano","auto_bug_cleanup",true);
         unusedRestrictSwitch = actionSwitch("Restringir apps sem uso há mais de 3 dias","auto_unused_restrict",true);
@@ -549,6 +561,19 @@ public class MainActivity extends Activity {
 
         refreshSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("adaptive_refresh",v).apply());
         cleanupSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("critical_cleanup",v).apply());
+        memoryCompactionSwitch.setOnCheckedChangeListener((b,v) ->
+                prefs.edit().putBoolean("memory_compaction_enabled", v).apply());
+        memoryCompactionSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                int pct = 50 + progress;
+                memoryCompactionLabel.setText("Compactar quando RAM livre ≤ " + pct + "%");
+                if (fromUser) prefs.edit()
+                        .putInt("memory_compaction_threshold_pct", pct)
+                        .apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
         aggressiveMemorySwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("aggressive_memory_cleanup",v).apply());
         bugCleanupSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("auto_bug_cleanup",v).apply());
         unusedRestrictSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("auto_unused_restrict",v).apply());
@@ -590,7 +615,7 @@ public class MainActivity extends Activity {
             if(v) ChangeNotifier.notifyChange(this,"Notificações ativadas","O Adaptive Performance avisará sobre mudanças importantes.",9);
         });
 
-        c.addView(refreshSwitch); c.addView(cleanupSwitch); c.addView(aggressiveMemorySwitch); c.addView(bugCleanupSwitch);
+        c.addView(refreshSwitch); c.addView(cleanupSwitch); c.addView(memoryCompactionSwitch); c.addView(memoryCompactionLabel); c.addView(memoryCompactionSeekBar); c.addView(aggressiveMemorySwitch); c.addView(bugCleanupSwitch);
         c.addView(unusedRestrictSwitch); c.addView(cpuPressureSwitch);
         c.addView(advancedAdaptiveSwitch); c.addView(screenOffSwitch); c.addView(wakeupGuardSwitch);
         c.addView(healthGuardSwitch); c.addView(autoCalibrationSwitch); c.addView(appLearningSwitch);
@@ -732,9 +757,6 @@ public class MainActivity extends Activity {
         nav.addView(apps,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(clean,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(settings,new LinearLayout.LayoutParams(0,-1,1f));
-        TextView support = navItem("♡\nApoiar",MUTED,false);
-        support.setOnClickListener(v -> startActivity(new Intent(this,SupportActivity.class)));
-        nav.addView(support,new LinearLayout.LayoutParams(0,-1,1f));
         return nav;
     }
 
@@ -1068,13 +1090,22 @@ public class MainActivity extends Activity {
                     new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
                             .format(new Date()) + ".txt";
             android.content.ContentValues values = new android.content.ContentValues();
-            values.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name);
-            values.put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain");
-            if (Build.VERSION.SDK_INT >= 29)
-                values.put(android.provider.MediaStore.Downloads.RELATIVE_PATH,
+            values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name);
+            values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+            android.net.Uri collection;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
                         android.os.Environment.DIRECTORY_DOWNLOADS);
-            android.net.Uri uri = getContentResolver().insert(
-                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+            } else {
+                java.io.File downloads = android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS);
+                if (!downloads.exists()) downloads.mkdirs();
+                values.put(android.provider.MediaStore.MediaColumns.DATA,
+                        new java.io.File(downloads, name).getAbsolutePath());
+                collection = android.provider.MediaStore.Files.getContentUri("external");
+            }
+            android.net.Uri uri = getContentResolver().insert(collection, values);
             if (uri == null) throw new IllegalStateException("Não foi possível criar o arquivo.");
             try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
                 if (out == null) throw new IllegalStateException("Não foi possível abrir o arquivo.");
@@ -1126,6 +1157,7 @@ public class MainActivity extends Activity {
         int idx = actionsInsertIndex;
         if (idx >= 0 && idx < content.getChildCount()) content.removeViewAt(idx);
         refreshSwitch = cleanupSwitch = aggressiveMemorySwitch = bugCleanupSwitch = unusedRestrictSwitch = cpuPressureSwitch = null;
+        memoryCompactionSwitch = null; memoryCompactionLabel = null; memoryCompactionSeekBar = null;
         manualFreezeSwitch = notifySwitch = advancedAdaptiveSwitch = screenOffSwitch = wakeupGuardSwitch = null;
         healthGuardSwitch = autoCalibrationSwitch = appLearningSwitch = antiStallSwitch = historySwitch = null;
         rollbackSwitch = crashLoopSwitch = extendedDiagnosticsSwitch = thermalPredictionSwitch = diagnosticBurstSwitch = null;

@@ -126,7 +126,7 @@ public class StorageCleanupActivity extends Activity {
     private void addTitle(LinearLayout p,String icon,String a,String b){ TextView x=t(icon+"  "+a,19,TEXT,true); p.addView(x); TextView y=t(b,12,MUTED,false); y.setPadding(0,dp(4),0,dp(8)); p.addView(y); }
     private Switch sw(String s,boolean checked){ Switch x=new Switch(this); x.setText(s); x.setTextColor(TEXT); x.setTextSize(14); x.setChecked(checked); x.setPadding(dp(8),dp(8),dp(8),dp(8)); x.setBackground(bg(Color.rgb(13,34,48),Color.rgb(28,62,81),14)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.setMargins(0,dp(6),0,0); x.setLayoutParams(p); return x; }
     private Button btn(String s){ Button b=new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(15); b.setAllCaps(false); b.setBackground(bg(Color.rgb(25,132,220),Color.rgb(39,188,255),15)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(56)); p.setMargins(0,dp(10),0,0); b.setLayoutParams(p); return b; }
-    private TextView t(String s,float z,int c,boolean bold){ TextView t=new TextView(this); t.setText(s); t.setTextColor(c); t.setTextSize(z); if(bold)t.setTypeface(null,1); return t; }
+    private TextView t(String s,float z,int c,boolean bold){ TextView t=new TextView(this); t.setText(s); t.setTextColor(c); t.setTextSize(z); if(bold)t.setTypeface(null,android.graphics.Typeface.BOLD); return t; }
     private GradientDrawable bg(int c,int stroke,int r){ GradientDrawable g=new GradientDrawable(); g.setColor(c); g.setCornerRadius(dp(r)); g.setStroke(dp(1),stroke); return g; }
     private int dp(int v){ return (int)(v*getResources().getDisplayMetrics().density+0.5f); }
 }

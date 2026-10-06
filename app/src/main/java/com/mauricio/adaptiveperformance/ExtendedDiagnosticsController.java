@@ -104,8 +104,10 @@ public final class ExtendedDiagnosticsController {
         this.privileged = privileged;
         long vc = -1L;
         try {
-            vc = this.context.getPackageManager()
-                    .getPackageInfo(this.context.getPackageName(), 0).getLongVersionCode();
+            android.content.pm.PackageInfo info = this.context.getPackageManager()
+                    .getPackageInfo(this.context.getPackageName(), 0);
+            vc = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P
+                    ? info.getLongVersionCode() : info.versionCode;
         } catch (Throwable ignored) {}
         this.currentVersionCode = vc;
         long now = SystemClock.elapsedRealtime();

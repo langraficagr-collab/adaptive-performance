@@ -24,24 +24,7 @@ public class PrivilegedService extends IPrivilegedService.Stub {
     @Override public int remoteUid() { return Process.myUid(); }
 
     @Override public String exec(String command) {
-        StringBuilder out = new StringBuilder();
-        try {
-            ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", "-c", command);
-            pb.redirectErrorStream(true);
-            java.lang.Process p = pb.start();
-            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (out.length() < 65536) out.append(line).append('\n');
-            }
-            if (!p.waitFor(5, TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                out.append("[timeout]");
-            }
-        } catch (Throwable t) {
-            out.append("[error] ").append(t.getClass().getSimpleName()).append(": ").append(t.getMessage());
-        }
-        return out.toString().trim();
+        return ShellCommandRunner.run("/system/bin/sh", command, 5_000L);
     }
 
     @Override public void destroy() { System.exit(0); }

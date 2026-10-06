@@ -89,7 +89,9 @@ public final class AdaptiveIntelligenceController {
             if (temp > 0) e.putFloat("learn_temp_"+h, ema(oldTemp,temp,0.08f));
             e.putInt("learn_n_"+h,n).putString("learn_pkg_"+h,fg);
             try {
-                PackageInfo pi=c.getPackageManager().getPackageInfo(fg,0); long v=pi.getLongVersionCode();
+                PackageInfo pi=c.getPackageManager().getPackageInfo(fg,0);
+                long v = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P
+                        ? pi.getLongVersionCode() : pi.versionCode;
                 long oldV=p.getLong("learn_ver_"+h,-1L);
                 if (oldV>=0 && oldV!=v) {
                     e.putLong("update_seen_at_"+h,now).putLong("update_prev_ver_"+h,oldV)

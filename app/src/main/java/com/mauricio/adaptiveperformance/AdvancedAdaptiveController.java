@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 public final class AdvancedAdaptiveController {
     private static final long MIN_THERMAL_HOLD_MS = 90_000L;
     private static final long MEMORY_RELIEF_COOLDOWN_MS = 12L * 60L * 1000L;
+    private static final long MEMORY_COMPACTION_COOLDOWN_MS = 60_000L;
     private static final long SCREEN_OFF_SWEEP_MS = 20L * 60L * 1000L;
     private static final long ANOMALY_SCAN_MS = 30L * 60L * 1000L;
     private static final long STORAGE_NOTICE_MS = 6L * 60L * 60L * 1000L;
@@ -80,6 +81,7 @@ public final class AdvancedAdaptiveController {
     private int lastObservedThermal = -1;
     private long lastThermalChangeElapsed = 0L;
     private long lastMemoryReliefElapsed = 0L;
+    private long lastMemoryCompactionElapsed = 0L;
     private long lastScreenOffSweepElapsed = 0L;
     private long lastAnomalyScanElapsed = 0L;
     private long lastStorageNoticeElapsed = 0L;
@@ -143,6 +145,7 @@ public final class AdvancedAdaptiveController {
             maybeScanWakeupsAndNetwork(foregroundPackage, now);
             maybeNotifyStorage(r.storageFreePct, now);
         }
+        maybeCompactMemory(ramFreePct, now);
 
         prefs.edit()
                 .putFloat("temp_trend_c_min", r.tempTrendCPerMin)
@@ -465,6 +468,53 @@ public final class AdvancedAdaptiveController {
             sb.append(v);
         }
         return sb.toString();
+    }
+
+    private void maybeCompactMemory(double ramFreePct, long now) {
+        if (!prefs.getBoolean("memory_compaction_enabled", true)) return;
+        if (prefs.getBoolean("diagnostic_only", false)) return;
+        if (ramFreePct <= 0) return;
+
+        int threshold = prefs.getInt("memory_compaction_threshold_pct", 50);
+        threshold = Math.max(50, Math.min(95, threshold));
+        if (ramFreePct > threshold) return;
+        if (now - lastMemoryCompactionElapsed < MEMORY_COMPACTION_COOLDOWN_MS) return;
+
+        lastMemoryCompactionElapsed = now;
+        try {
+            String output = privileged.exec("cmd activity compact system 2>&1");
+            String normalized = output == null ? "" : output.replaceAll("\s+", " ").trim();
+            if (normalized.length() > 240) normalized = normalized.substring(0, 240);
+            boolean ok = normalized.contains("Finished system compaction")
+                    && !normalized.toLowerCase(Locale.US).contains("error");
+            String result = ok ? "ok" : (normalized.isEmpty() ? "sem retorno" : normalized);
+
+            prefs.edit()
+                    .putInt("memory_compaction_threshold_pct", threshold)
+                    .putFloat("memory_compaction_last_free_pct", (float) ramFreePct)
+                    .putLong("memory_compaction_last_at", System.currentTimeMillis())
+                    .putInt("memory_compaction_count",
+                            prefs.getInt("memory_compaction_count", 0) + (ok ? 1 : 0))
+                    .putString("memory_compaction_last_result", result)
+                    .apply();
+
+            String msg = String.format(Locale.US,
+                    "Compactação de RAM em %d%%: %s (RAM livre %.1f%%)",
+                    threshold, ok ? "concluída" : "falhou", ramFreePct);
+            log(msg);
+            if (ok) {
+                ChangeNotifier.notifyChange(context, "Compactação de RAM", msg, 4);
+            } else {
+                ChangeNotifier.notifyUnresolved(context, "Compactação de RAM", msg, 4);
+            }
+        } catch (Throwable t) {
+            prefs.edit()
+                    .putLong("memory_compaction_last_at", System.currentTimeMillis())
+                    .putString("memory_compaction_last_result",
+                            t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()))
+                    .apply();
+            log("Compactação de RAM falhou: " + t.getClass().getSimpleName());
+        }
     }
 
     private void maybeRelieveMemory(double ramFreePct, float memoryPsi, String foreground, long now) {

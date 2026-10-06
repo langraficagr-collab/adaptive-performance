@@ -1,6 +1,6 @@
 # AdMob integration
 
-The default build uses Google demo IDs and generates no revenue. Open **Apoiar** to test an adaptive banner. Ads are confined to this screen; the optimization service never requests ads. No interstitials or ad rewards are enabled.
+The default build uses the publisher AdMob IDs. Use `-PproductionAds=false` for demo IDs. Open **Apoiar** to test an adaptive banner. Ads are confined to this screen; the optimization service never requests ads. No interstitials or ad rewards are enabled.
 
 ## Production setup
 
@@ -14,9 +14,9 @@ The default build uses Google demo IDs and generates no revenue. Open **Apoiar**
 gradle :app:assembleRelease -PproductionAds=true -PadmobAppId=YOUR_APP_ID -PadmobBannerId=YOUR_BANNER_ID
 ```
 
-Configure release signing with the existing distribution key before publishing an update. The current test version is 1.4.7-admob-test; choose a production version name before publishing. Never test production ads by clicking them; use Google's demo IDs or registered test devices.
+Configure release signing with the existing distribution key before publishing an update. The current production-ID version is 1.4.8. Never test production ads by clicking them; use Google's demo IDs or registered test devices.
 
-The default test build intentionally skips UMP because Google demo IDs are not associated with the publisher's privacy messages. Production mode rejects demo IDs and requires both real IDs. Errors and no-fill leave every optimizer feature available. AdView is paused when this screen is hidden and destroyed when it closes.
+The demo build intentionally skips UMP because Google demo IDs are not associated with the publisher's privacy messages. Production mode rejects demo IDs and requires both real IDs. Errors and no-fill leave every optimizer feature available. AdView is paused when this screen is hidden and destroyed when it closes.
 
 Official references:
 - https://developers.google.com/admob/android/quick-start
@@ -38,4 +38,10 @@ Official references:
 - App ID: `ca-app-pub-6594966604456519~9008375832`
 - Banner Apoiar ID: `ca-app-pub-6594966604456519/1610986134`
 - Registration and ad-unit creation confirmed in the AdMob console.
-- Payment profile submission, privacy-message configuration, store listing and app-ads.txt remain pending. The installed APK still uses demo ads.
+- Payment profile submission, privacy-message configuration, store listing and app-ads.txt remain pending. Version 1.4.8 uses the publisher IDs, with UMP gating and the publisher phone registered as a test device.
+
+## Production-ID validation (2026-10-06)
+
+Version 1.4.8 (versionCode 32) built successfully and installed over the previous version. The UMP request used the correct publisher app ID. UMP reported missing publisher privacy forms; banner request returned error 3 (no fill). Live ad delivery and revenue are not verified. Configure Privacy & messaging and complete AdMob app readiness before expecting live inventory. The publisher phone is registered in RequestConfiguration as a test device.
+
+The AdSense (Brasil) payment profile was submitted and confirmed in the console. Identity verification is not currently requested.

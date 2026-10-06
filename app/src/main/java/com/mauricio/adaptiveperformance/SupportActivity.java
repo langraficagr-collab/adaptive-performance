@@ -76,6 +76,7 @@ public class SupportActivity extends Activity {
             },
             error -> {
                 if (isFinishing() || isDestroyed()) return;
+                android.util.Log.w("SupportAds", "Consent update failed: " + error.getErrorCode() + " " + error.getMessage());
                 status.setText("Anúncios indisponíveis. O aplicativo continua funcionando.");
                 initializeAds();
             });
@@ -85,6 +86,10 @@ public class SupportActivity extends Activity {
         if (started || isFinishing() || isDestroyed()) return;
         if (!BuildConfig.ADS_TEST_MODE && (consent == null || !consent.canRequestAds())) return;
         started = true;
+        // The publisher's phone remains a test device; other devices use live ads.
+        MobileAds.setRequestConfiguration(new RequestConfiguration.Builder()
+            .setTestDeviceIds(java.util.Collections.singletonList("E3E3B2FC15E4F1EA2DA2ECE7234A73C2"))
+            .build());
         new Thread(() -> MobileAds.initialize(getApplicationContext(),
             result -> runOnUiThread(() -> container.post(this::loadBanner))), "ads-init").start();
     }

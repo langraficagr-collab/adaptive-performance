@@ -2,9 +2,9 @@ plugins {
     id("com.android.application")
 }
 
-val productionAds = providers.gradleProperty("productionAds").orNull == "true"
-val admobAppId = if (productionAds) providers.gradleProperty("admobAppId").get() else "ca-app-pub-3940256099942544~3347511713"
-val admobBannerId = if (productionAds) providers.gradleProperty("admobBannerId").get() else "ca-app-pub-3940256099942544/9214589741"
+val productionAds = providers.gradleProperty("productionAds").orElse("true").get() == "true"
+val admobAppId = if (productionAds) providers.gradleProperty("admobAppId").orElse("ca-app-pub-6594966604456519~9008375832").get() else "ca-app-pub-3940256099942544~3347511713"
+val admobBannerId = if (productionAds) providers.gradleProperty("admobBannerId").orElse("ca-app-pub-6594966604456519/1610986134").get() else "ca-app-pub-3940256099942544/9214589741"
 require(admobAppId.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}")))
 require(admobBannerId.matches(Regex("ca-app-pub-[0-9]{16}/[0-9]{10}")))
 if (productionAds) {
@@ -23,8 +23,8 @@ android {
         manifestPlaceholders["admobAppId"] = admobAppId
         resValue("string", "admob_banner_id", admobBannerId)
         buildConfigField("boolean", "ADS_TEST_MODE", (!productionAds).toString())
-        versionCode = 31
-        versionName = "1.4.7-admob-test"
+        versionCode = 32
+        versionName = "1.4.8"
     }
 
     buildTypes {

@@ -2,6 +2,14 @@
 
 Android utility focused on adaptive performance, thermal control, RAM/CPU pressure management, safe background restrictions, diagnostics and storage maintenance. The project is designed for Android devices with Shizuku access and does not require root.
 
+## Vídeo de apresentação
+
+[▶ Assista ao vídeo do Adaptive Performance (19 segundos)](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.4.8/AdaptivePerformance-divulgacao.mp4)
+
+Demonstração com gravação real do aplicativo, narração em português e cena ilustrativa gerada por IA no Vibes. Os resultados variam conforme o aparelho; as funções avançadas usam Shizuku.
+
+[Baixar o APK](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
+
 ## Main features
 
 - RAM, CPU, LMKD/zRAM and pressure monitoring.

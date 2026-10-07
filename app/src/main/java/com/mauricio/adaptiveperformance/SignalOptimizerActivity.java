@@ -12,11 +12,20 @@ import java.util.*;
 public class SignalOptimizerActivity extends Activity {
     private android.content.SharedPreferences prefs;
     private TextView status, signal, intervalLabel, thresholdLabel, cooldownLabel;
-    private Switch enabled, test5g, test4g, test3g, test2g;
+    private Switch enabled, gpsSaver, test5g, test4g, test3g, test2g;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         prefs=getSharedPreferences("adaptive",MODE_PRIVATE);
+        if (!prefs.getBoolean("signal_optimizer_aggressive_v2", false)) {
+            android.content.SharedPreferences.Editor migration = prefs.edit()
+                    .putBoolean("signal_optimizer_aggressive_v2", true);
+            if (prefs.getInt("signal_optimizer_interval_min", 5) == 5)
+                migration.putInt("signal_optimizer_interval_min", 1);
+            if (prefs.getInt("signal_optimizer_cooldown_min", 30) == 30)
+                migration.putInt("signal_optimizer_cooldown_min", 5);
+            migration.apply();
+        }
         build();
     }
 
@@ -36,6 +45,14 @@ public class SignalOptimizerActivity extends Activity {
         signal=t("",13,muted,false); c.addView(signal);
         root.addView(c);
 
+        LinearLayout gps=card(card);
+        gps.addView(t("Economia de localização",16,text,true));
+        gpsSaver=sw("Limitar atualizações GPS em segundo plano com a tela apagada","gps_battery_saver_enabled",false,text);
+        gps.addView(gpsSaver);
+        TextView gpsNote=t("A navegação com o app aberto continua funcionando. Pode atrasar geocercas e rastreamento em segundo plano. A configuração original é restaurada ao desligar ou conectar o carregador.",12,muted,false);
+        gpsNote.setPadding(0,dp(4),0,0); gps.addView(gpsNote);
+        root.addView(gps);
+
         LinearLayout tech=card(card);
         tech.addView(t("Tecnologias que podem ser testadas",16,text,true));
         test5g=sw("5G + 4G, somente se NR já estiver permitido pelo SIM","signal_optimizer_test_5g",true,text);
@@ -49,16 +66,16 @@ public class SignalOptimizerActivity extends Activity {
         cfg.addView(t("Sensibilidade e intervalo",16,text,true));
 
         intervalLabel=t("",13,muted,false); cfg.addView(intervalLabel);
-        SeekBar interval=new SeekBar(this); interval.setMax(28); interval.setProgress(Math.max(0,prefs.getInt("signal_optimizer_interval_min",5)-2)); cfg.addView(interval);
-        interval.setOnSeekBarChangeListener(listener(v->{ int min=v+2; prefs.edit().putInt("signal_optimizer_interval_min",min).commit(); updateLabels(); }));
+        SeekBar interval=new SeekBar(this); interval.setMax(29); interval.setProgress(Math.max(0,prefs.getInt("signal_optimizer_interval_min",1)-1)); cfg.addView(interval);
+        interval.setOnSeekBarChangeListener(listener(v->{ int min=v+1; prefs.edit().putInt("signal_optimizer_interval_min",min).commit(); updateLabels(); }));
 
         thresholdLabel=t("",13,muted,false); thresholdLabel.setPadding(0,dp(10),0,0); cfg.addView(thresholdLabel);
         SeekBar thr=new SeekBar(this); thr.setMax(25); thr.setProgress(Math.max(0,Math.min(25,-100-prefs.getInt("signal_optimizer_rsrp_threshold",-115)))); cfg.addView(thr);
         thr.setOnSeekBarChangeListener(listener(v->{ int dbm=-100-v; prefs.edit().putInt("signal_optimizer_rsrp_threshold",dbm).commit(); updateLabels(); }));
 
         cooldownLabel=t("",13,muted,false); cooldownLabel.setPadding(0,dp(10),0,0); cfg.addView(cooldownLabel);
-        SeekBar cool=new SeekBar(this); cool.setMax(110); cool.setProgress(Math.max(0,prefs.getInt("signal_optimizer_cooldown_min",30)-10)); cfg.addView(cool);
-        cool.setOnSeekBarChangeListener(listener(v->{ int min=v+10; prefs.edit().putInt("signal_optimizer_cooldown_min",min).commit(); updateLabels(); }));
+        SeekBar cool=new SeekBar(this); cool.setMax(115); cool.setProgress(Math.max(0,prefs.getInt("signal_optimizer_cooldown_min",5)-5)); cfg.addView(cool);
+        cool.setOnSeekBarChangeListener(listener(v->{ int min=v+5; prefs.edit().putInt("signal_optimizer_cooldown_min",min).commit(); updateLabels(); }));
         root.addView(cfg);
 
         Button check=btn("Verificar sinal agora");
@@ -87,7 +104,7 @@ public class SignalOptimizerActivity extends Activity {
         });
         root.addView(restore);
 
-        TextView warn=t("Segurança: não troca a rede durante chamadas. Cada tecnologia é testada por pelo menos 20 s. Pode haver uma breve queda de dados durante a comparação. Ao desativar, o modo de rede original é restaurado.",12,muted,false);
+        TextView warn=t("Segurança: não troca a rede durante chamadas. Cada tecnologia é testada por 10 s. Pode haver uma breve queda de dados durante a comparação. A economia GPS limita apenas atualizações em segundo plano e pode atrasar geocercas. Ao desativar, as configurações originais são restauradas.",12,muted,false);
         warn.setPadding(0,dp(14),0,0); root.addView(warn);
 
         setContentView(sv);
@@ -100,12 +117,21 @@ public class SignalOptimizerActivity extends Activity {
             }
             refresh();
         });
+        gpsSaver.setOnCheckedChangeListener((b,on)->{
+            prefs.edit().putBoolean("gps_battery_saver_enabled",on).commit();
+            if(prefs.getBoolean("master",false)){
+                Intent i=new Intent(this,OptimizationService.class);
+                if(Build.VERSION.SDK_INT>=26) startForegroundService(i); else startService(i);
+            }
+            refresh();
+        });
         updateLabels();
         refresh();
     }
 
     private void refresh(){
-        status.setText(prefs.getString("signal_optimizer_status","Aguardando monitoramento"));
+        status.setText(prefs.getString("signal_optimizer_status","Aguardando monitoramento")
+                + "\n" + prefs.getString("gps_battery_saver_status","Economia GPS desligada"));
         signal.setText("Atual: "+prefs.getString("signal_optimizer_current_tech","—")+" • nível "+
                 prefs.getInt("signal_optimizer_current_level",0)+"/4 • "+prefs.getInt("signal_optimizer_current_dbm",-140)+" dBm"+
                 "\nMelhor modo: "+prefs.getString("signal_optimizer_selected_mode","ainda não testado"));
@@ -113,9 +139,9 @@ public class SignalOptimizerActivity extends Activity {
     @Override protected void onResume(){super.onResume(); if(status!=null)refresh();}
 
     private void updateLabels(){
-        intervalLabel.setText("Verificar a cada "+prefs.getInt("signal_optimizer_interval_min",5)+" min");
+        intervalLabel.setText("Verificar a cada "+prefs.getInt("signal_optimizer_interval_min",1)+" min");
         thresholdLabel.setText("Considerar LTE/5G muito fraco em ≤ "+prefs.getInt("signal_optimizer_rsrp_threshold",-115)+" dBm");
-        cooldownLabel.setText("Cooldown após otimização: "+prefs.getInt("signal_optimizer_cooldown_min",30)+" min");
+        cooldownLabel.setText("Cooldown após otimização: "+prefs.getInt("signal_optimizer_cooldown_min",5)+" min");
     }
 
     private SeekBar.OnSeekBarChangeListener listener(java.util.function.IntConsumer c){

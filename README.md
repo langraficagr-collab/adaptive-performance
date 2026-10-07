@@ -206,15 +206,19 @@ A versão 1.7.0 adicionou monitoramento e otimização da tecnologia da rede cel
 - Pode comparar 5G+4G, 4G/LTE, 3G/WCDMA/HSPA e 2G/GSM/EDGE.
 - 5G só entra quando NR já está permitido no perfil do SIM.
 - Nunca habilita uma tecnologia que não estava permitida no perfil original.
-- Testa cada modo por um período de estabilização.
+- Confirma a queda de sinal em cerca de 10 s e testa cada modo por 10 s.
 - Mantém o modo com melhor resultado.
 - Não troca a rede durante chamadas.
-- Usa cooldown configurável para evitar alternância constante.
+- Verifica por padrão a cada 1 min e usa cooldown configurável de 5 a 120 min para evitar alternância constante.
 - Verifica o bitmask depois de cada mudança.
 - Restaura o perfil original se o Android devolver um resultado inesperado.
 - Possui botão para restaurar manualmente a configuração original.
 
 A disponibilidade real de 2G/3G/4G/5G depende do aparelho, ROM, SIM e operadora.
+
+### Economia opcional de GPS
+
+A tela do otimizador de sinal permite limitar atualizações de localização em segundo plano enquanto a tela está apagada. O recurso eleva o intervalo do sistema para 15 minutos e restaura o valor anterior ao acender a tela, conectar o carregador, desligar a opção ou encerrar o serviço. Navegação visível continua disponível; geocercas e rastreamento em segundo plano podem atualizar mais tarde.
 
 ## Segurança
 
@@ -248,9 +252,9 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
-**1.8.2 — Economia de bateria em repouso**
+**1.8.3 — GPS e troca de rede mais rápidos**
 
-A versão 1.8.2 reduz as verificações em segundo plano para intervalos de até 10 minutos com a tela apagada e o aparelho frio, ou 5 minutos enquanto carrega. Calor ou pressão alta mantêm as verificações rápidas. Inclui os modos **Automático** e **Avançado**, aprendizado adaptativo e **Meta de bateria**.
+Inclui economia GPS opcional em segundo plano com restauração automática, confirmação de sinal fraco e testes de rede de 10 segundos. A verificação padrão da rede é a cada 1 minuto e o cooldown mínimo é 5 minutos. Mantém as melhorias de repouso da versão 1.8.2: verificações em segundo plano mais espaçadas com tela apagada e aparelho frio, mantendo rapidez quando há calor ou pressão alta.
 
 [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 
@@ -279,7 +283,8 @@ app/build/outputs/apk/debug/app-debug.apk
 - AdGuardDnsVpnService.java — túnel DNS local por aplicativo.
 - DnsFirewallActivity.java — configuração do firewall DNS.
 - CellularSignalOptimizer.java — comparação de tecnologias móveis.
-- SignalOptimizerActivity.java — configuração do otimizador de sinal.
+- SignalOptimizerActivity.java — configuração do otimizador de sinal e economia GPS.
+- LocationBatteryController.java — limitação/restauração de localização em segundo plano.
 - CpuPressureController.java — controle de pressão de CPU.
 - SystemBatteryController.java — bateria, repouso e wakeups.
 - ExtendedDiagnosticsController.java — diagnósticos avançados.

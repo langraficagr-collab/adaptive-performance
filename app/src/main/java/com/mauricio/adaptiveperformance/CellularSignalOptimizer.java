@@ -6,8 +6,8 @@ import java.util.*;
 import java.util.regex.*;
 
 public final class CellularSignalOptimizer {
-    private static final long TEST_SETTLE_MS = 20_000L;
-    private static final long DEFAULT_COOLDOWN_MS = 30L * 60L * 1000L;
+    private static final long TEST_SETTLE_MS = 10_000L;
+    private static final long DEFAULT_COOLDOWN_MS = 5L * 60L * 1000L;
 
     // Android TelephonyManager network bitmasks.
     private static final long GPRS = 1L;
@@ -42,12 +42,14 @@ public final class CellularSignalOptimizer {
         long now = System.currentTimeMillis();
         try {
             String phase = p.getString("signal_optimizer_phase", "idle");
-            long interval = Math.max(2, Math.min(30, p.getInt("signal_optimizer_interval_min", 5))) * 60_000L;
+            long interval = Math.max(1, Math.min(30, p.getInt("signal_optimizer_interval_min", 1))) * 60_000L;
             boolean force = p.getBoolean("signal_optimizer_force_check", false);
             long last = p.getLong("signal_optimizer_last_check", 0L);
             boolean testing = "testing".equals(phase);
-            if (!testing && !force && (now - last < interval
+            boolean confirmingWeak = p.getInt("signal_optimizer_weak_confirm", 0) > 0;
+            if (!testing && !confirmingWeak && !force && (now - last < interval
                     || now < p.getLong("signal_optimizer_cooldown_until", 0L))) return;
+            if (confirmingWeak && !force && now - last < 10_000L) return;
 
             if (callActive(s)) {
                 p.edit().putString("signal_optimizer_status", "Pausado: chamada em andamento").apply();
@@ -84,9 +86,9 @@ public final class CellularSignalOptimizer {
 
             int confirm = p.getInt("signal_optimizer_weak_confirm", 0) + 1;
             if (confirm < 2) {
-                // Confirma novamente em ~30 s para não reagir a uma queda transitória.
+                // Confirma novamente em ~10 s para não reagir a uma queda transitória.
                 p.edit().putInt("signal_optimizer_weak_confirm", confirm)
-                        .putLong("signal_optimizer_last_check", now - interval + 30_000L)
+                        .putLong("signal_optimizer_last_check", now - interval + 10_000L)
                         .putString("signal_optimizer_status",
                                 "Sinal baixo detectado; confirmando antes de trocar a rede…").apply();
                 return;
@@ -202,7 +204,7 @@ public final class CellularSignalOptimizer {
         p.edit().putInt("signal_optimizer_candidate_index", idx + 1)
                 .putLong("signal_optimizer_candidate_applied_at", now)
                 .putString("signal_optimizer_testing_mode", c.name)
-                .putString("signal_optimizer_status", "Testando " + c.name + " por 20 s…")
+                .putString("signal_optimizer_status", "Testando " + c.name + " por 10 s…")
                 .apply();
     }
 
@@ -213,7 +215,7 @@ public final class CellularSignalOptimizer {
         long original = p.getLong("signal_optimizer_original_mask", 0L);
         boolean applied = slot >= 0 && best > 0 && safeSetCandidate(s, slot, best, original);
 
-        long cooldown = Math.max(10, Math.min(120, p.getInt("signal_optimizer_cooldown_min", 30))) * 60_000L;
+        long cooldown = Math.max(5, Math.min(120, p.getInt("signal_optimizer_cooldown_min", 5))) * 60_000L;
         p.edit()
                 .putBoolean("signal_optimizer_changed", applied && best != original)
                 .putString("signal_optimizer_phase", "idle")

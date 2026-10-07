@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 60
-        versionName = "1.8.2-idle-battery"
+        versionCode = 61
+        versionName = "1.8.3-gps-radio"
     }
 
     buildTypes {

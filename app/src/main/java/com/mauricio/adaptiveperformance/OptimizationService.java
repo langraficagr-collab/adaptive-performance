@@ -261,6 +261,8 @@ public class OptimizationService extends Service {
                         long fallback = (pm != null && pm.isInteractive()) ? 60_000L : 300_000L;
                         long delay = nextLoopDelayMs >= 3_000L && nextLoopDelayMs <= 900_000L
                                 ? nextLoopDelayMs : fallback;
+                        if ("testing".equals(prefs.getString("signal_optimizer_phase", "idle")))
+                            delay = Math.min(delay, 10_000L);
                         handler.postDelayed(loop, delay);
                     }
                 }
@@ -504,6 +506,9 @@ public class OptimizationService extends Service {
         }
         try {
             CellularSignalOptimizer.evaluate(this, prefs, privileged);
+        } catch (Throwable ignored) {}
+        try {
+            LocationBatteryController.evaluate(prefs, privileged, interactive, chargingNow);
         } catch (Throwable ignored) {}
         final boolean mutationsAllowed = AdaptiveIntelligenceController.mutationAllowed(prefs);
 
@@ -1293,6 +1298,7 @@ public class OptimizationService extends Service {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP_OPTIMIZATION.equals(action)) {
+            try { LocationBatteryController.restore(prefs, privileged); } catch (Throwable ignored) {}
             prefs.edit()
                     .putBoolean("master", false)
                     .putBoolean("service_running", false)
@@ -1783,6 +1789,9 @@ public class OptimizationService extends Service {
                         prefs.edit().putLong(key, 0L).apply();
                     }
                     restoreExpiredCauseInactivity();
+                }
+                if (privilegedRef != null) {
+                    try { LocationBatteryController.restore(prefs, privilegedRef); } catch (Throwable ignored) {}
                 }
                 if (sbc != null && privilegedRef != null) {
                     try { sbc.restoreAll(); } catch (Throwable ignored) {}

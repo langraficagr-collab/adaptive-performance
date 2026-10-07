@@ -15,6 +15,7 @@ import java.util.regex.*;
 public class BackgroundMaintenance {
     private static final long BATTERY_INTERVAL = 30L * 60L * 1000L;
     private static final long BG_SCAN_INTERVAL = 10L * 60L * 1000L;
+    private static final long RAM_SCAN_INTERVAL = 60_000L;
     private static final long UNUSED_SCAN_INTERVAL = 6L * 60L * 60L * 1000L;
     private static final long UNUSED_AGE = 3L * 24L * 60L * 60L * 1000L;
     private static final double HOT_CPU = 30.0;
@@ -24,6 +25,7 @@ public class BackgroundMaintenance {
     private final IPrivilegedService privileged;
     private final PackageManager pm;
     private final Map<String,Integer> hotCounts = new HashMap<>();
+    private final Map<String,Integer> highRamCounts = new HashMap<>();
 
     public BackgroundMaintenance(Context context, SharedPreferences prefs, IPrivilegedService privileged) {
         this.context = context.getApplicationContext();
@@ -68,6 +70,14 @@ public class BackgroundMaintenance {
             if (now - lastBg >= BG_SCAN_INTERVAL) {
                 try { scanBackgroundAnomalies(foregroundPackage); } catch (Throwable t) { log("Falha na verificação de segundo plano: " + shortErr(t)); }
                 prefs.edit().putLong("last_bg_scan", now).apply();
+            }
+        }
+
+        if (prefs.getBoolean("app_ram_limiter_enabled", false)) {
+            long lastRam = prefs.getLong("last_app_ram_scan", 0);
+            if (now - lastRam >= RAM_SCAN_INTERVAL) {
+                try { scanHighRamApps(foregroundPackage); } catch (Throwable t) { log("Falha no limitador de RAM: " + shortErr(t)); }
+                prefs.edit().putLong("last_app_ram_scan", now).apply();
             }
         }
 
@@ -178,6 +188,59 @@ public class BackgroundMaintenance {
 
         for (String pkg : new ArrayList<>(hotCounts.keySet())) {
             if (!hotNow.contains(pkg)) hotCounts.remove(pkg);
+        }
+    }
+
+    private void scanHighRamApps(String foregroundPackage) throws Exception {
+        int defaultLimitMb = Math.max(100, Math.min(1500, prefs.getInt("app_ram_limit_mb", 500)));
+        Set<String> thirdParty = thirdPartyPackages();
+        String raw = privileged.exec("ps -A -o RSS,ARGS 2>/dev/null");
+        if (raw == null || raw.isEmpty()) return;
+
+        Map<String,Long> rssByPkg = new HashMap<>();
+        Pattern row = Pattern.compile("^\\s*(\\d+)\\s+([^\\s]+)", Pattern.MULTILINE);
+        Matcher m = row.matcher(raw);
+        while (m.find()) {
+            long rss;
+            try { rss = Long.parseLong(m.group(1)); } catch (Exception e) { continue; }
+            String proc = m.group(2);
+            String pkg = proc.contains(":") ? proc.substring(0, proc.indexOf(':')) : proc;
+            if (!thirdParty.contains(pkg)) continue;
+            rssByPkg.put(pkg, rssByPkg.getOrDefault(pkg, 0L) + rss);
+        }
+
+        Set<String> highNow = new HashSet<>();
+        for (Map.Entry<String,Long> e : rssByPkg.entrySet()) {
+            String pkg = e.getKey();
+            long rssKb = e.getValue();
+            int limitMb = SmartRecommendationSuite.ramLimitFor(prefs, pkg, defaultLimitMb);
+            long limitKb = limitMb * 1024L;
+            if (rssKb < limitKb) continue;
+            if (pkg.equals(foregroundPackage) || isProtected(pkg) || hasForegroundService(pkg)) continue;
+            highNow.add(pkg);
+            int count = highRamCounts.getOrDefault(pkg, 0) + 1;
+            highRamCounts.put(pkg, count);
+
+            if (count == 1) {
+                RestrictionGuard.command(privileged, "am set-standby-bucket " + pkg + " restricted");
+                log("RAM alta: " + label(pkg) + " — " + (rssKb / 1024L) + " MB; standby restrito aplicado.");
+            } else if (count >= 2) {
+                if (!RestrictionGuard.claim(prefs, pkg, "ram_limiter", "RAM excessiva")) continue;
+                boolean stopped = RestrictionGuard.command(privileged, "am force-stop --user 0 " + pkg);
+                RestrictionGuard.release(prefs, pkg, "ram_limiter");
+                if (stopped) {
+                    prefs.edit()
+                            .putString("app_ram_limiter_last_pkg", pkg)
+                            .putLong("app_ram_limiter_last_mb", rssKb / 1024L)
+                            .putLong("app_ram_limiter_last_at", System.currentTimeMillis())
+                            .apply();
+                    log("RAM excessiva: " + label(pkg) + " finalizado após 2 verificações — " + (rssKb / 1024L) + " MB.");
+                    highRamCounts.remove(pkg);
+                }
+            }
+        }
+        for (String pkg : new ArrayList<>(highRamCounts.keySet())) {
+            if (!highNow.contains(pkg)) highRamCounts.remove(pkg);
         }
     }
 

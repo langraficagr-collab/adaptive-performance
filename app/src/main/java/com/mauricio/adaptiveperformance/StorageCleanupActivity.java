@@ -15,6 +15,7 @@ public class StorageCleanupActivity extends Activity {
     private TextView status, summary, largeFiles, trimPercent;
     private ProgressBar trimProgress;
     private Switch cacheSw, thumbsSw, partialSw, apkSw, diagSw, emptySw;
+    private Switch logsSw, staleSw, editorTempSw, dexCacheSw;
     private static final int BG=Color.rgb(6,16,25), CARD=Color.rgb(12,30,43), BORDER=Color.rgb(35,72,92), TEXT=Color.rgb(239,247,255), MUTED=Color.rgb(150,174,194), CYAN=Color.rgb(49,190,255), GREEN=Color.rgb(75,230,125);
 
     @Override protected void onCreate(Bundle b){
@@ -45,6 +46,10 @@ public class StorageCleanupActivity extends Activity {
         apkSw=sw("Instaladores APK antigos (mais de 7 dias)",false); options.addView(apkSw);
         diagSw=sw("Diagnósticos antigos do Adaptive Performance",true); options.addView(diagSw);
         emptySw=sw("Pastas vazias dentro de Downloads",true); options.addView(emptySw);
+        logsSw=sw("Logs e relatórios de falha antigos acessíveis (>7 dias)",true); options.addView(logsSw);
+        staleSw=sw("Arquivos .log / .bak / .old antigos em Downloads (>14 dias)",false); options.addView(staleSw);
+        editorTempSw=sw("Resíduos temporários de editores em Downloads (>7 dias)",true); options.addView(editorTempSw);
+        dexCacheSw=sw("Caches temporários de compilação do Android (somente se permitido)",false); options.addView(dexCacheSw);
         TextView note=t("Não são apagados automaticamente: fotos, vídeos, músicas, documentos, backups ou arquivos grandes encontrados na análise.",12,MUTED,false); note.setPadding(0,dp(10),0,0); options.addView(note);
         Button clean=btn("Limpar categorias selecionadas"); clean.setOnClickListener(v->confirmClean()); options.addView(clean);
         LinearLayout trimBox=card();
@@ -85,7 +90,9 @@ public class StorageCleanupActivity extends Activity {
     private void requestClean(){
         Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_CLEAN)
                 .putExtra("cache",cacheSw.isChecked()).putExtra("thumbs",thumbsSw.isChecked()).putExtra("partial",partialSw.isChecked())
-                .putExtra("apk",apkSw.isChecked()).putExtra("diag",diagSw.isChecked()).putExtra("empty",emptySw.isChecked());
+                .putExtra("apk",apkSw.isChecked()).putExtra("diag",diagSw.isChecked()).putExtra("empty",emptySw.isChecked())
+                .putExtra("logs",logsSw.isChecked()).putExtra("stale",staleSw.isChecked())
+                .putExtra("editorTemp",editorTempSw.isChecked()).putExtra("dexCache",dexCacheSw.isChecked());
         startForegroundService(i); status.setText("Limpando…");
     }
 

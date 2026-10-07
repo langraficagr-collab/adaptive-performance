@@ -82,6 +82,7 @@ public final class AdvancedAdaptiveController {
     private long lastThermalChangeElapsed = 0L;
     private long lastMemoryReliefElapsed = 0L;
     private long lastMemoryCompactionElapsed = 0L;
+    private boolean autoMemoryThermalPaused = false;
     private long lastScreenOffSweepElapsed = 0L;
     private long lastAnomalyScanElapsed = 0L;
     private long lastStorageNoticeElapsed = 0L;
@@ -145,7 +146,7 @@ public final class AdvancedAdaptiveController {
             maybeScanWakeupsAndNetwork(foregroundPackage, now);
             maybeNotifyStorage(r.storageFreePct, now);
         }
-        maybeCompactMemory(ramFreePct, now);
+        maybeCompactMemory(ramFreePct, controlTemp, batteryTemp, now);
 
         prefs.edit()
                 .putFloat("temp_trend_c_min", r.tempTrendCPerMin)
@@ -470,15 +471,71 @@ public final class AdvancedAdaptiveController {
         return sb.toString();
     }
 
-    private void maybeCompactMemory(double ramFreePct, long now) {
+    private void maybeCompactMemory(double ramFreePct, float controlTemp, float batteryTemp, long now) {
         if (!prefs.getBoolean("memory_compaction_enabled", true)) return;
         if (prefs.getBoolean("diagnostic_only", false)) return;
         if (ramFreePct <= 0) return;
 
         int threshold = prefs.getInt("memory_compaction_threshold_pct", 50);
         threshold = Math.max(50, Math.min(95, threshold));
+
+        String zramProfile = prefs.getString("zram_profile", "normal");
+        String effectiveProfile = zramProfile;
+        long compactionCooldown;
+
+        if ("auto".equals(zramProfile)) {
+            // No automático o ciclo é fixo em 30→50% e protegido pela temperatura.
+            threshold = 50;
+            float hottest = Math.max(controlTemp, batteryTemp);
+
+            if (autoMemoryThermalPaused) {
+                if (hottest <= 36.0f) {
+                    autoMemoryThermalPaused = false;
+                } else {
+                    prefs.edit()
+                            .putBoolean("auto_memory_thermal_paused", true)
+                            .putString("auto_memory_effective_profile", "pausado")
+                            .putFloat("auto_memory_temperature_c", hottest)
+                            .apply();
+                    return;
+                }
+            }
+            if (hottest >= 40.0f) {
+                autoMemoryThermalPaused = true;
+                prefs.edit()
+                        .putBoolean("auto_memory_thermal_paused", true)
+                        .putString("auto_memory_effective_profile", "pausado")
+                        .putFloat("auto_memory_temperature_c", hottest)
+                        .apply();
+                return;
+            }
+
+            // RAM muito baixa = máxima compactação; conforme recupera RAM, reduz a agressividade.
+            if (ramFreePct <= 30.0) effectiveProfile = "extreme";
+            else if (ramFreePct <= 40.0) effectiveProfile = "maximum";
+            else if (ramFreePct <= 50.0) effectiveProfile = "normal";
+            else return;
+
+            // Ao esquentar, desce um nível antes de precisar pausar completamente.
+            if (hottest >= 38.0f) {
+                if ("extreme".equals(effectiveProfile)) effectiveProfile = "maximum";
+                else if ("maximum".equals(effectiveProfile)) effectiveProfile = "normal";
+                else return;
+            }
+            compactionCooldown = "extreme".equals(effectiveProfile) ? 30_000L
+                    : ("maximum".equals(effectiveProfile) ? 45_000L : MEMORY_COMPACTION_COOLDOWN_MS);
+            prefs.edit()
+                    .putBoolean("auto_memory_thermal_paused", false)
+                    .putString("auto_memory_effective_profile", effectiveProfile)
+                    .putFloat("auto_memory_temperature_c", hottest)
+                    .apply();
+        } else {
+            compactionCooldown = "extreme".equals(zramProfile) ? 30_000L
+                    : ("maximum".equals(zramProfile) ? 45_000L : MEMORY_COMPACTION_COOLDOWN_MS);
+        }
+
         if (ramFreePct > threshold) return;
-        if (now - lastMemoryCompactionElapsed < MEMORY_COMPACTION_COOLDOWN_MS) return;
+        if (now - lastMemoryCompactionElapsed < compactionCooldown) return;
 
         lastMemoryCompactionElapsed = now;
         try {
@@ -499,8 +556,8 @@ public final class AdvancedAdaptiveController {
                     .apply();
 
             String msg = String.format(Locale.US,
-                    "Compactação de RAM em %d%%: %s (RAM livre %.1f%%)",
-                    threshold, ok ? "concluída" : "falhou", ramFreePct);
+                    "Compactação de RAM [%s] em %d%%: %s (RAM livre %.1f%%)",
+                    effectiveProfile, threshold, ok ? "concluída" : "falhou", ramFreePct);
             log(msg);
             if (ok) {
                 ChangeNotifier.notifyChange(context, "Compactação de RAM", msg, 4);
@@ -521,8 +578,22 @@ public final class AdvancedAdaptiveController {
         if (!AdaptiveIntelligenceController.mutationAllowed(prefs)) return;
         if (!prefs.getBoolean("critical_cleanup", true)) return;
         boolean aggressive = prefs.getBoolean("aggressive_memory_cleanup", false);
-        double moderateThreshold = aggressive ? 20.0 : 10.0;
-        double severeThreshold = aggressive ? 10.0 : 6.0;
+        String zramProfile = prefs.getString("zram_profile", "normal");
+        double moderateThreshold;
+        double severeThreshold;
+        if ("auto".equals(zramProfile)) {
+            moderateThreshold = 30.0;
+            severeThreshold = 15.0;
+        } else if ("extreme".equals(zramProfile)) {
+            moderateThreshold = 30.0;
+            severeThreshold = 15.0;
+        } else if ("maximum".equals(zramProfile) || aggressive) {
+            moderateThreshold = 20.0;
+            severeThreshold = 10.0;
+        } else {
+            moderateThreshold = 10.0;
+            severeThreshold = 6.0;
+        }
         boolean severe = (ramFreePct > 0 && ramFreePct < severeThreshold) || memoryPsi >= 18f;
         boolean moderate = (ramFreePct > 0 && ramFreePct < moderateThreshold) || memoryPsi >= 8f;
         if (!moderate || now - lastMemoryReliefElapsed < MEMORY_RELIEF_COOLDOWN_MS) return;

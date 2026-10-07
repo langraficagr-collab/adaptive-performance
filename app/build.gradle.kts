@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 39
-        versionName = "1.4.14-noads"
+        versionCode = 47
+        versionName = "1.5.0-noads-smart-suite"
     }
 
     buildTypes {

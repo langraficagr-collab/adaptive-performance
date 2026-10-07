@@ -20,9 +20,13 @@ public class MainActivity extends Activity {
     private TextView thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto;
     private Switch autoRepairSwitch, effectivenessSwitch, profilesSwitch, restrictionGuardSwitch, emergencySwitch, startupSwitch;
     private Switch refreshSwitch, cleanupSwitch, aggressiveMemorySwitch, bugCleanupSwitch, unusedRestrictSwitch, cpuPressureSwitch, manualFreezeSwitch, notifySwitch;
-    private Switch memoryCompactionSwitch;
+    private Switch memoryCompactionSwitch, appRamLimiterSwitch;
+    private SeekBar appRamLimitSeekBar;
+    private TextView appRamLimitLabel;
     private TextView memoryCompactionLabel;
     private SeekBar memoryCompactionSeekBar;
+    private Spinner zramProfileSpinner;
+    private TextView zramProfileHint;
     private Switch advancedAdaptiveSwitch, screenOffSwitch, wakeupGuardSwitch;
     private Switch healthGuardSwitch, autoCalibrationSwitch, appLearningSwitch, antiStallSwitch, historySwitch, rollbackSwitch, crashLoopSwitch;
     private Switch extendedDiagnosticsSwitch, thermalPredictionSwitch, diagnosticBurstSwitch, adaptiveAggressivenessSwitch, abTestingSwitch, sensorModemSwitch, storageGuardSwitch, duplicateDetectionSwitch, safeModeManualSwitch;
@@ -524,6 +528,65 @@ public class MainActivity extends Activity {
                 prefs.getInt("memory_compaction_threshold_pct", 50)));
         memoryCompactionSeekBar.setProgress(compactionThreshold - 50);
         memoryCompactionLabel.setText("Compactar quando RAM livre ≤ " + compactionThreshold + "%");
+
+        TextView zramProfileTitle = text("Perfil de ZRAM", 13, TEXT, true);
+        zramProfileTitle.setPadding(dp(12), dp(12), dp(8), dp(2));
+        zramProfileSpinner = new Spinner(this);
+        String[] zramProfiles = {"Normal", "Máxima", "Extrema", "Automático"};
+        ArrayAdapter<String> zramAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, zramProfiles);
+        zramAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        zramProfileSpinner.setAdapter(zramAdapter);
+        String savedZramProfile = prefs.getString("zram_profile", "normal");
+        // Migração das opções antigas para os três perfis simplificados.
+        if ("aggressive".equals(savedZramProfile) || "zstd1".equals(savedZramProfile)
+                || "zstd3".equals(savedZramProfile) || "zstd6".equals(savedZramProfile)) {
+            savedZramProfile = "maximum";
+        } else if ("extreme".equals(savedZramProfile)
+                || "zstd19".equals(savedZramProfile) || "zstd22".equals(savedZramProfile)) {
+            savedZramProfile = "extreme";
+        }
+        int zramSelection = "auto".equals(savedZramProfile) ? 3
+                : ("extreme".equals(savedZramProfile) ? 2
+                : ("maximum".equals(savedZramProfile) ? 1 : 0));
+        zramProfileSpinner.setSelection(zramSelection, false);
+        zramProfileHint = text(zramProfileDescription(savedZramProfile), 12, MUTED, false);
+        zramProfileHint.setPadding(dp(12), dp(2), dp(8), dp(6));
+
+        TextView smartTitle = text("Automação inteligente recomendada", 16, TEXT, true);
+        smartTitle.setPadding(dp(12), dp(16), dp(8), dp(4));
+        c.addView(smartTitle);
+        Switch smartSuiteSwitch = actionSwitch("Modo automático geral: RAM + PSI + temperatura + bateria", "smart_suite_enabled", true);
+        Switch smartCleanupSwitch = actionSwitch("Limpeza automática com pouco armazenamento e tela apagada", "smart_auto_cleanup", false);
+        Switch adaptiveFreezeSwitch = actionSwitch("Congelamento adaptativo de apps ociosos/restritos", "adaptive_freeze_enabled", false);
+        Switch recurrenceSwitch = actionSwitch("Detectar processos que reiniciam repetidamente", "restart_recurrence_guard", true);
+        Switch lowBatterySwitch = actionSwitch("Modo automático de bateria baixa (≤25%)", "low_battery_adaptive", true);
+        Switch thrashSwitch = actionSwitch("Proteção contra thrashing da ZRAM/swap", "zram_thrash_guard", true);
+        Switch psiSmartSwitch = actionSwitch("Usar PSI real de CPU, memória e I/O nas decisões", "advanced_adaptive", true);
+        Switch perAppProfileSwitch = actionSwitch("Perfis automáticos Econômico/Balanceado/Desempenho por app", "app_profiles", true);
+        Switch leak2Switch = actionSwitch("Detector de vazamento de RAM por tendência", "memory_leak_detector", true);
+        Switch thermalSmartSwitch = actionSwitch("Controle térmico adaptativo gradual", "thermal_prediction", true);
+        for (Switch x : new Switch[]{smartSuiteSwitch,smartCleanupSwitch,adaptiveFreezeSwitch,recurrenceSwitch,lowBatterySwitch,
+                thrashSwitch,psiSmartSwitch,perAppProfileSwitch,leak2Switch,thermalSmartSwitch}) c.addView(x);
+        Button economyDashboard = actionButton("Painel de economia e automação");
+        economyDashboard.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Economia e automação")
+                .setMessage(prefs.getString("economy_dashboard","Aguardando dados do monitor…")+"\n\n"+
+                        "Reinício recorrente: "+prefs.getString("restart_recurrence_pkg","nenhum")+" ("+
+                        prefs.getInt("restart_recurrence_count",0)+")\n"+
+                        "Swap: "+String.format(Locale.US,"%.0f páginas/s",prefs.getFloat("zram_swap_pages_sec",0))+
+                        (prefs.getBoolean("zram_thrashing",false)?" • THRASHING":""))
+                .setPositiveButton("Fechar",null).show());
+        c.addView(economyDashboard);
+
+        appRamLimiterSwitch = actionSwitch("Limitar apps em segundo plano com RAM excessiva (limite individual suportado)", "app_ram_limiter_enabled", false);
+        appRamLimitLabel = text("", 12, MUTED, false);
+        appRamLimitLabel.setPadding(dp(12), dp(4), dp(8), 0);
+        appRamLimitSeekBar = new SeekBar(this);
+        appRamLimitSeekBar.setMax(1400); // 100–1500 MB
+        int appRamLimitMb = Math.max(100, Math.min(1500, prefs.getInt("app_ram_limit_mb", 500)));
+        appRamLimitSeekBar.setProgress(appRamLimitMb - 100);
+        appRamLimitLabel.setText("Limite por app em segundo plano: " + appRamLimitMb + " MB");
+
         aggressiveMemorySwitch = actionSwitch("Modo RAM agressivo: agir quando RAM livre < 20%","aggressive_memory_cleanup",false);
         bugCleanupSwitch = actionSwitch("Finalizar apps anormais travados em segundo plano","auto_bug_cleanup",true);
         unusedRestrictSwitch = actionSwitch("Restringir apps sem uso há mais de 3 dias","auto_unused_restrict",true);
@@ -574,6 +637,32 @@ public class MainActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar bar) {}
             @Override public void onStopTrackingTouch(SeekBar bar) {}
         });
+        zramProfileSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String profile = position == 3 ? "auto" : (position == 2 ? "extreme" : (position == 1 ? "maximum" : "normal"));
+                prefs.edit()
+                        .putString("zram_profile", profile)
+                        .putInt("zstd_requested_level",
+                                "extreme".equals(profile) ? 19 : ("maximum".equals(profile) ? 1 : ("auto".equals(profile) ? 19 : 0)))
+                        .apply();
+                if (zramProfileHint != null) zramProfileHint.setText(zramProfileDescription(profile));
+                boolean aggressiveMode = !"normal".equals(profile);
+                if (aggressiveMemorySwitch != null && aggressiveMemorySwitch.isChecked() != aggressiveMode) {
+                    aggressiveMemorySwitch.setChecked(aggressiveMode);
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        appRamLimiterSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("app_ram_limiter_enabled",v).apply());
+        appRamLimitSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                int mb = 100 + progress;
+                appRamLimitLabel.setText("Limite por app em segundo plano: " + mb + " MB");
+                if (fromUser) prefs.edit().putInt("app_ram_limit_mb", mb).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
         aggressiveMemorySwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("aggressive_memory_cleanup",v).apply());
         bugCleanupSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("auto_bug_cleanup",v).apply());
         unusedRestrictSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("auto_unused_restrict",v).apply());
@@ -615,7 +704,10 @@ public class MainActivity extends Activity {
             if(v) ChangeNotifier.notifyChange(this,"Notificações ativadas","O Adaptive Performance avisará sobre mudanças importantes.",9);
         });
 
-        c.addView(refreshSwitch); c.addView(cleanupSwitch); c.addView(memoryCompactionSwitch); c.addView(memoryCompactionLabel); c.addView(memoryCompactionSeekBar); c.addView(aggressiveMemorySwitch); c.addView(bugCleanupSwitch);
+        c.addView(refreshSwitch); c.addView(cleanupSwitch); c.addView(memoryCompactionSwitch); c.addView(memoryCompactionLabel); c.addView(memoryCompactionSeekBar);
+        c.addView(zramProfileTitle); c.addView(zramProfileSpinner); c.addView(zramProfileHint);
+        c.addView(appRamLimiterSwitch); c.addView(appRamLimitLabel); c.addView(appRamLimitSeekBar);
+        c.addView(aggressiveMemorySwitch); c.addView(bugCleanupSwitch);
         c.addView(unusedRestrictSwitch); c.addView(cpuPressureSwitch);
         c.addView(advancedAdaptiveSwitch); c.addView(screenOffSwitch); c.addView(wakeupGuardSwitch);
         c.addView(healthGuardSwitch); c.addView(autoCalibrationSwitch); c.addView(appLearningSwitch);
@@ -1151,6 +1243,19 @@ public class MainActivity extends Activity {
         super.onPause();
     }
 
+    private String zramProfileDescription(String profile) {
+        if ("auto".equals(profile)) {
+            return "Automático: Extrema com ≤30% de RAM livre, reduz para Máxima e Normal até 50%. Reduz com calor, pausa a 40 °C e retoma após normalizar em ≤36 °C.";
+        }
+        if ("extreme".equals(profile)) {
+            return "Extrema: referência ZSTD-19/22, maior compactação no teste de 512 MB (2,641×). Maior custo de CPU; fallback seguro se o kernel bloquear ZSTD.";
+        }
+        if ("maximum".equals(profile)) {
+            return "Máxima: referência ZSTD-1, quase a mesma compactação do máximo com muito menos processamento.";
+        }
+        return "Normal: equilíbrio entre RAM disponível, CPU e bateria.";
+    }
+
     private void unloadActionsSection() {
         autoRepairSwitch = effectivenessSwitch = profilesSwitch = restrictionGuardSwitch = emergencySwitch = startupSwitch = null;
         if (!actionsBuilt || content == null) return;
@@ -1158,6 +1263,7 @@ public class MainActivity extends Activity {
         if (idx >= 0 && idx < content.getChildCount()) content.removeViewAt(idx);
         refreshSwitch = cleanupSwitch = aggressiveMemorySwitch = bugCleanupSwitch = unusedRestrictSwitch = cpuPressureSwitch = null;
         memoryCompactionSwitch = null; memoryCompactionLabel = null; memoryCompactionSeekBar = null;
+        zramProfileSpinner = null; zramProfileHint = null;
         manualFreezeSwitch = notifySwitch = advancedAdaptiveSwitch = screenOffSwitch = wakeupGuardSwitch = null;
         healthGuardSwitch = autoCalibrationSwitch = appLearningSwitch = antiStallSwitch = historySwitch = null;
         rollbackSwitch = crashLoopSwitch = extendedDiagnosticsSwitch = thermalPredictionSwitch = diagnosticBurstSwitch = null;

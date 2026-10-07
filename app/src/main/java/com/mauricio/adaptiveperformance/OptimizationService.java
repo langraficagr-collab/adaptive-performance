@@ -458,6 +458,19 @@ public class OptimizationService extends Service {
                 effectivePressure = Math.max(basePressure, effectivePressure - 1);
         }
         final int adaptivePressureScore = effectivePressure;
+        int smartBatteryPct = -1;
+        try {
+            android.content.Intent bi = registerReceiver(null, new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
+            if (bi != null) {
+                int bl = bi.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                int bs = bi.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100);
+                if (bl >= 0 && bs > 0) smartBatteryPct = Math.round(bl * 100f / bs);
+            }
+        } catch (Throwable ignored) {}
+        try {
+            SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
+                    smartBatteryPct, controlTemp, adaptivePressureScore);
+        } catch (Throwable ignored) {}
         final boolean mutationsAllowed = AdaptiveIntelligenceController.mutationAllowed(prefs);
 
         if (mutationsAllowed && health != null && health.rollbackRequested) {
@@ -826,13 +839,14 @@ public class OptimizationService extends Service {
                 .build();
     }
 
-    private void runStorageTask(String mode, boolean cache, boolean thumbs, boolean partial, boolean apk, boolean diag, boolean empty, int retry) {
+    private void runStorageTask(String mode, boolean cache, boolean thumbs, boolean partial, boolean apk, boolean diag, boolean empty,
+                                boolean logs, boolean stale, boolean editorTemp, boolean dexCache, int retry) {
         prefs.edit().putBoolean("storage_cleanup_busy", true)
                 .putString("storage_cleanup_status", "Preparando " + ("clean".equals(mode) ? "limpeza" : "análise") + "…").apply();
         if (privileged == null) {
             bindShizukuIfPossible();
             if (retry < 8) {
-                handler.postDelayed(() -> runStorageTask(mode, cache, thumbs, partial, apk, diag, empty, retry + 1), 1200L);
+                handler.postDelayed(() -> runStorageTask(mode, cache, thumbs, partial, apk, diag, empty, logs, stale, editorTemp, dexCache, retry + 1), 1200L);
             } else {
                 prefs.edit().putBoolean("storage_cleanup_busy", false)
                         .putString("storage_cleanup_status", "Shizuku indisponível. Abra/autorize o Shizuku e tente novamente.").apply();
@@ -844,7 +858,7 @@ public class OptimizationService extends Service {
             try {
                 if ("scan".equals(mode)) storageScan();
                 else if ("large".equals(mode)) storageLargeScan();
-                else storageClean(cache, thumbs, partial, apk, diag, empty);
+                else storageClean(cache, thumbs, partial, apk, diag, empty, logs, stale, editorTemp, dexCache);
             } catch (Throwable t) {
                 prefs.edit().putString("storage_cleanup_status", "Falha: " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage())).apply();
             } finally {
@@ -1016,7 +1030,8 @@ public class OptimizationService extends Service {
         });
     }
 
-    private void storageClean(boolean cache, boolean thumbs, boolean partial, boolean apk, boolean diag, boolean empty) throws Exception {
+    private void storageClean(boolean cache, boolean thumbs, boolean partial, boolean apk, boolean diag, boolean empty,
+                              boolean logs, boolean stale, boolean editorTemp, boolean dexCache) throws Exception {
         prefs.edit().putString("storage_cleanup_status", "Limpando categorias selecionadas…").apply();
         long before = dataFreeKb();
         ArrayList<String> done = new ArrayList<>();
@@ -1046,6 +1061,23 @@ public class OptimizationService extends Service {
             privileged.exec("find /sdcard/Download -mindepth 1 -maxdepth 2 -type d -empty -delete 2>/dev/null; true");
             done.add("pastas vazias");
         }
+        if (logs) {
+            privileged.exec("find /data/local/tmp -maxdepth 2 -type f \\( -name '*.log' -o -name 'tombstone*' -o -name '*.trace' \\) -mtime +7 -delete 2>/dev/null; true");
+            done.add("logs/relatórios antigos");
+        }
+        if (stale) {
+            privileged.exec("find /sdcard/Download -maxdepth 2 -type f \\( -name '*.log' -o -name '*.bak' -o -name '*.old' \\) -mtime +14 -delete 2>/dev/null; true");
+            done.add("arquivos auxiliares antigos");
+        }
+        if (editorTemp) {
+            privileged.exec("find /sdcard/Download -maxdepth 2 -type f \\( -name '*~' -o -name '*.temp' -o -name '*.swp' -o -name '*.swo' \\) -mtime +7 -delete 2>/dev/null; true");
+            done.add("temporários de editores");
+        }
+        if (dexCache) {
+            // Solicita apenas a limpeza suportada pelo Package Manager; não remove APK/dados do usuário.
+            privileged.exec("pm trim-caches 512G 2>/dev/null; true");
+            done.add("caches temporários do Android");
+        }
         try { Thread.sleep(700L); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
         long after = dataFreeKb();
         long freed = Math.max(0L, after - before);
@@ -1068,11 +1100,11 @@ public class OptimizationService extends Service {
         }
 
         if (ACTION_STORAGE_SCAN.equals(action)) {
-            runStorageTask("scan", false,false,false,false,false,false, 0);
+            runStorageTask("scan", false,false,false,false,false,false,false,false,false,false, 0);
             return START_STICKY;
         }
         if (ACTION_STORAGE_LARGE_SCAN.equals(action)) {
-            runStorageTask("large", false,false,false,false,false,false, 0);
+            runStorageTask("large", false,false,false,false,false,false,false,false,false,false, 0);
             return START_STICKY;
         }
         if (ACTION_STORAGE_CLEAN.equals(action)) {
@@ -1082,7 +1114,11 @@ public class OptimizationService extends Service {
                     intent.getBooleanExtra("partial", true),
                     intent.getBooleanExtra("apk", false),
                     intent.getBooleanExtra("diag", true),
-                    intent.getBooleanExtra("empty", true), 0);
+                    intent.getBooleanExtra("empty", true),
+                    intent.getBooleanExtra("logs", true),
+                    intent.getBooleanExtra("stale", false),
+                    intent.getBooleanExtra("editorTemp", true),
+                    intent.getBooleanExtra("dexCache", false), 0);
             return START_STICKY;
         }
         if (ACTION_STORAGE_TRIM.equals(action)) {

@@ -15,7 +15,8 @@ public final class SmartRecommendationSuite {
                                 float tempC, int pressureScore) {
         if (!p.getBoolean("smart_suite_enabled", true) || s==null) return;
         long now=System.currentTimeMillis();
-        if(now-lastRun<30_000L) return;
+        long interval = pressureScore >= 4 || tempC >= 40f ? 60_000L : 300_000L;
+        if(now-lastRun<interval) return;
         lastRun=now;
         try { detectSwapThrashing(p,s,now); } catch(Throwable ignored){}
         try { lowBatteryMode(p,batteryPct); } catch(Throwable ignored){}

@@ -74,7 +74,7 @@ public class OptimizationService extends Service {
     private DeepSleepController deepSleepController;
     private ThermalBrightnessController thermalBrightnessController;
     private SystemBatteryController systemBatteryController;
-    private volatile long nextLoopDelayMs = 12000L;
+    private volatile long nextLoopDelayMs = 60000L;
     private final ExecutorService maintenanceExecutor = idleSingleExecutor("maintenance");
     private final AtomicBoolean maintenanceBusy = new AtomicBoolean(false);
     private final ExecutorService cpuPressureExecutor = idleSingleExecutor("cpu");
@@ -102,7 +102,7 @@ public class OptimizationService extends Service {
                         .putBoolean("system_deep_idle_active", false)
                         .putBoolean("shizuku_suspended_deep_idle", false)
                         .apply();
-                nextLoopDelayMs = 3_000L;
+                nextLoopDelayMs = 5_000L;
                 lastShizukuBindAttemptElapsed = 0L;
                 bindShizukuIfPossible();
             }
@@ -239,7 +239,7 @@ public class OptimizationService extends Service {
                     sampleBusy.set(false);
                     if (!serviceDestroyed && prefs.getBoolean("master", true)) {
                         PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
-                        long fallback = (pm != null && pm.isInteractive()) ? 15_000L : 300_000L;
+                        long fallback = (pm != null && pm.isInteractive()) ? 60_000L : 300_000L;
                         long delay = nextLoopDelayMs >= 3_000L && nextLoopDelayMs <= 900_000L
                                 ? nextLoopDelayMs : fallback;
                         handler.postDelayed(loop, delay);
@@ -278,7 +278,7 @@ public class OptimizationService extends Service {
         if (privileged != null) {
             try {
                 long now = SystemClock.elapsedRealtime();
-                boolean cachedHot = thermalLevelApplied > 0 || cachedThermals.soc >= SOC_LEVEL1_C
+                boolean cachedHot = thermalLevelApplied > 0
                         || tempC >= 38f;
                 long thermalInterval = cachedHot ? 10_000L
                         : (batteryChargingNow ? 20_000L : (interactive ? 45_000L : 60_000L));
@@ -290,7 +290,7 @@ public class OptimizationService extends Service {
                     "for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq; do cat \"$f\" 2>/dev/null; done; " +
                     "echo __SEP__; dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'; ";
                 if (readThermal) {
-                    command += "echo __THERM__; dumpsys thermalservice 2>/dev/null | grep 'Temperature{mValue='";
+                    command += "echo __THERM__; dumpsys thermalservice 2>/dev/null | awk '/Current temperatures from HAL:/{cur=1; next} /Current cooling devices from HAL:/{cur=0} cur && /Temperature\\{mValue=/{print}'";
                 }
 
                 String snap = privileged.exec(command);
@@ -323,7 +323,7 @@ public class OptimizationService extends Service {
         boolean launcherNow = fg == null || fg.isEmpty() || fg.contains("launcher") || fg.contains("miui.home");
         if (interactive && launcherNow && !predictedPkg.isEmpty() && !"DEFAULT".equals(predictedProfile)) {
             profile = "Pré-perfil " + predictedProfile;
-            nextLoopDelayMs = Math.min(nextLoopDelayMs, 15_000L);
+            // A previsão muda apenas o perfil exibido; não deve acelerar o monitoramento normal.
             prefs.edit().putString("time_predicted_pkg", predictedPkg)
                     .putString("time_predicted_profile", predictedProfile).apply();
         }

@@ -104,6 +104,7 @@ public final class AdvancedAdaptiveController {
                            boolean learnedHeavy) {
         Result r = new Result();
         long now = SystemClock.elapsedRealtime();
+        boolean firstThermalObservation = lastObservedThermal < 0;
 
         if (currentThermalLevel != lastObservedThermal) {
             lastObservedThermal = currentThermalLevel;
@@ -128,17 +129,18 @@ public final class AdvancedAdaptiveController {
         int rawTarget = advanced
                 ? thermalTarget(controlTemp, batteryTemp, r.tempTrendCPerMin, power.charging)
                 : legacyThermalTarget(controlTemp);
-        r.thermalTarget = applyThermalHysteresis(rawTarget, currentThermalLevel, controlTemp, now);
+        r.thermalTarget = applyThermalHysteresis(rawTarget, currentThermalLevel, controlTemp, now,
+                firstThermalObservation);
 
         r.profileHint = classifyForeground(foregroundPackage, learnedHeavy, interactive, power.charging,
                 r.pressureScore, r.thermalTarget);
         r.reason = buildReason(r, psi);
 
         if (!interactive) r.nextSampleMs = 60_000L;
-        else if (r.thermalTarget >= 4 || r.pressureScore >= 4) r.nextSampleMs = 6_000L;
-        else if (r.thermalTarget > 0 || r.pressureScore >= 2 || r.tempTrendCPerMin >= 0.8f) r.nextSampleMs = 10_000L;
-        else if (learnedHeavy || isRealtimeForeground(foregroundPackage)) r.nextSampleMs = 15_000L;
-        else r.nextSampleMs = 25_000L;
+        else if (r.thermalTarget >= 4 || r.pressureScore >= 4) r.nextSampleMs = 8_000L;
+        else if (r.thermalTarget > 0 || r.pressureScore >= 2 || r.tempTrendCPerMin >= 0.8f) r.nextSampleMs = 20_000L;
+        else if (learnedHeavy || isRealtimeForeground(foregroundPackage)) r.nextSampleMs = 30_000L;
+        else r.nextSampleMs = 60_000L;
 
         if (advanced) {
             maybeRelieveMemory(ramFreePct, psi.memory, foregroundPackage, now);
@@ -184,7 +186,7 @@ public final class AdvancedAdaptiveController {
     private Psi readPressureSignals(long now) {
         // Pressure sources are intentionally sampled less often than the thermal loop.
         // This prevents the optimizer itself from becoming a source of wakeups/CPU load.
-        if (lastPressureReadElapsed > 0L && now - lastPressureReadElapsed < 20_000L) {
+        if (lastPressureReadElapsed > 0L && now - lastPressureReadElapsed < 60_000L) {
             return cachedPressure;
         }
         lastPressureReadElapsed = now;
@@ -410,7 +412,13 @@ public final class AdvancedAdaptiveController {
         return 0;
     }
 
-    private int applyThermalHysteresis(int requested, int current, float temp, long now) {
+    private int applyThermalHysteresis(int requested, int current, float temp, long now,
+                                       boolean firstObservation) {
+        if (firstObservation) {
+            // Um override persistido não deve prolongar um estado térmico antigo
+            // quando a primeira leitura real já voltou a uma faixa segura.
+            return requested;
+        }
         if (requested >= current) return requested;
         if (current <= 0) return requested;
         if (now - lastThermalChangeElapsed < MIN_THERMAL_HOLD_MS) return current;

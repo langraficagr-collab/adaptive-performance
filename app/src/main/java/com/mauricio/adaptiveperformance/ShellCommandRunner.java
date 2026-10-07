@@ -27,22 +27,13 @@ final class ShellCommandRunner {
                 byte[] buffer = new byte[8192];
                 try {
                     while (!stop.get()) {
-                        int available = stream.available();
-                        if (available > 0) {
-                            int count = stream.read(buffer, 0, Math.min(available, buffer.length));
-                            if (count < 0) break;
-                            synchronized (output) {
-                                int keep = Math.min(count, MAX_OUTPUT_BYTES - output.size());
-                                if (keep > 0) output.write(buffer, 0, keep);
-                            }
-                        } else if (!child.isAlive()) {
-                            break;
-                        } else {
-                            Thread.sleep(10L);
+                        int count = stream.read(buffer);
+                        if (count < 0) break;
+                        synchronized (output) {
+                            int keep = Math.min(count, MAX_OUTPUT_BYTES - output.size());
+                            if (keep > 0) output.write(buffer, 0, keep);
                         }
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                 } catch (java.io.IOException ignored) {
                     // Destruction or closing the pipe can race with a read.
                 }

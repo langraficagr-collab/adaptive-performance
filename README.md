@@ -1,5 +1,7 @@
 # Adaptive Performance
 
+<p align="center"><img src="docs/branding/banner.jpg" alt="Adaptive Performance" width="100%"></p>
+
 **Adaptive Performance** é um utilitário avançado para Android focado em desempenho adaptativo, controle térmico, gerenciamento de RAM/CPU, economia de bateria, limpeza de armazenamento, congelamento de aplicativos, diagnóstico do sistema, firewall DNS por aplicativo e otimização de sinal móvel.
 
 O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para executar operações privilegiadas sem exigir root.

@@ -1,1 +1,64 @@
-<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Adaptive Performance</title><style>body{margin:auto;max-width:1000px;padding:35px;background:#061019;color:#eff7ff;font:17px system-ui}h1{font-size:55px}p{color:#aac0d0;line-height:1.6}.b{display:inline-block;padding:15px 22px;margin:8px;background:#159970;color:white;text-decoration:none;border-radius:14px}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.c{background:#0c1e2b;padding:22px;border-radius:20px}img{max-width:30%;margin:1%;border-radius:18px}@media(max-width:700px){.g{grid-template-columns:1fr}img{max-width:100%}}</style><h1>Sua bateria com uma meta.</h1><p>Defina quanto de bateria você quer ter no fim do dia. O Adaptive Performance aprende seu uso e ajusta automaticamente o Android para tentar atingir essa meta, controlando temperatura, memória e atividades em segundo plano.</p><a class=b href=../releases/latest>Baixar APK</a><a class=b href=..>Código-fonte</a><div class=g><div class=c><h2>Automático que aprende</h2><p>Compara perfis usando bateria, temperatura, CPU e RAM.</p></div><div class=c><h2>Meta de bateria</h2><p>Escolha porcentagem e horário. O app adapta a economia ao orçamento de consumo.</p></div><div class=c><h2>Modo Avançado</h2><p>Controle térmico, zRAM, CPU, limpeza, congelamento e diagnósticos.</p></div></div><h2>Veja o aplicativo</h2><img src=site/home.png><img src=site/cleanup.png><img src=site/signal.png><h2>Android + Shizuku, sem root</h2><p>Código-fonte disponível. Algumas funções dependem do Android, fabricante e permissões concedidas.</p><a class=b href=../releases/latest>Baixar versão mais recente</a>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adaptive Performance — bateria inteligente para Android</title>
+<meta name="description" content="Defina uma meta de bateria. O Adaptive Performance aprende seu uso e ajusta automaticamente o Android para economizar energia, controlar temperatura e reduzir desperdícios em segundo plano.">
+<meta name="theme-color" content="#07131d">
+<meta property="og:title" content="Adaptive Performance — sua bateria com uma meta">
+<meta property="og:description" content="Modo automático com aprendizado, meta de bateria, controle térmico, RAM/zRAM, limpeza e recursos avançados via Shizuku.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://langraficagr-collab.github.io/adaptive-performance/">
+<meta property="og:image" content="https://langraficagr-collab.github.io/adaptive-performance/site/home.png">
+<style>
+:root{--bg:#07131d;--card:#0d2230;--card2:#102b3b;--line:#214b61;--text:#f1f8fc;--muted:#a8c0cf;--cyan:#31bfff;--teal:#35dfc2;--green:#56e48a;--shadow:0 18px 50px rgba(0,0,0,.28)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% -10%,#123e52 0,transparent 32%),var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit}.wrap{width:min(1120px,calc(100% - 36px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}.brand{font-weight:800;letter-spacing:-.3px}.navlinks{display:flex;gap:18px;align-items:center}.navlinks a{text-decoration:none;color:var(--muted)}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding:64px 0 82px}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border:1px solid #1e5d6d;border-radius:999px;background:#0c2832;color:#8eead9;font-size:13px;font-weight:700}.hero h1{font-size:clamp(44px,7vw,76px);line-height:1.02;letter-spacing:-2.7px;margin:18px 0 20px}.hero h1 span{background:linear-gradient(90deg,var(--teal),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{font-size:20px;color:var(--muted);max-width:680px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-weight:800;padding:14px 20px;border-radius:14px;border:1px solid var(--line)}.primary{background:linear-gradient(90deg,#159970,#137fc4);border:0}.secondary{background:#0b1f2c}.fine{font-size:13px;color:#7899aa;margin-top:14px}.phone{justify-self:center;width:min(365px,88vw);border-radius:34px;box-shadow:var(--shadow);border:1px solid #24556b}.section{padding:62px 0}.section h2{font-size:clamp(30px,5vw,48px);letter-spacing:-1.4px;margin:0 0 12px}.lead{color:var(--muted);font-size:18px;max-width:760px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px}.card{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);padding:24px;border-radius:22px;box-shadow:0 10px 28px rgba(0,0,0,.14)}.card b{font-size:19px}.card p{color:var(--muted);margin-bottom:0}.icon{width:42px;height:42px;border-radius:13px;background:#0d4b4e;display:grid;place-items:center;margin-bottom:14px;font-weight:900;color:#63efd7}.goal{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;background:linear-gradient(135deg,#0d2938,#0c1f2c);border:1px solid var(--line);border-radius:28px;padding:32px;margin-top:28px}.goalbox{background:#071923;border:1px solid #275e72;border-radius:20px;padding:22px}.goalrow{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #173848}.goalrow:last-child{border:0}.goalrow span{color:var(--muted)}.shotgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:28px}.shotgrid img{width:100%;border-radius:24px;border:1px solid var(--line);box-shadow:var(--shadow)}.steps{counter-reset:steps}.step{position:relative;padding-left:58px}.step:before{counter-increment:steps;content:counter(steps);position:absolute;left:0;top:0;width:40px;height:40px;border-radius:13px;background:#113a4c;color:#7fe9dc;display:grid;place-items:center;font-weight:900}.cta{text-align:center;padding:48px 24px;background:linear-gradient(135deg,#0e3040,#0b232f);border:1px solid var(--line);border-radius:28px;margin:50px 0}.cta h2{margin-top:0}.footer{border-top:1px solid #173748;color:#7594a5;padding:28px 0 42px;font-size:14px}.badges{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}.badge{background:#0c2532;border:1px solid #21495d;padding:6px 10px;border-radius:999px;color:#a9cad7;font-size:13px}
+@media(max-width:850px){.hero,.goal{grid-template-columns:1fr}.hero{padding-top:38px;text-align:center}.hero p{margin-left:auto;margin-right:auto}.actions,.badges{justify-content:center}.phone{order:-1;width:min(310px,78vw)}.grid,.shotgrid{grid-template-columns:1fr}.navlinks a:not(.btn){display:none}.section{padding:42px 0}.goal{padding:24px}.hero h1{letter-spacing:-1.7px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="nav"><div class="brand">Adaptive Performance</div><div class="navlinks"><a href="#recursos">Recursos</a><a href="#instalar">Instalação</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">GitHub</a></div></nav>
+<section class="hero">
+<div>
+<div class="eyebrow">Android + Shizuku • sem root</div>
+<h1>Sua bateria com <span>uma meta.</span></h1>
+<p>Defina quanto de bateria você quer ter no fim do dia. O Adaptive Performance aprende seu uso e ajusta automaticamente o Android para tentar atingir essa meta sem ignorar temperatura e estabilidade.</p>
+<div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/latest">Baixar APK</a><a class="btn secondary" href="#recursos">Ver recursos</a></div>
+<div class="fine">Código aberto • versão 1.8.1 • algumas funções avançadas dependem do Shizuku e da ROM</div>
+</div>
+<img class="phone" src="site/home.png" alt="Tela principal do Adaptive Performance">
+</section>
+</div>
+<div class="wrap">
+<section class="section" id="recursos">
+<h2>Automático para quem quer simplicidade. Avançado para quem quer controle.</h2>
+<p class="lead">O aplicativo combina aprendizado de uso, proteção térmica, memória e economia de bateria em uma interface simples, sem esconder as ferramentas técnicas de quem prefere ajustar tudo manualmente.</p>
+<div class="grid">
+<div class="card"><div class="icon">A</div><b>Automático que aprende</b><p>Compara perfis econômicos usando bateria, temperatura, CPU, RAM, consumo estimado e estado da tela.</p></div>
+<div class="card"><div class="icon">%</div><b>Meta de bateria</b><p>Escolha a porcentagem mínima e o horário. O app calcula um orçamento de consumo por hora e adapta a economia.</p></div>
+<div class="card"><div class="icon">°</div><b>Proteção térmica</b><p>Acompanha tendências de temperatura e usa níveis graduais de proteção para reduzir aquecimento excessivo.</p></div>
+<div class="card"><div class="icon">R</div><b>RAM e zRAM</b><p>Compactação de memória, proteção contra thrashing, limites adaptativos e detecção de crescimento anormal.</p></div>
+<div class="card"><div class="icon">Z</div><b>Repouso inteligente</b><p>Deep sleep, Doze, wakeups e tarefas em segundo plano são coordenados conforme o contexto de uso.</p></div>
+<div class="card"><div class="icon">+</div><b>Modo Avançado</b><p>Controle manual de recursos térmicos, CPU, memória, limpeza, congelamento, diagnósticos e outros módulos.</p></div>
+</div>
+</section>
+<section class="section">
+<h2>A meta muda o ritmo da economia.</h2>
+<div class="goal"><div><p class="lead">Se você pedir para chegar às 22:00 com pelo menos 20%, o modo automático compara a bateria disponível com o tempo restante. Quando o orçamento fica apertado, ele aumenta a economia; quando há folga, reduz a agressividade.</p><div class="badges"><span class="badge">Equilibrado econômico</span><span class="badge">Economia adaptativa</span><span class="badge">Máxima economia</span></div></div><div class="goalbox"><div class="goalrow"><span>Meta</span><b>20% às 22:00</b></div><div class="goalrow"><span>Bateria atual</span><b>62%</b></div><div class="goalrow"><span>Orçamento</span><b>~4,2% por hora</b></div><div class="goalrow"><span>Ação</span><b>Economia adaptativa</b></div></div></div>
+</section>
+<section class="section">
+<h2>Veja o aplicativo.</h2>
+<p class="lead">Capturas reais do projeto. Recursos exibidos podem variar conforme Android, fabricante e permissões disponíveis.</p>
+<div class="shotgrid"><img src="site/home.png" alt="Painel principal"><img src="site/cleanup.png" alt="Limpeza de armazenamento"><img src="site/signal.png" alt="Otimizador de sinal móvel"></div>
+</section>
+<section class="section" id="instalar">
+<h2>Instalação.</h2>
+<div class="grid steps"><div class="card step"><b>Baixe o APK</b><p>Use a versão mais recente publicada em Releases neste repositório.</p></div><div class="card step"><b>Instale no Android</b><p>Autorize a instalação do APK pelo navegador ou gerenciador de arquivos quando o Android solicitar.</p></div><div class="card step"><b>Conecte o Shizuku</b><p>O app funciona parcialmente sem ele, mas os controles avançados dependem de privilégios de shell.</p></div></div>
+</section>
+<div class="cta"><h2>Quer terminar o dia com bateria sobrando?</h2><p class="lead" style="margin:0 auto 22px">Experimente o modo Automático, defina sua meta e deixe o Adaptive Performance ajustar a estratégia ao seu uso.</p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/latest">Baixar Adaptive Performance</a></div>
+<footer class="footer">Adaptive Performance é um projeto independente e open source. Não promete ganhos fixos de autonomia; resultados dependem do aparelho, ROM, bateria, rede e padrão de uso. <a href="https://github.com/langraficagr-collab/adaptive-performance">Código-fonte no GitHub</a>.</footer>
+</div>
+</body>
+</html>

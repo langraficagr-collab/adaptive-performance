@@ -246,9 +246,9 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
-**1.8.0 — Auto Learning / Battery First**
+**1.8.1 — Auto Learning + Battery Goal**
 
-A versão 1.8.0 adiciona os modos **Automático** e **Avançado**, com aprendizado adaptativo voltado para economia de bateria.
+A versão 1.8.1 inclui os modos **Automático** e **Avançado**, aprendizado adaptativo e **Meta de bateria**: escolha a porcentagem mínima e o horário, e o app adapta o nível de economia ao orçamento de consumo disponível.
 
 [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 

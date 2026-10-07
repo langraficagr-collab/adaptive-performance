@@ -26,6 +26,7 @@ public class BackgroundMaintenance {
     private final PackageManager pm;
     private final Map<String,Integer> hotCounts = new HashMap<>();
     private final Map<String,Integer> highRamCounts = new HashMap<>();
+    private long lastProtectedExceptionCheck = 0L;
 
     public BackgroundMaintenance(Context context, SharedPreferences prefs, IPrivilegedService privileged) {
         this.context = context.getApplicationContext();
@@ -56,7 +57,10 @@ public class BackgroundMaintenance {
                 prefs.edit().putBoolean("restriction_safety_v3", true).apply();
             } catch (Throwable ignored) {}
         }
-        try { maybeUnrestrictProtectedExceptions(); } catch (Throwable ignored) {}
+        if (now - lastProtectedExceptionCheck >= 60_000L) {
+            try { maybeUnrestrictProtectedExceptions(); } catch (Throwable ignored) {}
+            lastProtectedExceptionCheck = now;
+        }
         try { maybeUnrestrictForeground(foregroundPackage); } catch (Throwable ignored) {}
 
         long lastBattery = prefs.getLong("last_battery_rank", 0);
@@ -410,7 +414,7 @@ public class BackgroundMaintenance {
     }
 
     private boolean isProtected(String pkg) {
-        return AppSafety.isCritical(context, pkg) || AppSafety.isAutoProtected(context, pkg);
+        return AppSafety.isCritical(context, pkg) || AppSafety.isAutoProtected(context, pkg) || AppProfilePolicy.protectedActive(context, prefs, pkg);
     }
 
     private String label(String pkg) { return AppSafety.label(context, pkg); }

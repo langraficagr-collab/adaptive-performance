@@ -41,22 +41,23 @@ public final class CellularSignalOptimizer {
 
         long now = System.currentTimeMillis();
         try {
+            String phase = p.getString("signal_optimizer_phase", "idle");
+            long interval = Math.max(2, Math.min(30, p.getInt("signal_optimizer_interval_min", 5))) * 60_000L;
+            boolean force = p.getBoolean("signal_optimizer_force_check", false);
+            long last = p.getLong("signal_optimizer_last_check", 0L);
+            boolean testing = "testing".equals(phase);
+            if (!testing && !force && (now - last < interval
+                    || now < p.getLong("signal_optimizer_cooldown_until", 0L))) return;
+
             if (callActive(s)) {
                 p.edit().putString("signal_optimizer_status", "Pausado: chamada em andamento").apply();
                 return;
             }
 
-            String phase = p.getString("signal_optimizer_phase", "idle");
-            if ("testing".equals(phase)) {
+            if (testing) {
                 continueTest(p, s, now);
                 return;
             }
-
-            long interval = Math.max(2, Math.min(30, p.getInt("signal_optimizer_interval_min", 5))) * 60_000L;
-            boolean force = p.getBoolean("signal_optimizer_force_check", false);
-            long last = p.getLong("signal_optimizer_last_check", 0L);
-            if (!force && now - last < interval) return;
-            if (!force && now < p.getLong("signal_optimizer_cooldown_until", 0L)) return;
             p.edit().putBoolean("signal_optimizer_force_check", false)
                     .putLong("signal_optimizer_last_check", now).apply();
 

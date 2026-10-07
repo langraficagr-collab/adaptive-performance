@@ -129,7 +129,7 @@ public class SignalOptimizerActivity extends Activity {
         Switch x=new Switch(this); x.setText(title); x.setTextColor(color); x.setTextSize(14); x.setPadding(dp(5),dp(8),dp(5),dp(8)); x.setChecked(prefs.getBoolean(key,def));
         x.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean(key,v).commit()); return x;
     }
-    private TextView t(String s,int z,int color,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(z);v.setTextColor(color);if(bold)v.setTypeface(null,1);return v;}
+    private TextView t(String s,int z,int color,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(z);v.setTextColor(color);if(bold)v.setTypeface(null, android.graphics.Typeface.BOLD);return v;}
     private LinearLayout card(int color){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(14),dp(14),dp(14),dp(14));l.setBackgroundColor(color);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(7),0,dp(7));l.setLayoutParams(p);return l;}
     private Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(56));p.setMargins(0,dp(8),0,0);b.setLayoutParams(p);return b;}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}

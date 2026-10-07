@@ -270,7 +270,7 @@ public class DnsFirewallActivity extends Activity {
 
     @Override protected void onResume(){ super.onResume(); if(privateStatus!=null) refreshStatus(); }
 
-    private TextView t(String s,int size,int color,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(color);if(bold)v.setTypeface(null,1);return v;}
+    private TextView t(String s,int size,int color,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(color);if(bold)v.setTypeface(null, android.graphics.Typeface.BOLD);return v;}
     private LinearLayout card(int color){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(14),dp(14),dp(14),dp(14));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(7),0,dp(7));l.setLayoutParams(p);l.setBackgroundColor(color);return l;}
     private Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);return b;}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}

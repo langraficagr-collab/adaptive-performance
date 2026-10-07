@@ -62,6 +62,8 @@ public class OptimizationService extends Service {
     private volatile int thermalLevelApplied = 0;
     private boolean bindingInProgress = false;
     private long lastShizukuBindAttemptElapsed = 0L;
+    private String lastNotificationStatus = "";
+    private long lastNotificationUpdateElapsed = 0L;
     private BackgroundMaintenance maintenance;
     private volatile boolean startupReady;
     private CpuPressureController cpuPressureController;
@@ -629,7 +631,13 @@ public class OptimizationService extends Service {
         AppProfilePolicy.batch(this, prefs, fg, 4);
         AutoRepairController.evaluate(prefs, cpuPressureController);
         NotificationManager nm = getSystemService(NotificationManager.class);
-        if (nm != null) nm.notify(7014, buildNotification(status));
+        long notificationNow = SystemClock.elapsedRealtime();
+        if (nm != null && (!status.equals(lastNotificationStatus)
+                || notificationNow - lastNotificationUpdateElapsed >= 120000L)) {
+            nm.notify(7014, buildNotification(status));
+            lastNotificationStatus = status;
+            lastNotificationUpdateElapsed = notificationNow;
+        }
 
         if (healthController != null) {
             long cost = Math.max(0L, SystemClock.elapsedRealtime() - cycleStarted);

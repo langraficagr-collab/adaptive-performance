@@ -11,7 +11,7 @@ public final class AppProfilePolicy {
         if (s.matches(".*(waze|maps|navigation|navega).*")) return "REALTIME";
         if (s.matches(".*(dolphin|game|zf3d|gaming|emulator).*")) return "GAME";
         if (s.matches(".*(tiktok|musically|vibes|youtube|video|audio|music|spotify).*")) return "MEDIA";
-        if (s.matches(".*(camera|câmera).*")) return "CAMERA";
+        if (s.matches(".*(camera|câmera|camhdr).*")) return "CAMERA";
         String h = Integer.toHexString(pkg.hashCode());
         if (p.getInt("app_learn_n_" + h, 0) >= 40 && p.getFloat("app_cpu_" + h, 0) > 65) return "GAME";
         return "DEFAULT";
@@ -34,8 +34,9 @@ public final class AppProfilePolicy {
         return profile.equals("GAME") || profile.equals("MEDIA") || profile.equals("CAMERA") ? Math.min(2, normal) : normal;
     }
     public static boolean protectedActive(Context c, SharedPreferences p, String pkg) {
-        if (pkg == null || !pkg.equals(p.getString("foreground", ""))) return false;
+        if (pkg == null) return false;
         String s = classify(c, p, pkg);
+        if (s.equals("CAMERA")) return true;
         return s.equals("AUTOMATION") || s.equals("REALTIME");
     }
 }

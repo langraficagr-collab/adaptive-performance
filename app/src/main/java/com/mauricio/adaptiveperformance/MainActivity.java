@@ -43,6 +43,10 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private static final int SHIZUKU_REQ = 9042;
     private long lastShizukuUiCheckElapsed = 0L;
+    private boolean lastRenderedMaster;
+    private boolean lastRenderedMasterValid = false;
+    private String lastThermalStyleKey = "";
+    private float lastChartSoc = Float.NaN;
 
     private static final int BG = Color.rgb(6,16,25);
     private static final int CARD = Color.rgb(12,30,43);
@@ -68,6 +72,10 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+        // A tela de monitoramento não precisa renderizar em 120 Hz; 60 Hz reduz custo de GPU/FramePolicy.
+        WindowManager.LayoutParams windowParams = getWindow().getAttributes();
+        windowParams.preferredRefreshRate = 60f;
+        getWindow().setAttributes(windowParams);
         if (Build.VERSION.SDK_INT >= 23) getWindow().getDecorView().setSystemUiVisibility(0);
         Shizuku.addRequestPermissionResultListener(permissionListener);
         buildUi();
@@ -943,13 +951,20 @@ public class MainActivity extends Activity {
         if (shizukuText != null) shizukuText.setText(s);
     }
 
+    private void setTextIfChanged(TextView view, CharSequence value) {
+        if (view == null) return;
+        if (!android.text.TextUtils.equals(view.getText(), value)) view.setText(value);
+    }
+
     private void updateUi() {
         boolean master=prefs.getBoolean("master",false);
-        if (startButton != null) {
+        if (startButton != null && (!lastRenderedMasterValid || lastRenderedMaster != master)) {
             startButton.setText(master ? "Parar otimização" : "Iniciar otimização");
             startButton.setBackground(master
                     ? gradient(Color.rgb(22,157,220),Color.rgb(17,105,210),16)
                     : gradient(Color.rgb(35,178,105),Color.rgb(17,126,91),16));
+            lastRenderedMaster = master;
+            lastRenderedMasterValid = true;
         }
 
         String raw=prefs.getString("status", master?"Aguardando primeira leitura":"Monitor parado");
@@ -961,7 +976,7 @@ public class MainActivity extends Activity {
         } else if(profile.startsWith("Térmico máximo")) profile="Proteção máxima";
         else if(profile.startsWith("Térmico nível 1")) profile="Proteção térmica";
         else if(profile.startsWith("CPU alta")) profile="CPU sob controle";
-        if(statusText!=null) statusText.setText(profile);
+        setTextIfChanged(statusText, profile);
 
         float soc=prefs.getFloat("thermal_soc_c",-1f);
         float bat=prefs.getFloat("thermal_battery_c",prefs.getFloat("temp_c",-1f));
@@ -969,21 +984,25 @@ public class MainActivity extends Activity {
         float cpu=prefs.getFloat("cpu_load",-1f);
         long freq=prefs.getLong("cpu_freq_khz",-1L);
 
-        if(socValue!=null) socValue.setText(soc>0?String.format(Locale.US,"%.1f°C",soc):"--.-°C");
-        if(batValue!=null) batValue.setText(bat>0?String.format(Locale.US,"%.1f°C",bat):"--.-°C");
-        if(ramValue!=null) ramValue.setText(ram>=0?String.format(Locale.US,"%.0f%%",ram):"--%");
-        if(cpuValue!=null) cpuValue.setText(cpu>=0?String.format(Locale.US,"%.0f%%",cpu):"--%");
-        if(freqValue!=null) freqValue.setText(freq>0?String.format(Locale.US,"%.2f GHz",freq/1000000.0):"---- MHz");
-        if(chart!=null && soc>0) chart.addValue(soc);
+        setTextIfChanged(socValue, soc>0?String.format(Locale.US,"%.1f°C",soc):"--.-°C");
+        setTextIfChanged(batValue, bat>0?String.format(Locale.US,"%.1f°C",bat):"--.-°C");
+        setTextIfChanged(ramValue, ram>=0?String.format(Locale.US,"%.0f%%",ram):"--%");
+        setTextIfChanged(cpuValue, cpu>=0?String.format(Locale.US,"%.0f%%",cpu):"--%");
+        setTextIfChanged(freqValue, freq>0?String.format(Locale.US,"%.2f GHz",freq/1000000.0):"---- MHz");
+        if(chart!=null && soc>0 && (Float.isNaN(lastChartSoc) || Math.abs(soc-lastChartSoc)>=0.1f)) { chart.addValue(soc); lastChartSoc=soc; }
 
         int thermal=prefs.getInt("thermal_level",0);
         String thermalMode=prefs.getString("thermal_mode","auto");
-        styleThermal(thermalLevel1, "level1".equals(thermalMode), GREEN);
-        styleThermal(thermalLevel2, "level2".equals(thermalMode), ORANGE);
-        styleThermal(thermalLevel3, "level3".equals(thermalMode), Color.rgb(255,151,62));
-        styleThermal(thermalLevel4, "level4".equals(thermalMode), RED);
-        styleThermal(thermalLevel5, "level5".equals(thermalMode), Color.rgb(255,58,58));
-        styleThermal(thermalAuto, "auto".equals(thermalMode), CYAN);
+        String thermalStyleKey = thermalMode + ":" + thermal;
+        if (!thermalStyleKey.equals(lastThermalStyleKey)) {
+            styleThermal(thermalLevel1, "level1".equals(thermalMode), GREEN);
+            styleThermal(thermalLevel2, "level2".equals(thermalMode), ORANGE);
+            styleThermal(thermalLevel3, "level3".equals(thermalMode), Color.rgb(255,151,62));
+            styleThermal(thermalLevel4, "level4".equals(thermalMode), RED);
+            styleThermal(thermalLevel5, "level5".equals(thermalMode), Color.rgb(255,58,58));
+            styleThermal(thermalAuto, "auto".equals(thermalMode), CYAN);
+            lastThermalStyleKey = thermalStyleKey;
+        }
 
         if(statusSubText!=null) {
             int lockedLevel = manualThermalLevel(thermalMode);
@@ -1004,7 +1023,7 @@ public class MainActivity extends Activity {
                 if(i>0) shortRank.append("\n");
                 shortRank.append(lines[i]);
             }
-            batteryText.setText(shortRank.toString());
+            setTextIfChanged(batteryText, shortRank.toString());
         }
 
         if(maintenanceText!=null) {
@@ -1015,7 +1034,7 @@ public class MainActivity extends Activity {
                 if(i>0) out.append("\n");
                 out.append(lines[i]);
             }
-            maintenanceText.setText(out.toString());
+            setTextIfChanged(maintenanceText, out.toString());
         }
 
         if(restrictedText!=null) {
@@ -1026,7 +1045,7 @@ public class MainActivity extends Activity {
                 if(i>0) out.append("\n");
                 out.append(lines[i]);
             }
-            restrictedText.setText(out.toString());
+            setTextIfChanged(restrictedText, out.toString());
         }
 
         int sel=prefs.getStringSet("manual_freeze_selected",Collections.emptySet()).size();
@@ -1058,7 +1077,7 @@ public class MainActivity extends Activity {
             if(storage>=0) a.append(String.format(Locale.US," • armazenamento %.0f%% livre",storage));
             int wl=prefs.getInt("held_wakelocks",0);
             if(wl>0) a.append(" • wakelocks ").append(wl);
-            advancedText.setText(a.toString());
+            setTextIfChanged(advancedText, a.toString());
         }
 
         if(healthText!=null) {
@@ -1091,7 +1110,7 @@ public class MainActivity extends Activity {
                     .append(" • hist ").append(points)
                     .append(" • ciclo ").append(cycle).append("ms");
             if(prefs.getBoolean("health_watchdog_slow",false)) h.append(" • watchdog econômico");
-            healthText.setText(h.toString());
+            setTextIfChanged(healthText, h.toString());
         }
 
         if(extendedText!=null) {
@@ -1175,7 +1194,7 @@ public class MainActivity extends Activity {
             if(!wakeReport.isEmpty()) e.append("\nWakelock: ").append(wakeReport);
             if(stuckSync && !syncReport.isEmpty()) e.append("\nSync: ").append(syncReport);
             if(bgSensor && !sensorReport.isEmpty()) e.append("\nSensor: ").append(sensorReport);
-            extendedText.setText(e.toString());
+            setTextIfChanged(extendedText, e.toString());
         }
     }
 
@@ -1233,12 +1252,12 @@ public class MainActivity extends Activity {
     private final Runnable refreshLoop = new Runnable() {
         @Override public void run() {
             long now = SystemClock.elapsedRealtime();
-            if (now - lastShizukuUiCheckElapsed >= 30_000L) {
+            if (now - lastShizukuUiCheckElapsed >= 60_000L) {
                 updateShizuku();
                 lastShizukuUiCheckElapsed = now;
             }
             updateUi();
-            handler.postDelayed(this,6000);
+            handler.postDelayed(this,15000);
         }
     };
 

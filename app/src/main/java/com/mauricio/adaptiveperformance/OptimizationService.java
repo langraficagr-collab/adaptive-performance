@@ -119,6 +119,15 @@ public class OptimizationService extends Service {
             recoveryReady = false;
             startupReady = false;
             privileged = IPrivilegedService.Stub.asInterface(service);
+            // Em modo automático, um override salvo pertence à execução anterior.
+            // Remova-o ao reconectar; o primeiro ciclo reaplica proteção somente se a leitura real exigir.
+            if (thermalLevelFromMode(prefs.getString("thermal_mode", "auto")) == 0 && thermalLevelApplied > 0) {
+                try {
+                    privileged.exec("cmd thermalservice reset");
+                    thermalLevelApplied = 0;
+                    prefs.edit().putInt("thermal_level", 0).putBoolean("thermal_stage1", false).apply();
+                } catch (Throwable ignored) {}
+            }
             maintenance = new BackgroundMaintenance(OptimizationService.this, prefs, privileged);
             cpuPressureController = new CpuPressureController(OptimizationService.this, prefs, privileged);
             manualFreezeManager = new ManualFreezeManager(OptimizationService.this, prefs, privileged);
@@ -524,6 +533,14 @@ public class OptimizationService extends Service {
 
         String thermalMode = prefs.getString("thermal_mode", "auto");
         int manualThermalLevel = thermalLevelFromMode(thermalMode);
+        // A janela pós-correção bloqueia novas ações, mas não deve manter um override térmico
+        // antigo quando a leitura real já voltou para uma faixa segura.
+        if (!mutationsAllowed && privileged != null && manualThermalLevel == 0 && thermalLevelApplied > 0) {
+            boolean hasSoc = thermals.hasSoc();
+            float observed = hasSoc ? thermals.soc : tempC;
+            float release = hasSoc ? SOC_LEVEL1_RELEASE_C : 37.5f;
+            if (observed > 0 && observed <= release) resetThermalOverride();
+        }
         if (mutationsAllowed && privileged != null) {
             if (manualThermalLevel > 0) {
                 setThermalLevel(manualThermalLevel);

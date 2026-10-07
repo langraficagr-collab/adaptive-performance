@@ -9,6 +9,7 @@ public class ManualFreezeManager {
     private final SharedPreferences prefs;
     private final IPrivilegedService privileged;
     private final Set<String> active = new HashSet<>();
+    private final Set<String> openedByUser = new HashSet<>();
 
     public ManualFreezeManager(Context context, SharedPreferences prefs, IPrivilegedService privileged) {
         this.context = context.getApplicationContext();
@@ -33,11 +34,23 @@ public class ManualFreezeManager {
                         || AppSafety.isSystemApp(context, pkg) || AppSafety.isAutoProtected(context, pkg)) {
                     unfreeze(pkg, false);
                 } else if (pkg.equals(foregroundPackage)) {
-                    unfreeze(pkg, true);
+                    active.remove(pkg);
+                    openedByUser.add(pkg);
+                    persist();
+                    prefs.edit().putString("manual_freeze_last_reason",
+                            pkg + ": aberto pelo usuário; será finalizado ao sair").apply();
+                    report(pkg, "Aberto pelo usuário; será finalizado ao sair");
                 }
             } catch (Throwable ignored) {}
         }
         if (!enabled) return;
+
+        for (String pkg : new HashSet<>(openedByUser)) {
+            if (!pkg.equals(foregroundPackage)) {
+                openedByUser.remove(pkg);
+                freeze(pkg);
+            }
+        }
 
         for (String pkg : selected) {
             if (active.contains(pkg) || pkg.equals(foregroundPackage)) continue;
@@ -67,6 +80,10 @@ public class ManualFreezeManager {
     private void freeze(String pkg) {
         if (active.contains(pkg)) return;
         try {
+            // A escolha manual do usuário tem prioridade sobre restrições automáticas.
+            // Primeiro restaura somente estados que sabemos terem sido aplicados por nós,
+            // remove o rastreamento desses módulos e então assume ownership "manual".
+            releaseAutomaticOwnership(pkg);
             if (!RestrictionGuard.claim(prefs, pkg, "manual", "persistent user freeze")) {
                 prefs.edit().putString("manual_freeze_last_reason", pkg + ": controlado por outro módulo").apply();
                 return;
@@ -88,6 +105,7 @@ public class ManualFreezeManager {
                 return;
             }
 
+            openedByUser.remove(pkg);
             active.add(pkg);
             persist();
             prefs.edit()
@@ -107,6 +125,7 @@ public class ManualFreezeManager {
             String previous = prefs.getString("manual_freeze_prev_bucket_" + pkg, "10");
             restoreBucket(pkg, previous);
             active.remove(pkg);
+            openedByUser.remove(pkg);
             persist();
             prefs.edit()
                     .remove("manual_freeze_prev_bucket_" + pkg)
@@ -118,6 +137,45 @@ public class ManualFreezeManager {
         } catch (Throwable t) {
             report(pkg, "Falha ao restaurar; nova tentativa será feita");
         }
+    }
+
+    private void releaseAutomaticOwnership(String pkg) {
+        String h = Integer.toHexString(pkg.hashCode());
+        try {
+            Set<String> auto = new HashSet<>(prefs.getStringSet("auto_restricted", Collections.emptySet()));
+            if (auto.contains(pkg)) {
+                String oldBg = prefs.getString("prev_bg_" + h, "");
+                String oldAny = prefs.getString("prev_any_" + h, "");
+                if (oldBg.matches("allow|ignore|deny|default")) {
+                    try { RestrictionGuard.command(privileged,
+                            "appops set --user 0 " + pkg + " RUN_IN_BACKGROUND " + oldBg); }
+                    catch (Throwable ignored) {}
+                }
+                if (oldAny.matches("allow|ignore|deny|default")) {
+                    try { RestrictionGuard.command(privileged,
+                            "appops set --user 0 " + pkg + " RUN_ANY_IN_BACKGROUND " + oldAny); }
+                    catch (Throwable ignored) {}
+                }
+                auto.remove(pkg);
+                prefs.edit().putStringSet("auto_restricted", new HashSet<>(auto))
+                        .remove("prev_bg_" + h).remove("prev_any_" + h).commit();
+                RestrictionGuard.release(prefs, pkg, "maintenance");
+            }
+
+            Set<String> cpu = new HashSet<>(prefs.getStringSet("cpu_limited_set", Collections.emptySet()));
+            if (cpu.contains(pkg)) {
+                String old = prefs.getString("cpu_prev_" + h, "");
+                if (RestrictionGuard.level(old)) {
+                    try { RestrictionGuard.command(privileged,
+                            "cmd activity set-bg-restriction-level --user 0 " + pkg + " " + old); }
+                    catch (Throwable ignored) {}
+                }
+                cpu.remove(pkg);
+                prefs.edit().putStringSet("cpu_limited_set", new HashSet<>(cpu))
+                        .remove("cpu_prev_" + h).remove("cpu_applied_at_" + h).commit();
+                RestrictionGuard.release(prefs, pkg, "cpu");
+            }
+        } catch (Throwable ignored) {}
     }
 
     private String getStandbyBucket(String pkg) {

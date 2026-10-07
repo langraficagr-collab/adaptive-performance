@@ -265,6 +265,10 @@ public class MainActivity extends Activity {
         sw.setTextSize(14);
         sw.setPadding(dp(12), dp(10), dp(8), dp(10));
         sw.setChecked(prefs.getBoolean(key, def));
+        // Persistência padrão para todos os switches, inclusive opções adicionadas
+        // dinamicamente que não possuem listener específico.
+        sw.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean(key, checked).commit());
         sw.setButtonTintList(null);
         sw.setBackground(bordered(Color.rgb(13,34,48), Color.rgb(28,62,81), 14));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2);

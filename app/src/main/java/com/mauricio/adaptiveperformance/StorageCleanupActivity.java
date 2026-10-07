@@ -1,18 +1,25 @@
 package com.mauricio.adaptiveperformance;
 
 import android.app.*;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
 import android.os.*;
 import android.content.*;
 import android.graphics.Color;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.provider.Settings;
 import android.graphics.drawable.GradientDrawable;
 import android.view.*;
 import android.widget.*;
-import java.util.Locale;
+import java.util.*;
 
 public class StorageCleanupActivity extends Activity {
     private SharedPreferences prefs;
     private final Handler h = new Handler(Looper.getMainLooper());
-    private TextView status, summary, largeFiles, trimPercent;
+    private TextView status, summary, largeFiles, trimPercent, unusedAppsSummary;
     private ProgressBar trimProgress;
     private Switch cacheSw, thumbsSw, partialSw, apkSw, diagSw, emptySw;
     private Switch logsSw, staleSw, editorTempSw, dexCacheSw;
@@ -40,16 +47,16 @@ public class StorageCleanupActivity extends Activity {
         Button scanBtn=btn("Analisar armazenamento"); scanBtn.setOnClickListener(v->requestScan()); scan.addView(scanBtn); c.addView(scan);
 
         LinearLayout options=card(); addTitle(options,"✦","O que pode ser limpo","Você escolhe as categorias. Itens pessoais ficam fora.");
-        cacheSw=sw("Cache de aplicativos e do sistema",true); options.addView(cacheSw);
-        thumbsSw=sw("Miniaturas recriáveis de fotos",true); options.addView(thumbsSw);
-        partialSw=sw("Downloads temporários/incompletos antigos (>7 dias)",false); options.addView(partialSw);
-        apkSw=sw("Instaladores APK antigos (mais de 7 dias)",false); options.addView(apkSw);
-        diagSw=sw("Diagnósticos antigos do Adaptive Performance",true); options.addView(diagSw);
-        emptySw=sw("Pastas vazias dentro de Downloads",true); options.addView(emptySw);
-        logsSw=sw("Logs e relatórios de falha antigos acessíveis (>7 dias)",true); options.addView(logsSw);
-        staleSw=sw("Arquivos .log / .bak / .old antigos em Downloads (>14 dias)",false); options.addView(staleSw);
-        editorTempSw=sw("Resíduos temporários de editores em Downloads (>7 dias)",true); options.addView(editorTempSw);
-        dexCacheSw=sw("Caches temporários de compilação do Android (somente se permitido)",false); options.addView(dexCacheSw);
+        cacheSw=swPref("Cache de aplicativos e do sistema","cleanup_cache",true); options.addView(cacheSw);
+        thumbsSw=swPref("Miniaturas recriáveis de fotos","cleanup_thumbs",true); options.addView(thumbsSw);
+        partialSw=swPref("Downloads temporários/incompletos antigos (>7 dias)","cleanup_partial",false); options.addView(partialSw);
+        apkSw=swPref("Instaladores APK antigos (mais de 7 dias)","cleanup_apk",false); options.addView(apkSw);
+        diagSw=swPref("Diagnósticos antigos do Adaptive Performance","cleanup_diag",true); options.addView(diagSw);
+        emptySw=swPref("Pastas vazias dentro de Downloads","cleanup_empty",true); options.addView(emptySw);
+        logsSw=swPref("Logs e relatórios de falha antigos acessíveis (>7 dias)","cleanup_logs",true); options.addView(logsSw);
+        staleSw=swPref("Arquivos .log / .bak / .old antigos em Downloads (>14 dias)","cleanup_stale",false); options.addView(staleSw);
+        editorTempSw=swPref("Resíduos temporários de editores em Downloads (>7 dias)","cleanup_editor_temp",true); options.addView(editorTempSw);
+        dexCacheSw=swPref("Caches temporários de compilação do Android (somente se permitido)","cleanup_dex_cache",false); options.addView(dexCacheSw);
         TextView note=t("Não são apagados automaticamente: fotos, vídeos, músicas, documentos, backups ou arquivos grandes encontrados na análise.",12,MUTED,false); note.setPadding(0,dp(10),0,0); options.addView(note);
         Button clean=btn("Limpar categorias selecionadas"); clean.setOnClickListener(v->confirmClean()); options.addView(clean);
         LinearLayout trimBox=card();
@@ -70,9 +77,17 @@ public class StorageCleanupActivity extends Activity {
         pauseTrim.setOnClickListener(v -> requestPauseTrim());
         options.addView(pauseTrim); c.addView(options);
 
-        LinearLayout large=card(); addTitle(large,"⌕","Arquivos grandes","Somente análise: mostra arquivos acima de 500 MB em Downloads.");
+        LinearLayout large=card(); addTitle(large,"⌕","Arquivos grandes","Localiza arquivos acima de 500 MB em Downloads e permite escolher quais excluir.");
         largeFiles=t("Nenhuma análise feita.",13,MUTED,false); large.addView(largeFiles);
-        Button largeBtn=btn("Localizar arquivos grandes"); largeBtn.setOnClickListener(v->requestLarge()); large.addView(largeBtn); c.addView(large);
+        Button largeBtn=btn("Localizar arquivos grandes"); largeBtn.setOnClickListener(v->requestLarge()); large.addView(largeBtn);
+        Button deleteLargeBtn=btn("Selecionar arquivos grandes para excluir"); deleteLargeBtn.setOnClickListener(v->showLargeDeleteDialog()); large.addView(deleteLargeBtn);
+        c.addView(large);
+
+        LinearLayout unused=card();
+        addTitle(unused,"⌛","Apps sem uso há mais de 15 dias","Recomenda apps que podem ser desinstalados. Apps de sistema e protegidos ficam fora.");
+        unusedAppsSummary=t("Toque para analisar o histórico de uso.",13,MUTED,false); unused.addView(unusedAppsSummary);
+        Button unusedBtn=btn("Recomendar apps para desinstalar"); unusedBtn.setOnClickListener(v->showUnusedApps()); unused.addView(unusedBtn);
+        c.addView(unused);
 
         LinearLayout footer=card(); addTitle(footer,"✓","Proteções","A limpeza usa Shizuku e mantém uma lista fixa de exclusões.");
         footer.addView(t("• não limpa mídia pessoal\n• não apaga dados de login\n• não mexe em WhatsApp/Termux/ChatGPT\n• cache pode ser recriado pelos próprios apps\n• instaladores antigos só são removidos se você marcar a opção",12,MUTED,false)); c.addView(footer);
@@ -81,6 +96,102 @@ public class StorageCleanupActivity extends Activity {
 
     private void requestScan(){ status.setText("Analisando…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_SCAN); startForegroundService(i); }
     private void requestLarge(){ largeFiles.setText("Analisando arquivos grandes…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_LARGE_SCAN); startForegroundService(i); }
+    private void showLargeDeleteDialog(){
+        Set<String> raw=new HashSet<>(prefs.getStringSet("storage_large_entries",Collections.emptySet()));
+        if(raw.isEmpty()){
+            new AlertDialog.Builder(this).setTitle("Arquivos grandes")
+                    .setMessage("Nenhum arquivo grande disponível. Execute a análise primeiro.")
+                    .setPositiveButton("OK",null).show();
+            return;
+        }
+        ArrayList<String> entries=new ArrayList<>(raw);
+        entries.sort((a,b)->Long.compare(entryBytes(b),entryBytes(a)));
+        String[] labels=new String[entries.size()];
+        boolean[] checked=new boolean[entries.size()];
+        for(int i=0;i<entries.size();i++){
+            String path=entryPath(entries.get(i));
+            String name=path.substring(path.lastIndexOf('/')+1);
+            labels[i]=fmt(entryBytes(entries.get(i))/1024L)+" • "+name;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Excluir arquivos grandes — marque os arquivos")
+                .setMultiChoiceItems(labels,checked,(d,which,isChecked)->checked[which]=isChecked)
+                .setNegativeButton("Cancelar",null)
+                .setPositiveButton("Continuar",(d,w)->{
+                    ArrayList<String> paths=new ArrayList<>(); long total=0;
+                    for(int i=0;i<checked.length;i++) if(checked[i]){
+                        paths.add(entryPath(entries.get(i))); total+=entryBytes(entries.get(i));
+                    }
+                    if(paths.isEmpty()){ Toast.makeText(this,"Nenhum arquivo selecionado",Toast.LENGTH_SHORT).show(); return; }
+                    confirmLargeDelete(paths,total);
+                }).show();
+    }
+    private void confirmLargeDelete(ArrayList<String> paths,long bytes){
+        new AlertDialog.Builder(this).setTitle("Confirmar exclusão")
+                .setMessage("Excluir permanentemente "+paths.size()+" arquivo(s), aproximadamente "+fmt(bytes/1024L)+"?\n\nEsta ação não pode ser desfeita.")
+                .setNegativeButton("Cancelar",null)
+                .setPositiveButton("Excluir",(d,w)->{
+                    Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_DELETE_LARGE);
+                    i.putStringArrayListExtra("paths",paths); startForegroundService(i);
+                    status.setText("Excluindo arquivos grandes selecionados…");
+                }).show();
+    }
+    private long entryBytes(String entry){ try{ int b=entry.indexOf('|'); return Long.parseLong(entry.substring(0,b)); }catch(Exception e){return 0L;} }
+    private String entryPath(String entry){ int b=entry.indexOf('|'); return b>=0?entry.substring(b+1):""; }
+
+    private boolean hasUsageAccess(){
+        AppOpsManager a=(AppOpsManager)getSystemService(APP_OPS_SERVICE);
+        return a!=null && a.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,android.os.Process.myUid(),getPackageName())==AppOpsManager.MODE_ALLOWED;
+    }
+    private void showUnusedApps(){
+        if(!hasUsageAccess()){
+            new AlertDialog.Builder(this).setTitle("Acesso ao uso necessário")
+                    .setMessage("Para recomendar apps realmente sem uso há 15 dias, permita Acesso ao uso para o Adaptive Performance.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Abrir configurações",(d,w)->startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))).show();
+            return;
+        }
+        long now=System.currentTimeMillis(), cutoff=now-15L*24L*60L*60L*1000L;
+        UsageStatsManager usm=(UsageStatsManager)getSystemService(USAGE_STATS_SERVICE);
+        Map<String,UsageStats> stats=usm==null?Collections.emptyMap():usm.queryAndAggregateUsageStats(now-120L*24L*60L*60L*1000L,now);
+        PackageManager pm=getPackageManager();
+        ArrayList<AppCandidate> apps=new ArrayList<>();
+        for(ApplicationInfo ai:pm.getInstalledApplications(0)){
+            String pkg=ai.packageName;
+            boolean system=(ai.flags & ApplicationInfo.FLAG_SYSTEM)!=0 || (ai.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)!=0;
+            if(system || pm.getLaunchIntentForPackage(pkg)==null) continue;
+            if(pkg.equals(getPackageName()) || AppSafety.isSystemApp(this,pkg) || AppSafety.isAutoProtected(this,pkg)) continue;
+            PackageInfo pi; try{pi=pm.getPackageInfo(pkg,0);}catch(Exception e){continue;}
+            if(pi.firstInstallTime>cutoff) continue;
+            UsageStats u=stats.get(pkg); long last=0;
+            if(u!=null){ last=u.getLastTimeUsed(); if(Build.VERSION.SDK_INT>=29) last=Math.max(last,u.getLastTimeVisible()); }
+            if(last>cutoff) continue;
+            apps.add(new AppCandidate(pkg,AppSafety.label(this,pkg),last));
+        }
+        apps.sort((a,b)->Long.compare(a.lastUse,b.lastUse));
+        unusedAppsSummary.setText(apps.isEmpty()?"Nenhum app elegível sem uso há mais de 15 dias.":apps.size()+" app(s) podem ser revisados para desinstalação.");
+        if(apps.isEmpty()) return;
+        String[] labels=new String[apps.size()];
+        for(int i=0;i<apps.size();i++){
+            AppCandidate a=apps.get(i);
+            labels[i]=a.label+"\n"+(a.lastUse<=0?"Sem uso registrado nos últimos 120 dias":("Último uso há "+Math.max(15,(now-a.lastUse)/(24L*60L*60L*1000L))+" dias"));
+        }
+        new AlertDialog.Builder(this).setTitle("Apps sem uso há mais de 15 dias")
+                .setItems(labels,(d,which)->confirmUninstall(apps.get(which)))
+                .setNegativeButton("Fechar",null).show();
+    }
+    private void confirmUninstall(AppCandidate app){
+        new AlertDialog.Builder(this).setTitle("Desinstalar "+app.label+"?")
+                .setMessage("O Android abrirá a tela oficial de desinstalação. Nenhum app será removido automaticamente.")
+                .setNegativeButton("Cancelar",null)
+                .setPositiveButton("Abrir desinstalação",(d,w)->startActivity(new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+app.pkg))))
+                .show();
+    }
+    private static class AppCandidate{
+        final String pkg,label; final long lastUse;
+        AppCandidate(String p,String l,long u){pkg=p;label=l;lastUse=u;}
+    }
+
     private void requestTrim(){ status.setText("Otimizando armazenamento…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM); startForegroundService(i); }
     private void requestPauseTrim(){ status.setText("Pausando otimização…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM_ABORT); startForegroundService(i); }
     private void confirmClean(){
@@ -132,6 +243,11 @@ public class StorageCleanupActivity extends Activity {
     private LinearLayout card(){ LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); l.setPadding(dp(16),dp(16),dp(16),dp(16)); l.setBackground(bg(CARD,BORDER,18)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.setMargins(0,0,0,dp(12)); l.setLayoutParams(p); return l; }
     private void addTitle(LinearLayout p,String icon,String a,String b){ TextView x=t(icon+"  "+a,19,TEXT,true); p.addView(x); TextView y=t(b,12,MUTED,false); y.setPadding(0,dp(4),0,dp(8)); p.addView(y); }
     private Switch sw(String s,boolean checked){ Switch x=new Switch(this); x.setText(s); x.setTextColor(TEXT); x.setTextSize(14); x.setChecked(checked); x.setPadding(dp(8),dp(8),dp(8),dp(8)); x.setBackground(bg(Color.rgb(13,34,48),Color.rgb(28,62,81),14)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.setMargins(0,dp(6),0,0); x.setLayoutParams(p); return x; }
+    private Switch swPref(String title,String key,boolean def){
+        Switch x=sw(title,prefs.getBoolean(key,def));
+        x.setOnCheckedChangeListener((button,checked)->prefs.edit().putBoolean(key,checked).commit());
+        return x;
+    }
     private Button btn(String s){ Button b=new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(15); b.setAllCaps(false); b.setBackground(bg(Color.rgb(25,132,220),Color.rgb(39,188,255),15)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(56)); p.setMargins(0,dp(10),0,0); b.setLayoutParams(p); return b; }
     private TextView t(String s,float z,int c,boolean bold){ TextView t=new TextView(this); t.setText(s); t.setTextColor(c); t.setTextSize(z); if(bold)t.setTypeface(null,android.graphics.Typeface.BOLD); return t; }
     private GradientDrawable bg(int c,int stroke,int r){ GradientDrawable g=new GradientDrawable(); g.setColor(c); g.setCornerRadius(dp(r)); g.setStroke(dp(1),stroke); return g; }

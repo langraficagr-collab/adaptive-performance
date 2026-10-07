@@ -32,6 +32,7 @@ public class OptimizationService extends Service {
     public static final String ACTION_STORAGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_SCAN";
     public static final String ACTION_STORAGE_CLEAN = "com.mauricio.adaptiveperformance.STORAGE_CLEAN";
     public static final String ACTION_STORAGE_LARGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_LARGE_SCAN";
+    public static final String ACTION_STORAGE_DELETE_LARGE = "com.mauricio.adaptiveperformance.STORAGE_DELETE_LARGE";
     public static final String ACTION_STORAGE_TRIM = "com.mauricio.adaptiveperformance.STORAGE_TRIM";
     public static final String ACTION_STORAGE_TRIM_ABORT = "com.mauricio.adaptiveperformance.STORAGE_TRIM_ABORT";
     private static final float SOC_LEVEL1_C = 56.0f;
@@ -910,22 +911,85 @@ public class OptimizationService extends Service {
         String out = privileged.exec("find /sdcard/Download -maxdepth 2 -type f -size +500M -exec stat -c '%s|%n' {} \\; 2>/dev/null | sort -nr | head -12");
         if (out == null || out.trim().isEmpty()) {
             prefs.edit().putString("storage_large_files", "Nenhum arquivo acima de 500 MB encontrado em Downloads.")
+                    .putStringSet("storage_large_entries", new HashSet<>())
                     .putString("storage_cleanup_status", "Análise de arquivos grandes concluída").apply();
             return;
         }
-        StringBuilder b = new StringBuilder();
-        for (String line : out.split("\\n")) {
-            int bar = line.indexOf('|'); if (bar <= 0) continue;
+        StringBuilder text = new StringBuilder();
+        Set<String> entries = new HashSet<>();
+        for (String line : out.split("\n")) {
+            int bar = line.indexOf('|');
+            if (bar <= 0) continue;
             try {
                 long bytes = Long.parseLong(line.substring(0, bar).trim());
                 String path = line.substring(bar + 1).trim();
+                if (!path.startsWith("/sdcard/Download/")) continue;
                 String name = path.substring(path.lastIndexOf('/') + 1);
-                if (b.length() > 0) b.append("\\n");
-                b.append(String.format(Locale.US, "%.2f GB • %s", bytes / 1073741824.0, name));
+                entries.add(bytes + "|" + path);
+                if (text.length() > 0) text.append("\n");
+                text.append(String.format(Locale.US, "%.2f GB • %s", bytes / 1073741824.0, name));
             } catch (Throwable ignored) {}
         }
-        prefs.edit().putString("storage_large_files", b.length() == 0 ? "Nenhum arquivo grande encontrado." : b.toString())
-                .putString("storage_cleanup_status", "Análise de arquivos grandes concluída • nada foi apagado").apply();
+        prefs.edit()
+                .putString("storage_large_files", text.length() == 0 ? "Nenhum arquivo grande encontrado." : text.toString())
+                .putStringSet("storage_large_entries", new HashSet<>(entries))
+                .putString("storage_cleanup_status", "Análise de arquivos grandes concluída • selecione o que deseja excluir")
+                .apply();
+    }
+
+    private String shellQuote(String value) {
+        return "'" + value.replace("'", "'\"'\"'") + "'";
+    }
+
+    private void deleteLargeFiles(ArrayList<String> requested) {
+        prefs.edit().putBoolean("storage_cleanup_busy", true)
+                .putString("storage_cleanup_status", "Excluindo arquivos grandes selecionados…").apply();
+        if (privileged == null) {
+            bindShizukuIfPossible();
+            handler.postDelayed(() -> deleteLargeFiles(requested), 1200L);
+            return;
+        }
+        cleanupExecutor.execute(() -> {
+            int deleted = 0;
+            long bytesDeleted = 0L;
+            try {
+                Set<String> allowedEntries = new HashSet<>(prefs.getStringSet("storage_large_entries", Collections.emptySet()));
+                Map<String,Long> allowed = new HashMap<>();
+                for (String entry : allowedEntries) {
+                    int bar = entry.indexOf('|');
+                    if (bar <= 0) continue;
+                    try {
+                        long bytes = Long.parseLong(entry.substring(0, bar));
+                        String path = entry.substring(bar + 1);
+                        if (path.startsWith("/sdcard/Download/")) allowed.put(path, bytes);
+                    } catch (Throwable ignored) {}
+                }
+                if (requested != null) {
+                    for (String path : requested) {
+                        if (path == null || !allowed.containsKey(path) || !path.startsWith("/sdcard/Download/")) continue;
+                        if (RestrictionGuard.command(privileged, "rm -f -- " + shellQuote(path))) {
+                            deleted++;
+                            bytesDeleted += allowed.get(path);
+                        }
+                    }
+                }
+                storageLargeScan();
+                prefs.edit()
+                        .putLong("storage_large_deleted_bytes", bytesDeleted)
+                        .putInt("storage_large_deleted_count", deleted)
+                        .putLong("storage_large_deleted_at", System.currentTimeMillis())
+                        .putString("storage_cleanup_status", deleted > 0
+                                ? "Arquivos grandes excluídos: " + deleted + " • " + String.format(Locale.US, "%.2f GB", bytesDeleted / 1073741824.0)
+                                : "Nenhum arquivo grande foi excluído")
+                        .apply();
+            } catch (Throwable t) {
+                prefs.edit().putString("storage_cleanup_status",
+                        "Falha ao excluir arquivos grandes: " + t.getClass().getSimpleName()).apply();
+            } finally {
+                prefs.edit().putBoolean("storage_cleanup_busy", false).apply();
+                if (!prefs.getBoolean("master", false)) stopSelf();
+            }
+        });
     }
 
     private void runStorageTrim(int retry) {
@@ -1105,6 +1169,11 @@ public class OptimizationService extends Service {
         }
         if (ACTION_STORAGE_LARGE_SCAN.equals(action)) {
             runStorageTask("large", false,false,false,false,false,false,false,false,false,false, 0);
+            return START_STICKY;
+        }
+        if (ACTION_STORAGE_DELETE_LARGE.equals(action)) {
+            ArrayList<String> paths = intent.getStringArrayListExtra("paths");
+            deleteLargeFiles(paths == null ? new ArrayList<>() : paths);
             return START_STICKY;
         }
         if (ACTION_STORAGE_CLEAN.equals(action)) {
@@ -1574,9 +1643,8 @@ public class OptimizationService extends Service {
                 if (bc != null) {
                     try { bc.restore(); } catch (Throwable ignored) {}
                 }
-                if (mfm != null) {
-                    try { mfm.restoreAll(); } catch (Throwable ignored) {}
-                }
+                // O congelamento manual deve sobreviver ao encerramento/reinício do serviço.
+                // A restauração só ocorre se o usuário desativar/remover o app da seleção.
                 if (cpc != null) {
                     try { cpc.restoreAll(); } catch (Throwable ignored) {}
                 }

@@ -4,7 +4,7 @@
 
 O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para executar operações privilegiadas sem exigir root.
 
-[Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
+[Site oficial](https://langraficagr-collab.github.io/adaptive-performance/) · [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 
 ## Visão geral
 

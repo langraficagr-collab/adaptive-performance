@@ -472,6 +472,9 @@ public class OptimizationService extends Service {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
                     smartBatteryPct, controlTemp, adaptivePressureScore);
         } catch (Throwable ignored) {}
+        try {
+            CellularSignalOptimizer.evaluate(this, prefs, privileged);
+        } catch (Throwable ignored) {}
         final boolean mutationsAllowed = AdaptiveIntelligenceController.mutationAllowed(prefs);
 
         if (mutationsAllowed && health != null && health.rollbackRequested) {

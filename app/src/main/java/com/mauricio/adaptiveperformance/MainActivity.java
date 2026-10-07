@@ -725,6 +725,10 @@ public class MainActivity extends Activity {
         c.addView(safeModeManualSwitch);
         c.addView(manualFreezeSwitch);
 
+        Button signalOptimizer = actionButton("📶  Otimizador automático de sinal móvel");
+        signalOptimizer.setOnClickListener(v -> startActivity(new Intent(this, SignalOptimizerActivity.class)));
+        c.addView(signalOptimizer);
+
         Button dnsFirewall = actionButton("🛡  Firewall DNS AdGuard por aplicativo");
         dnsFirewall.setOnClickListener(v -> startActivity(new Intent(this, DnsFirewallActivity.class)));
         c.addView(dnsFirewall);

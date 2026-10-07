@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 52
-        versionName = "1.6.0-noads-dns-firewall"
+        versionCode = 53
+        versionName = "1.7.0-noads-signal-optimizer"
     }
 
     buildTypes {

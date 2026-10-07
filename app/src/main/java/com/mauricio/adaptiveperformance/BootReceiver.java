@@ -1,17 +1,25 @@
 package com.mauricio.adaptiveperformance;
 
 import android.content.*;
+import android.net.VpnService;
 import android.os.Build;
 
 public class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        boolean enabled = context.getSharedPreferences("adaptive", Context.MODE_PRIVATE)
-                .getBoolean("master", false);
-        if (!enabled) return;
-        Intent svc = new Intent(context, OptimizationService.class);
-        try {
-            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(svc);
-            else context.startService(svc);
-        } catch (Throwable ignored) {}
+        android.content.SharedPreferences p=context.getSharedPreferences("adaptive",Context.MODE_PRIVATE);
+        boolean enabled=p.getBoolean("master",false);
+        boolean dnsFirewall=p.getBoolean("dns_firewall_enabled",false);
+
+        if(enabled){
+            Intent svc=new Intent(context,OptimizationService.class);
+            try{ if(Build.VERSION.SDK_INT>=26) context.startForegroundService(svc); else context.startService(svc); }
+            catch(Throwable ignored){}
+        }
+
+        if(dnsFirewall && VpnService.prepare(context)==null){
+            Intent dns=new Intent(context,AdGuardDnsVpnService.class).setAction(AdGuardDnsVpnService.ACTION_START);
+            try{ if(Build.VERSION.SDK_INT>=26) context.startForegroundService(dns); else context.startService(dns); }
+            catch(Throwable ignored){}
+        }
     }
 }

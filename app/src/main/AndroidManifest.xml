@@ -27,6 +27,23 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <activity
+            android:name=".DnsFirewallActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".AdGuardDnsVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Per-app DNS filtering through a local VPN using AdGuard DNS" />
+        </service>
+
+        <activity
             android:name=".StorageCleanupActivity"
             android:exported="false" />
 

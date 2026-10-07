@@ -725,6 +725,10 @@ public class MainActivity extends Activity {
         c.addView(safeModeManualSwitch);
         c.addView(manualFreezeSwitch);
 
+        Button dnsFirewall = actionButton("🛡  Firewall DNS AdGuard por aplicativo");
+        dnsFirewall.setOnClickListener(v -> startActivity(new Intent(this, DnsFirewallActivity.class)));
+        c.addView(dnsFirewall);
+
         Button freezeSelect = actionButton("❄  Selecionar apps para congelar");
         freezeSelect.setOnClickListener(v->startActivity(new Intent(this, FreezeSelectionActivity.class)));
         c.addView(freezeSelect);

@@ -252,9 +252,11 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
-**1.8.3 — GPS e troca de rede mais rápidos**
+**1.8.4 — assistente de divulgação no Reddit**
 
-Inclui economia GPS opcional em segundo plano com restauração automática, confirmação de sinal fraco e testes de rede de 10 segundos. A verificação padrão da rede é a cada 1 minuto e o cooldown mínimo é 5 minutos. Mantém as melhorias de repouso da versão 1.8.2: verificações em segundo plano mais espaçadas com tela apagada e aparelho frio, mantendo rapidez quando há calor ou pressão alta.
+Adiciona uma seção de divulgação assistida: prepara um rascunho com identificação de desenvolvedor, abre o formulário oficial do Reddit para revisão e registra intervalo de 7 dias por comunidade. O app não publica automaticamente nem envia posts em segundo plano.
+
+A versão 1.8.3 incluiu economia GPS opcional em segundo plano com restauração automática, confirmação de sinal fraco e testes de rede de 10 segundos. A verificação padrão da rede é a cada 1 minuto e o cooldown mínimo é 5 minutos. Mantém as melhorias de repouso da versão 1.8.2: verificações em segundo plano mais espaçadas com tela apagada e aparelho frio, mantendo rapidez quando há calor ou pressão alta.
 
 [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 

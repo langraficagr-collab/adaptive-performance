@@ -9,6 +9,7 @@ import android.graphics.drawable.*;
 import android.view.*;
 import android.widget.*;
 import java.text.DateFormat;
+import android.net.Uri;
 import java.util.*;
 import rikka.shizuku.Shizuku;
 
@@ -336,6 +337,7 @@ public class MainActivity extends Activity {
             buildAutomaticModeCard();
         }
         buildInsights();
+        buildRedditPromoCard();
         buildSystemCard();
 
         page.addView(buildBottomNav(), new LinearLayout.LayoutParams(-1, dp(68)));
@@ -993,6 +995,90 @@ public class MainActivity extends Activity {
         content.addView(c);
     }
 
+    private void buildRedditPromoCard() {
+        LinearLayout c = card();
+        addSectionTitle(c, "↗", "Divulgar no Reddit", "Rascunhos transparentes para comunidades relevantes");
+        TextView explanation = text("Escolha uma comunidade onde a divulgação seja permitida. O texto identifica você como desenvolvedor e abre o formulário oficial do Reddit; revise as regras e toque em Publicar no Reddit. O app não publica sozinho nem envia spam.", 12, MUTED, false);
+        explanation.setPadding(dp(4), dp(12), dp(4), dp(12));
+        c.addView(explanation);
+
+        EditText subreddit = new EditText(this);
+        subreddit.setSingleLine(true);
+        subreddit.setHint("Comunidade (ex.: androidapps)");
+        subreddit.setTextColor(TEXT);
+        subreddit.setHintTextColor(MUTED);
+        subreddit.setText(prefs.getString("reddit_subreddit", ""));
+        subreddit.setPadding(dp(12), dp(8), dp(12), dp(8));
+        subreddit.setBackground(bordered(CARD_2, BORDER, 12));
+        c.addView(subreddit, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        EditText contribution = new EditText(this);
+        contribution.setHint("Contribuição útil para a comunidade (opcional)");
+        contribution.setTextColor(TEXT);
+        contribution.setHintTextColor(MUTED);
+        contribution.setMinLines(2);
+        contribution.setGravity(Gravity.TOP | Gravity.START);
+        contribution.setPadding(dp(12), dp(10), dp(12), dp(10));
+        contribution.setBackground(bordered(CARD_2, BORDER, 12));
+        LinearLayout.LayoutParams contributionLp = new LinearLayout.LayoutParams(-1, -2);
+        contributionLp.setMargins(0, dp(10), 0, 0);
+        c.addView(contribution, contributionLp);
+
+        TextView status = text("", 12, MUTED, false);
+        status.setPadding(dp(4), dp(8), dp(4), 0);
+        c.addView(status);
+
+        Button draft = actionButton("Preparar divulgação");
+        draft.setOnClickListener(v -> {
+            String community = subreddit.getText().toString().trim().replaceFirst("(?i)^r/", "");
+            if (!community.matches("[A-Za-z0-9_]{2,21}")) {
+                subreddit.setError("Digite uma comunidade válida, sem r/");
+                return;
+            }
+            String lastCommunity = prefs.getString("reddit_last_published_subreddit", "");
+            long lastAt = prefs.getLong("reddit_last_published_at", 0L);
+            if (community.equalsIgnoreCase(lastCommunity) && System.currentTimeMillis() - lastAt < 7L * 24 * 60 * 60 * 1000) {
+                status.setText("Você marcou uma divulgação recente nesta comunidade. Aguarde 7 dias para evitar repetição.");
+                status.setTextColor(ORANGE);
+                return;
+            }
+            prefs.edit().putString("reddit_subreddit", community).apply();
+            String title = "Como vocês monitoram desempenho e bateria no Android?";
+            String detail = contribution.getText().toString().trim();
+            String body = (detail.isEmpty() ? "Tenho desenvolvido o Adaptive Performance, um app Android para monitoramento adaptativo de desempenho, temperatura e bateria. Estou buscando feedback honesto sobre recursos e compatibilidade." : detail)
+                    + "\n\nSou o desenvolvedor do Adaptive Performance; esta é uma divulgação própria. O projeto e os detalhes estão aqui: https://github.com/langraficagr-collab/adaptive-performance\n\nSe este tipo de divulgação não for permitido nesta comunidade, não publique."
+                    + "\n\nAo publicar, use o botão abaixo para registrar a data e respeitar o intervalo de 7 dias.";
+            Uri uri = Uri.parse("https://www.reddit.com/r/" + Uri.encode(community) + "/submit")
+                    .buildUpon().appendQueryParameter("type", "self")
+                    .appendQueryParameter("title", title)
+                    .appendQueryParameter("text", body).build();
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            intent.setPackage("com.reddit.frontpage");
+            try { startActivity(intent); }
+            catch (Exception noApp) {
+                intent.setPackage(null);
+                try { startActivity(intent); }
+                catch (Exception noBrowser) { Toast.makeText(this, "Não foi possível abrir o Reddit.", Toast.LENGTH_LONG).show(); return; }
+            }
+            status.setText("Formulário aberto. Revise as regras da comunidade antes de publicar.");
+            status.setTextColor(CYAN);
+        });
+        c.addView(draft);
+
+        Button record = actionButton("Marcar como publicado (intervalo de 7 dias)");
+        record.setBackground(bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
+        record.setOnClickListener(v -> {
+            String community = subreddit.getText().toString().trim().replaceFirst("(?i)^r/", "");
+            if (!community.matches("[A-Za-z0-9_]{2,21}")) { subreddit.setError("Digite uma comunidade válida"); return; }
+            prefs.edit().putString("reddit_subreddit", community).putString("reddit_last_published_subreddit", community)
+                    .putLong("reddit_last_published_at", System.currentTimeMillis()).apply();
+            status.setText("Intervalo registrado para r/" + community + ". Próxima divulgação após 7 dias.");
+            status.setTextColor(GREEN);
+        });
+        c.addView(record);
+        content.addView(c);
+    }
+
     private View buildBottomNav() {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
@@ -1004,6 +1090,7 @@ public class MainActivity extends Activity {
         TextView apps = navItem("▦\nApps",MUTED,false);
         TextView clean = navItem("✦\nLimpeza",MUTED,false);
         TextView settings = navItem("⚙\nAjustes",MUTED,false);
+        TextView promo = navItem("↗\nReddit",MUTED,false);
 
         home.setOnClickListener(v -> {
             if (mainScroll != null) mainScroll.post(() -> mainScroll.smoothScrollTo(0,0));
@@ -1011,11 +1098,13 @@ public class MainActivity extends Activity {
         apps.setOnClickListener(v -> startActivity(new Intent(this,FreezeSelectionActivity.class)));
         clean.setOnClickListener(v -> startActivity(new Intent(this,StorageCleanupActivity.class)));
         settings.setOnClickListener(v -> openActions());
+        promo.setOnClickListener(v -> { if (mainScroll != null) mainScroll.post(() -> mainScroll.smoothScrollTo(0, content.getHeight())); });
 
         nav.addView(home,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(apps,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(clean,new LinearLayout.LayoutParams(0,-1,1f));
         nav.addView(settings,new LinearLayout.LayoutParams(0,-1,1f));
+        nav.addView(promo,new LinearLayout.LayoutParams(0,-1,1f));
         return nav;
     }
 

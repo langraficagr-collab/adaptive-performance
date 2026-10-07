@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 61
-        versionName = "1.8.3-gps-radio"
+        versionCode = 62
+        versionName = "1.8.4-reddit-helper"
     }
 
     buildTypes {

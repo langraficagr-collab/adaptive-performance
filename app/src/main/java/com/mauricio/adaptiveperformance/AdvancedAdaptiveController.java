@@ -136,9 +136,11 @@ public final class AdvancedAdaptiveController {
                 r.pressureScore, r.thermalTarget);
         r.reason = buildReason(r, psi);
 
-        if (!interactive) r.nextSampleMs = 60_000L;
-        else if (r.thermalTarget >= 4 || r.pressureScore >= 4) r.nextSampleMs = 8_000L;
+        // Keep fast safety sampling for heat/pressure, but let Android sleep
+        // between checks when the screen is off and the phone is cool.
+        if (r.thermalTarget >= 4 || r.pressureScore >= 4) r.nextSampleMs = 8_000L;
         else if (r.thermalTarget > 0 || r.pressureScore >= 2 || r.tempTrendCPerMin >= 0.8f) r.nextSampleMs = 20_000L;
+        else if (!interactive) r.nextSampleMs = power.charging ? 5L * 60_000L : 10L * 60_000L;
         else if (learnedHeavy || isRealtimeForeground(foregroundPackage)) r.nextSampleMs = 30_000L;
         else r.nextSampleMs = 60_000L;
 

@@ -192,6 +192,16 @@ public class OptimizationService extends Service {
         super.onCreate();
         serviceDestroyed = false;
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        if (!prefs.contains("user_mode")) {
+            // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
+            String initialMode = prefs.contains("master") ? "advanced" : "auto";
+            prefs.edit().putString("user_mode", initialMode).apply();
+        }
+        if (!prefs.contains("user_mode")) {
+            // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
+            String initialMode = prefs.contains("master") ? "advanced" : "auto";
+            prefs.edit().putString("user_mode", initialMode).apply();
+        }
         thermalLevelApplied = prefs.getInt("thermal_level", prefs.getBoolean("thermal_stage1", false) ? 1 : 0);
         createChannel();
         ChangeNotifier.ensureChannel(this);
@@ -485,6 +495,13 @@ public class OptimizationService extends Service {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
                     smartBatteryPct, controlTemp, adaptivePressureScore);
         } catch (Throwable ignored) {}
+        try {
+            AutoUserModeController.evaluate(prefs, smartBatteryPct, controlTemp, cpuLoad, availPct,
+                    interactive, chargingNow, advanced != null ? advanced.powerW : -1f);
+        } catch (Throwable t) {
+            prefs.edit().putString("auto_user_error",
+                    t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+        }
         try {
             CellularSignalOptimizer.evaluate(this, prefs, privileged);
         } catch (Throwable ignored) {}

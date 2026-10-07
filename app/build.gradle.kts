@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 57
-        versionName = "1.7.2-stable-lite"
+        versionCode = 58
+        versionName = "1.8.0-auto-learning"
     }
 
     buildTypes {

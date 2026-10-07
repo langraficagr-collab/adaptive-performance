@@ -70,6 +70,16 @@ public class MainActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        if (!prefs.contains("user_mode")) {
+            // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
+            String initialMode = prefs.contains("master") ? "advanced" : "auto";
+            prefs.edit().putString("user_mode", initialMode).apply();
+        }
+        if (!prefs.contains("user_mode")) {
+            // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
+            String initialMode = prefs.contains("master") ? "advanced" : "auto";
+            prefs.edit().putString("user_mode", initialMode).apply();
+        }
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         // A tela de monitoramento não precisa renderizar em 120 Hz; 60 Hz reduz custo de GPU/FramePolicy.
@@ -318,13 +328,107 @@ public class MainActivity extends Activity {
 
         buildHeader();
         buildHero();
-        buildThermal();
-        buildActionsPlaceholder();
+        buildModeSelector();
+        if (isAdvancedUserMode()) {
+            buildThermal();
+            buildActionsPlaceholder();
+        } else {
+            buildAutomaticModeCard();
+        }
         buildInsights();
         buildSystemCard();
 
         page.addView(buildBottomNav(), new LinearLayout.LayoutParams(-1, dp(68)));
         setContentView(page);
+    }
+
+    private boolean isAdvancedUserMode() {
+        return "advanced".equals(prefs.getString("user_mode", "auto"));
+    }
+
+    private void setUserMode(String mode) {
+        String normalized = "advanced".equals(mode) ? "advanced" : "auto";
+        if (normalized.equals(prefs.getString("user_mode", "auto"))) return;
+        prefs.edit().putString("user_mode", normalized).apply();
+        if ("auto".equals(normalized)) {
+            prefs.edit().putLong("auto_user_last_apply", 0L).apply();
+        }
+        recreate();
+    }
+
+    private void buildModeSelector() {
+        LinearLayout c = card();
+        addSectionTitle(c, "◎", "Modo de uso", "Automático para simplicidade ou Avançado para controle total");
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dp(14), 0, 0);
+
+        Button automatic = actionButton("Automático");
+        Button advanced = actionButton("Avançado");
+        automatic.setLayoutParams(new LinearLayout.LayoutParams(0, dp(54), 1f));
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(0, dp(54), 1f);
+        alp.setMargins(dp(8), 0, 0, 0);
+        advanced.setLayoutParams(alp);
+
+        boolean advancedMode = isAdvancedUserMode();
+        automatic.setBackground(advancedMode
+                ? bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16)
+                : gradient(Color.rgb(21,153,112), Color.rgb(15,107,155), 16));
+        advanced.setBackground(advancedMode
+                ? gradient(Color.rgb(29,182,244), Color.rgb(19,107,231), 16)
+                : bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
+        automatic.setOnClickListener(v -> setUserMode("auto"));
+        advanced.setOnClickListener(v -> setUserMode("advanced"));
+        row.addView(automatic);
+        row.addView(advanced);
+        c.addView(row);
+
+        TextView help = text(advancedMode
+                ? "Avançado: todas as opções ficam disponíveis para ajuste manual."
+                : "Automático: o app aprende seu padrão de uso, compara perfis e prioriza menor consumo sem abandonar proteções de estabilidade e temperatura.",
+                12, MUTED, false);
+        help.setPadding(dp(4), dp(10), dp(4), 0);
+        c.addView(help);
+        content.addView(c);
+    }
+
+    private void buildAutomaticModeCard() {
+        LinearLayout c = card();
+        addSectionTitle(c, "✦", "Otimização automática", "O aplicativo escolhe e testa as melhores configurações por você");
+        String autoStatus = prefs.getString("auto_user_status",
+                "Aprendizado inicial • priorizando economia de bateria");
+        // Remove temperatura de versões de teste antigas; a temperatura atual já aparece no painel principal.
+        autoStatus = autoStatus.replaceAll("\\s*•\\s*[0-9]+(?:\\.[0-9]+)?°C$", "");
+        TextView status = text(autoStatus, 14, TEXT, true);
+        status.setPadding(dp(4), dp(14), dp(4), dp(8));
+        c.addView(status);
+
+        TextView details = text("O modo automático usa temperatura, CPU, RAM, consumo estimado, estado da tela e nível da bateria. Ele alterna entre perfis econômicos em janelas longas, mede o resultado e mantém a configuração que apresentar menor consumo com segurança.",
+                12, MUTED, false);
+        details.setPadding(dp(4), dp(2), dp(4), dp(4));
+        c.addView(details);
+
+        Button resetLearning = actionButton("Reiniciar aprendizado automático");
+        resetLearning.setBackground(bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
+        resetLearning.setOnClickListener(v -> {
+            prefs.edit()
+                    .remove("auto_user_best_variant")
+                    .remove("auto_user_best_score")
+                    .remove("auto_user_trial_variant")
+                    .remove("auto_user_trial_start")
+                    .remove("auto_user_trial_start_battery")
+                    .remove("auto_user_avg_temp")
+                    .remove("auto_user_avg_cpu")
+                    .remove("auto_user_avg_power")
+                    .putLong("auto_user_last_apply", 0L)
+                    .putString("auto_user_status", "Aprendizado reiniciado • coletando novos dados")
+                    .apply();
+            Toast.makeText(this, "Aprendizado automático reiniciado.", Toast.LENGTH_SHORT).show();
+            recreate();
+        });
+        c.addView(resetLearning);
+        content.addView(c);
     }
 
     private void buildHeader() {

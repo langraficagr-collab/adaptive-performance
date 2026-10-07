@@ -729,7 +729,7 @@ public class MainActivity extends Activity {
         signalOptimizer.setOnClickListener(v -> startActivity(new Intent(this, SignalOptimizerActivity.class)));
         c.addView(signalOptimizer);
 
-        Button dnsFirewall = actionButton("🛡  Firewall DNS AdGuard por aplicativo");
+        Button dnsFirewall = actionButton("🛡  Proteção DNS AdGuard • sem VPN / por app");
         dnsFirewall.setOnClickListener(v -> startActivity(new Intent(this, DnsFirewallActivity.class)));
         c.addView(dnsFirewall);
 

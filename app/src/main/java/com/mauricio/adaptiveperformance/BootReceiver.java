@@ -8,7 +8,8 @@ public class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
         android.content.SharedPreferences p=context.getSharedPreferences("adaptive",Context.MODE_PRIVATE);
         boolean enabled=p.getBoolean("master",false);
-        boolean dnsFirewall=p.getBoolean("dns_firewall_enabled",false);
+        boolean privateDns=p.getBoolean("private_dns_enabled",false) || p.getBoolean("private_dns_requested",false);
+        boolean dnsFirewall=p.getBoolean("dns_firewall_enabled",false) && !privateDns;
 
         if(enabled){
             Intent svc=new Intent(context,OptimizationService.class);

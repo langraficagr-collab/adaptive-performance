@@ -35,6 +35,8 @@ public class OptimizationService extends Service {
     public static final String ACTION_STORAGE_DELETE_LARGE = "com.mauricio.adaptiveperformance.STORAGE_DELETE_LARGE";
     public static final String ACTION_STORAGE_TRIM = "com.mauricio.adaptiveperformance.STORAGE_TRIM";
     public static final String ACTION_STORAGE_TRIM_ABORT = "com.mauricio.adaptiveperformance.STORAGE_TRIM_ABORT";
+    public static final String ACTION_PRIVATE_DNS_ENABLE = "com.mauricio.adaptiveperformance.PRIVATE_DNS_ENABLE";
+    public static final String ACTION_PRIVATE_DNS_DISABLE = "com.mauricio.adaptiveperformance.PRIVATE_DNS_DISABLE";
     private static final float SOC_LEVEL1_C = 56.0f;
     private static final float SOC_MAX_C = 66.0f;
     private static final float SOC_LEVEL1_RELEASE_C = 52.0f;
@@ -1155,6 +1157,97 @@ public class OptimizationService extends Service {
         storageScan();
     }
 
+
+    private String cleanSettingValue(String value) {
+        if (value == null) return "";
+        value = value.trim();
+        if ("null".equalsIgnoreCase(value)) return "";
+        int nl = value.indexOf('\n');
+        return nl >= 0 ? value.substring(0, nl).trim() : value;
+    }
+
+    private void configurePrivateDns(boolean enable, int retry) {
+        prefs.edit().putString("private_dns_status",
+                enable ? "Ativando DNS Privado AdGuard…" : "Restaurando DNS Privado anterior…").apply();
+
+        if (privileged == null) {
+            if (retry >= 8) {
+                prefs.edit().putBoolean("private_dns_enabled", false)
+                        .putString("private_dns_status", "Shizuku indisponível; DNS não foi alterado").apply();
+                if (!prefs.getBoolean("master", false)) stopSelf();
+                return;
+            }
+            bindShizukuIfPossible();
+            handler.postDelayed(() -> configurePrivateDns(enable, retry + 1), 900L);
+            return;
+        }
+
+        maintenanceExecutor.execute(() -> {
+            try {
+                if (enable) {
+                    if (!prefs.getBoolean("private_dns_backup_saved", false)) {
+                        String oldMode = cleanSettingValue(privileged.exec("settings get global private_dns_mode 2>/dev/null"));
+                        String oldHost = cleanSettingValue(privileged.exec("settings get global private_dns_specifier 2>/dev/null"));
+                        prefs.edit()
+                                .putBoolean("private_dns_backup_saved", true)
+                                .putString("private_dns_original_mode", oldMode)
+                                .putString("private_dns_original_specifier", oldHost)
+                                .apply();
+                    }
+
+                    privileged.exec("settings put global private_dns_specifier dns.adguard-dns.com");
+                    privileged.exec("settings put global private_dns_mode hostname");
+                    try { Thread.sleep(500L); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+                    String mode = cleanSettingValue(privileged.exec("settings get global private_dns_mode 2>/dev/null"));
+                    String host = cleanSettingValue(privileged.exec("settings get global private_dns_specifier 2>/dev/null"));
+                    boolean ok = "hostname".equals(mode) && "dns.adguard-dns.com".equals(host);
+                    prefs.edit()
+                            .putBoolean("private_dns_enabled", ok)
+                            .putString("private_dns_status", ok
+                                    ? "Ativo sem VPN • dns.adguard-dns.com • todo o aparelho"
+                                    : "Falha ao confirmar DNS Privado no Android")
+                            .putString("private_dns_current_mode", mode)
+                            .putString("private_dns_current_specifier", host)
+                            .apply();
+                } else {
+                    boolean hasBackup = prefs.getBoolean("private_dns_backup_saved", false);
+                    String oldMode = prefs.getString("private_dns_original_mode", "");
+                    String oldHost = prefs.getString("private_dns_original_specifier", "");
+
+                    if (hasBackup) {
+                        if (oldHost == null || oldHost.isEmpty())
+                            privileged.exec("settings delete global private_dns_specifier");
+                        else
+                            privileged.exec("settings put global private_dns_specifier " + oldHost.replaceAll("[^A-Za-z0-9._-]", ""));
+
+                        if (oldMode == null || oldMode.isEmpty())
+                            privileged.exec("settings delete global private_dns_mode");
+                        else
+                            privileged.exec("settings put global private_dns_mode " + oldMode.replaceAll("[^A-Za-z0-9._-]", ""));
+                    }
+
+                    try { Thread.sleep(500L); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    String mode = cleanSettingValue(privileged.exec("settings get global private_dns_mode 2>/dev/null"));
+                    String host = cleanSettingValue(privileged.exec("settings get global private_dns_specifier 2>/dev/null"));
+                    prefs.edit()
+                            .putBoolean("private_dns_enabled", false)
+                            .putString("private_dns_status", hasBackup
+                                    ? "DNS anterior restaurado"
+                                    : "DNS Privado AdGuard desativado")
+                            .putString("private_dns_current_mode", mode)
+                            .putString("private_dns_current_specifier", host)
+                            .apply();
+                }
+            } catch (Throwable t) {
+                prefs.edit().putBoolean("private_dns_enabled", false)
+                        .putString("private_dns_status", "Falha no DNS Privado: " + t.getClass().getSimpleName()).apply();
+            } finally {
+                if (!prefs.getBoolean("master", false)) stopSelf();
+            }
+        });
+    }
+
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP_OPTIMIZATION.equals(action)) {
@@ -1164,6 +1257,15 @@ public class OptimizationService extends Service {
                     .apply();
             stopSelf();
             return START_NOT_STICKY;
+        }
+
+        if (ACTION_PRIVATE_DNS_ENABLE.equals(action)) {
+            configurePrivateDns(true, 0);
+            return START_STICKY;
+        }
+        if (ACTION_PRIVATE_DNS_DISABLE.equals(action)) {
+            configurePrivateDns(false, 0);
+            return START_STICKY;
         }
 
         if (ACTION_STORAGE_SCAN.equals(action)) {

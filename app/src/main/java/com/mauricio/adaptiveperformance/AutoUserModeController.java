@@ -49,6 +49,8 @@ public final class AutoUserModeController {
         }
 
         int effective = charging ? variant : trial;
+        int goalPressure = batteryGoalPressure(prefs, batteryPct, charging, now);
+        effective = Math.max(effective, goalPressure);
         if (batteryPct >= 0 && batteryPct <= 20) effective = 2;
         if (tempC >= 39f) effective = Math.max(effective, 2);
         if (!interactive) effective = Math.max(effective, 1);
@@ -56,8 +58,38 @@ public final class AutoUserModeController {
         applyVariant(prefs, effective, freeRamPct, batteryPct, interactive);
         prefs.edit()
                 .putLong("auto_user_last_apply", now)
-                .putString("auto_user_status", describe(effective, trial, variant, batteryPct, tempC))
+                .putString("auto_user_status", describe(effective, trial, variant, batteryPct, tempC)
+                        + batteryGoalStatus(prefs, batteryPct, charging, now))
                 .apply();
+    }
+
+    private static int batteryGoalPressure(SharedPreferences prefs, int batteryPct, boolean charging, long now) {
+        if (charging || batteryPct < 0) return 0;
+        int target = Math.max(10, Math.min(50, prefs.getInt("battery_goal_pct", 20)));
+        int hour = Math.max(0, Math.min(23, prefs.getInt("battery_goal_hour", 22)));
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTimeInMillis(now);
+        java.util.Calendar end = (java.util.Calendar) cal.clone();
+        end.set(java.util.Calendar.HOUR_OF_DAY, hour);
+        end.set(java.util.Calendar.MINUTE, 0);
+        end.set(java.util.Calendar.SECOND, 0);
+        end.set(java.util.Calendar.MILLISECOND, 0);
+        if (!end.after(cal)) end.add(java.util.Calendar.DAY_OF_YEAR, 1);
+        double hours = Math.max(0.25, (end.getTimeInMillis() - now) / 3600000.0);
+        double budgetPerHour = Math.max(0.0, batteryPct - target) / hours;
+        prefs.edit().putFloat("battery_goal_budget_per_hour", (float) budgetPerHour).apply();
+        if (batteryPct <= target + 3) return 2;
+        if (budgetPerHour < 1.0) return 2;
+        if (budgetPerHour < 2.0) return 1;
+        return 0;
+    }
+
+    private static String batteryGoalStatus(SharedPreferences prefs, int batteryPct, boolean charging, long now) {
+        if (charging || batteryPct < 0) return "";
+        int target = prefs.getInt("battery_goal_pct", 20);
+        int hour = prefs.getInt("battery_goal_hour", 22);
+        float budget = prefs.getFloat("battery_goal_budget_per_hour", -1f);
+        return budget >= 0 ? String.format(java.util.Locale.US, " • meta %d%% às %02d:00 • limite %.1f%%/h", target, hour, budget) : "";
     }
 
     private static void applyVariant(SharedPreferences prefs, int variant, double freeRamPct,

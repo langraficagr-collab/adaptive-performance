@@ -409,6 +409,49 @@ public class MainActivity extends Activity {
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
 
+        TextView goalTitle = text("Meta de bateria", 15, TEXT, true);
+        goalTitle.setPadding(dp(4), dp(16), dp(4), dp(6));
+        c.addView(goalTitle);
+        int goalPct = prefs.getInt("battery_goal_pct", 20);
+        int goalHour = prefs.getInt("battery_goal_hour", 22);
+        TextView goalLabel = text("Chegar às " + String.format(Locale.US, "%02d:00", goalHour)
+                + " com pelo menos " + goalPct + "%", 13, CYAN, true);
+        c.addView(goalLabel);
+        TextView goalHint = text("O modo automático compara a bateria atual com o ritmo necessário até o horário escolhido e aumenta ou reduz a economia para tentar cumprir a meta.", 12, MUTED, false);
+        goalHint.setPadding(dp(4), dp(4), dp(4), dp(8));
+        c.addView(goalHint);
+
+        TextView pctLabel = text("Bateria mínima: " + goalPct + "%", 12, MUTED, false);
+        c.addView(pctLabel);
+        SeekBar pctSeek = new SeekBar(this);
+        pctSeek.setMax(40);
+        pctSeek.setProgress(Math.max(0, Math.min(40, goalPct - 10)));
+        pctSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
+                int v = 10 + progress;
+                pctLabel.setText("Bateria mínima: " + v + "%");
+                if (fromUser) prefs.edit().putInt("battery_goal_pct", v).putLong("auto_user_last_apply", 0L).apply();
+            }
+            public void onStartTrackingTouch(SeekBar b) {}
+            public void onStopTrackingTouch(SeekBar b) { recreate(); }
+        });
+        c.addView(pctSeek);
+
+        TextView hourLabel = text("Horário alvo: " + String.format(Locale.US, "%02d:00", goalHour), 12, MUTED, false);
+        c.addView(hourLabel);
+        SeekBar hourSeek = new SeekBar(this);
+        hourSeek.setMax(23);
+        hourSeek.setProgress(Math.max(0, Math.min(23, goalHour)));
+        hourSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
+                hourLabel.setText("Horário alvo: " + String.format(Locale.US, "%02d:00", progress));
+                if (fromUser) prefs.edit().putInt("battery_goal_hour", progress).putLong("auto_user_last_apply", 0L).apply();
+            }
+            public void onStartTrackingTouch(SeekBar b) {}
+            public void onStopTrackingTouch(SeekBar b) { recreate(); }
+        });
+        c.addView(hourSeek);
+
         Button resetLearning = actionButton("Reiniciar aprendizado automático");
         resetLearning.setBackground(bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
         resetLearning.setOnClickListener(v -> {

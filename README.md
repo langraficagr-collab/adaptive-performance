@@ -4,13 +4,38 @@
 
 O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para executar operações privilegiadas sem exigir root.
 
-[Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest) · [Release 1.7.0](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.7.0)
+[Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 
 ## Visão geral
 
 O aplicativo monitora continuamente o estado do aparelho e tenta agir somente quando há necessidade real. As decisões podem considerar temperatura, memória disponível, pressão PSI, uso de CPU, swap/zRAM, bateria, atividade em segundo plano, estabilidade, wakeups e outros indicadores.
 
 A proposta é reduzir aquecimento, consumo e travamentos sem aplicar restrições agressivas de forma permanente. Sempre que possível, o Adaptive Performance guarda o estado anterior e permite rollback ou restauração.
+
+## Modos Automático e Avançado
+
+A versão 1.8.0 introduz uma experiência simplificada para usuários leigos sem retirar o controle dos usuários avançados.
+
+### Automático — economia com aprendizado
+
+- Escolhe as configurações automaticamente com prioridade para economia de bateria.
+- Aprende com o padrão real de uso do aparelho.
+- Considera bateria, temperatura, CPU, RAM, consumo estimado e estado da tela.
+- Compara três perfis econômicos em janelas longas de teste.
+- Mede o resultado e passa a favorecer o perfil que apresentar menor consumo com segurança.
+- Pode aumentar a economia quando a bateria está baixa, o aparelho aquece ou a tela permanece desligada.
+- Coordena automaticamente recursos já existentes, incluindo proteção térmica, zRAM/compactação, memória, CPU, Doze, rádio, brilho térmico, apps em segundo plano e proteções de estabilidade.
+- Mantém rollback, proteção contra otimização excessiva e Auto-Reparo ativos.
+- Permite reiniciar o aprendizado a qualquer momento.
+- Oculta a maior parte dos controles técnicos para deixar a interface mais simples.
+
+### Avançado — controle completo
+
+- Exibe todas as opções e ferramentas do Adaptive Performance.
+- Permite configurar manualmente proteção térmica, memória, zRAM, CPU, bateria, limpeza, congelamento, perfis de apps, diagnósticos e demais recursos disponíveis.
+- Indicado para quem prefere controlar individualmente o comportamento do sistema.
+
+Ao atualizar uma instalação existente, o aplicativo preserva o comportamento/configurações já utilizados. Novas instalações podem começar pela experiência automática simplificada.
 
 ## Prints do aplicativo
 
@@ -221,9 +246,11 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
-**1.7.0 — no ads / signal optimizer**
+**1.8.0 — Auto Learning / Battery First**
 
-[Ver a Release 1.7.0 e baixar o APK](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.7.0)
+A versão 1.8.0 adiciona os modos **Automático** e **Avançado**, com aprendizado adaptativo voltado para economia de bateria.
+
+[Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 
 ## Compilação
 

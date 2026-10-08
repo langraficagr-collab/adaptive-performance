@@ -17,7 +17,7 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private TextView shizukuText, statusText, statusSubText;
     private TextView socValue, batValue, ramValue, cpuValue, freqValue;
-    private TextView batteryText, maintenanceText, restrictedText, cpuPressureText, freezeStateText, advancedText, healthText, extendedText, limitingDashboardText;
+    private TextView batteryText, batteryForecastText, maintenanceText, restrictedText, cpuPressureText, freezeStateText, advancedText, healthText, extendedText, limitingDashboardText;
     private TextView thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto;
     private Switch autoRepairSwitch, effectivenessSwitch, profilesSwitch, restrictionGuardSwitch, emergencySwitch, startupSwitch;
     private Switch refreshSwitch, cleanupSwitch, aggressiveMemorySwitch, bugCleanupSwitch, unusedRestrictSwitch, cpuPressureSwitch, manualFreezeSwitch, notifySwitch;
@@ -914,7 +914,13 @@ public class MainActivity extends Activity {
         battery.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1f));
         addSectionTitle(battery,"▣","Apps que mais gastam bateria","Ranking atual");
         batteryText = text("Aguardando dados…",13,Color.rgb(206,224,236),false);
-        batteryText.setPadding(dp(2),dp(12),0,0);
+        TextView usageLabel = text("Consumo e autonomia estimada", 12, CYAN, true);
+        usageLabel.setPadding(dp(2), dp(12), 0, 0);
+        battery.addView(usageLabel);
+        batteryForecastText = text("Coletando leituras para calcular o ritmo de consumo…", 13, Color.rgb(206,224,236), false);
+        batteryForecastText.setPadding(dp(2), dp(5), 0, dp(8));
+        battery.addView(batteryForecastText);
+        batteryText.setPadding(dp(2),dp(8),0,0);
         battery.addView(batteryText);
 
         LinearLayout activity = card();
@@ -1192,6 +1198,84 @@ public class MainActivity extends Activity {
         if (!android.text.TextUtils.equals(view.getText(), value)) view.setText(value);
     }
 
+
+    private String batteryForecastText() {
+        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (battery == null) return "Não foi possível ler o estado da bateria.";
+        int level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+        int status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN);
+        int plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+        if (level < 0 || scale <= 0) return "O aparelho não forneceu o nível da bateria.";
+        int percent = Math.max(0, Math.min(100, Math.round(level * 100f / scale)));
+        boolean charging = plugged != 0 || status == BatteryManager.BATTERY_STATUS_CHARGING
+                || status == BatteryManager.BATTERY_STATUS_FULL;
+        if (charging) {
+            if (prefs.contains("battery_forecast_samples")) prefs.edit().remove("battery_forecast_samples").apply();
+            return "Carregando • " + percent + "%\nO consumo e a autonomia serão calculados quando sair do carregador.";
+        }
+        long now = System.currentTimeMillis();
+        String[] saved = prefs.getString("battery_forecast_samples", "").split(",");
+        ArrayList<String> samples = new ArrayList<>();
+        for (String item : saved) if (!item.isEmpty()) samples.add(item);
+        String latest = percent + ":" + now;
+        boolean samplesChanged = false;
+        if (samples.isEmpty()) {
+            samples.add(latest);
+            samplesChanged = true;
+        } else {
+            String[] last = samples.get(samples.size() - 1).split(":");
+            int lastLevel = last.length > 0 ? (int) parseLongOr(last[0], percent) : percent;
+            long lastTime = last.length > 1 ? parseLongOr(last[1], now) : now;
+            if (percent > lastLevel) {
+                // A level rose without charging (gauge recalibration); start a fresh baseline.
+                samples.clear();
+                samples.add(latest);
+                samplesChanged = true;
+            } else if (now - lastTime >= 60_000L) {
+                samples.add(latest);
+                samplesChanged = true;
+            }
+        }
+        while (samples.size() > 36) { samples.remove(0); samplesChanged = true; }
+        if (samplesChanged) {
+            prefs.edit().putString("battery_forecast_samples", android.text.TextUtils.join(",", samples)).apply();
+        }
+
+        float rate = Float.NaN;
+        if (samples.size() >= 2) {
+            long oldestTime = now;
+            int oldestLevel = percent;
+            for (String item : samples) {
+                String[] parts = item.split(":");
+                if (parts.length != 2) continue;
+                int sampleLevel = (int) parseLongOr(parts[0], percent);
+                long sampleTime = parseLongOr(parts[1], now);
+                if (sampleTime < oldestTime) { oldestTime = sampleTime; oldestLevel = sampleLevel; }
+            }
+            long elapsed = now - oldestTime;
+            int lost = oldestLevel - percent;
+            if (elapsed >= 15L * 60_000L && lost >= 1) {
+                rate = lost * 60_000f / elapsed;
+            }
+        }
+        String state = "Descarregando";
+        if (!Float.isFinite(rate) || rate <= 0f) {
+            return state + " • " + percent + "%\nEstimativa em aprendizado; use o aparelho por pelo menos 15 minutos.";
+        }
+        float hours = percent / rate;
+        if (hours > 240f) return state + " • " + percent + "%\nConsumo muito baixo para estimar com precisão agora.";
+        long totalMinutes = Math.round(hours * 60f);
+        long h = totalMinutes / 60L;
+        long m = totalMinutes % 60L;
+        String autonomy = h > 0 ? h + " h " + m + " min" : Math.max(1L, m) + " min";
+        return String.format(Locale.getDefault(), "%s • %d%%\nConsumo recente: ~%.1f%% por hora\nAutonomia estimada: ~%s", state, percent, rate * 60f, autonomy);
+    }
+
+    private long parseLongOr(String value, long fallback) {
+        try { return Long.parseLong(value); } catch (Exception ignored) { return fallback; }
+    }
+
     private void updateUi() {
         boolean master=prefs.getBoolean("master",false);
         if (startButton != null && (!lastRenderedMasterValid || lastRenderedMaster != master)) {
@@ -1249,6 +1333,10 @@ public class MainActivity extends Activity {
             else if(prefs.getInt("health_antistall",0)==1) statusSubText.setText("Prevenção de travamentos ativa");
             else if(prefs.getBoolean("cpu_pressure_active",false)) statusSubText.setText("Apps em segundo plano temporariamente limitados");
             else statusSubText.setText("Desempenho e temperatura sob controle");
+        }
+
+        if (batteryForecastText != null) {
+            setTextIfChanged(batteryForecastText, batteryForecastText());
         }
 
         if(batteryText!=null) {

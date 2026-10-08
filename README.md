@@ -252,6 +252,10 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
+**1.8.5 — monitor de consumo e autonomia**
+
+Exibe percentual atual, consumo recente por hora e uma estimativa de tempo restante baseada na queda observada durante o uso. A estimativa começa após pelo menos 15 minutos e uma queda mensurável; ela é aproximada e muda conforme uso, sinal, brilho e temperatura. As amostras são coletadas enquanto o painel está aberto e são reiniciadas ao conectar o carregador. Mantém também o assistente de divulgação da versão 1.8.4.
+
 **1.8.4 — assistente de divulgação no Reddit**
 
 Adiciona uma seção de divulgação assistida: prepara um rascunho com identificação de desenvolvedor, abre o formulário oficial do Reddit para revisão e registra intervalo de 7 dias por comunidade. O app não publica automaticamente nem envia posts em segundo plano.

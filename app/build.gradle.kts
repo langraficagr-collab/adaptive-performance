@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 62
-        versionName = "1.8.4-reddit-helper"
+        versionCode = 64
+        versionName = "1.8.5-battery-forecast"
     }
 
     buildTypes {

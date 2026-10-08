@@ -19,10 +19,10 @@ import java.util.*;
 public class StorageCleanupActivity extends Activity {
     private SharedPreferences prefs;
     private final Handler h = new Handler(Looper.getMainLooper());
-    private TextView status, summary, largeFiles, trimPercent, unusedAppsSummary;
+    private TextView status, summary, largeFiles, trimPercent, unusedAppsSummary, storageHealth;
     private ProgressBar trimProgress;
     private Switch cacheSw, thumbsSw, partialSw, apkSw, diagSw, emptySw;
-    private Switch logsSw, staleSw, editorTempSw, dexCacheSw;
+    private Switch logsSw, staleSw, editorTempSw, dexCacheSw, storageHealthSw;
     private static final int BG=Color.rgb(6,16,25), CARD=Color.rgb(12,30,43), BORDER=Color.rgb(35,72,92), TEXT=Color.rgb(239,247,255), MUTED=Color.rgb(150,174,194), CYAN=Color.rgb(49,190,255), GREEN=Color.rgb(75,230,125);
 
     @Override protected void onCreate(Bundle b){
@@ -76,6 +76,21 @@ public class StorageCleanupActivity extends Activity {
         Button pauseTrim=btn("Pausar otimização / TRIM");
         pauseTrim.setOnClickListener(v -> requestPauseTrim());
         options.addView(pauseTrim); c.addView(options);
+
+        LinearLayout health=card();
+        addTitle(health,"◎","Manutenção inteligente do armazenamento","Verifica mudanças a cada hora e só executa ações pesadas em repouso.");
+        storageHealthSw=swPref("Monitorar armazenamento automaticamente a cada hora","storage_health_auto_enabled",true);
+        health.addView(storageHealthSw);
+        storageHealth=t("Aguardando primeira verificação.",13,TEXT,false);
+        storageHealth.setPadding(0,dp(10),0,0);
+        health.addView(storageHealth);
+        TextView healthNote=t("TRIM: manutenção do Android • F2FS GC/discard: monitorados • defrag: somente se suportado • fsck/e2fsck: nunca executados com /data montado.",12,MUTED,false);
+        healthNote.setPadding(0,dp(8),0,0);
+        health.addView(healthNote);
+        Button healthNow=btn("Verificar armazenamento agora");
+        healthNow.setOnClickListener(v->requestStorageHealthCheck());
+        health.addView(healthNow);
+        c.addView(health);
 
         LinearLayout large=card(); addTitle(large,"⌕","Arquivos grandes","Localiza arquivos acima de 500 MB em Downloads e permite escolher quais excluir.");
         largeFiles=t("Nenhuma análise feita.",13,MUTED,false); large.addView(largeFiles);
@@ -194,6 +209,11 @@ public class StorageCleanupActivity extends Activity {
 
     private void requestTrim(){ status.setText("Otimizando armazenamento…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM); startForegroundService(i); }
     private void requestPauseTrim(){ status.setText("Pausando otimização…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM_ABORT); startForegroundService(i); }
+    private void requestStorageHealthCheck(){
+        if(storageHealth!=null) storageHealth.setText("Verificando agora…");
+        Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_HEALTH_CHECK);
+        startForegroundService(i);
+    }
     private void confirmClean(){
         String msg="A limpeza vai atuar somente nas categorias marcadas. Fotos, vídeos, músicas e documentos pessoais não serão apagados automaticamente.";
         new AlertDialog.Builder(this).setTitle("Confirmar limpeza").setMessage(msg).setNegativeButton("Cancelar",null).setPositiveButton("Limpar",(d,w)->requestClean()).show();
@@ -216,6 +236,15 @@ public class StorageCleanupActivity extends Activity {
         long freed=prefs.getLong("storage_last_freed_kb",0L); if(freed>0) s += "\nÚltima limpeza liberou aproximadamente "+fmt(freed);
         summary.setText(s);
         updateTrimProgress();
+        if(storageHealth!=null){
+            String hs=prefs.getString("storage_health_summary","Aguardando primeira verificação.");
+            long hc=prefs.getLong("storage_health_last_check_at",0L);
+            if(hc>0L){
+                long min=Math.max(0L,(System.currentTimeMillis()-hc)/60000L);
+                hs += "\nÚltima verificação: " + (min<1 ? "agora" : (min+" min atrás"));
+            }
+            storageHealth.setText(hs);
+        }
         largeFiles.setText(prefs.getString("storage_large_files","Nenhuma análise feita."));
     }
     private void updateTrimProgress(){

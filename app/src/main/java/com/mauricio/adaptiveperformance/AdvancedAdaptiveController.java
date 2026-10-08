@@ -647,7 +647,7 @@ public final class AdvancedAdaptiveController {
             for (String pkg : seen) {
                 if (count >= max) break;
                 if (pkg.equals(foreground) || fgs.contains(pkg)) continue;
-                if (!AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) continue;
+                if (!AppSafety.isEligibleForAdaptiveOptimization(context, pkg) || AppSafety.isNeverFreeze(context, pkg)) continue;
                 privileged.exec("cmd activity make-uid-idle --user 0 " + pkg);
                 count++;
             }

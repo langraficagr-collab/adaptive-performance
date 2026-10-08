@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 68
-        versionName = "1.8.9-auto-settings-fix"
+        versionCode = 70
+        versionName = "1.9.1-auto-learning-storage"
     }
 
     buildTypes {

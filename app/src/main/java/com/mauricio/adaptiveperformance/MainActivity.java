@@ -352,6 +352,7 @@ public class MainActivity extends Activity {
         prefs.edit().putString("user_mode", normalized).apply();
         if ("auto".equals(normalized)) {
             prefs.edit().putLong("auto_user_last_apply", 0L).apply();
+            AutoTuningController.resetSession(prefs);
         }
         recreate();
     }
@@ -404,10 +405,14 @@ public class MainActivity extends Activity {
         status.setPadding(dp(4), dp(14), dp(4), dp(8));
         c.addView(status);
 
-        TextView details = text("O modo automático usa temperatura, CPU, RAM, consumo estimado, estado da tela e nível da bateria. Ele alterna entre perfis econômicos em janelas longas, mede o resultado e mantém a configuração que apresentar menor consumo com segurança.",
+        TextView details = text("O modo automático testa gradualmente opções e níveis do modo avançado, mede bateria, temperatura, CPU, RAM e fluidez, e conserva as combinações com melhor resultado. Apps usados com frequência entram automaticamente na proteção contra congelamento.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
+        TextView tuning = text(prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes") +
+                " • apps frequentes protegidos: " + prefs.getInt("auto_frequent_count", 0), 12, CYAN, true);
+        tuning.setPadding(dp(4), dp(6), dp(4), dp(4));
+        c.addView(tuning);
 
         TextView goalTitle = text("Meta de bateria", 15, TEXT, true);
         goalTitle.setPadding(dp(4), dp(16), dp(4), dp(6));
@@ -467,6 +472,7 @@ public class MainActivity extends Activity {
                     .putLong("auto_user_last_apply", 0L)
                     .putString("auto_user_status", "Aprendizado reiniciado • coletando novos dados")
                     .apply();
+            AutoTuningController.resetSession(prefs);
             Toast.makeText(this, "Aprendizado automático reiniciado.", Toast.LENGTH_SHORT).show();
             recreate();
         });

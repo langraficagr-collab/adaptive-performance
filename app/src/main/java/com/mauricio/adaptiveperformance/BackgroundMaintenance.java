@@ -341,7 +341,8 @@ public class BackgroundMaintenance {
     }
 
     private boolean isEligibleForAutoRestriction(String pkg) {
-        return AppSafety.isEligibleForAdaptiveOptimization(context, pkg);
+        return AppSafety.isEligibleForAdaptiveOptimization(context, pkg)
+                && !AppSafety.isNeverFreeze(context, pkg);
     }
 
     private void restoreAutoRestriction(String pkg, Set<String> restricted) throws Exception {

@@ -35,6 +35,7 @@ public class OptimizationService extends Service {
     public static final String ACTION_STORAGE_DELETE_LARGE = "com.mauricio.adaptiveperformance.STORAGE_DELETE_LARGE";
     public static final String ACTION_STORAGE_TRIM = "com.mauricio.adaptiveperformance.STORAGE_TRIM";
     public static final String ACTION_STORAGE_TRIM_ABORT = "com.mauricio.adaptiveperformance.STORAGE_TRIM_ABORT";
+    public static final String ACTION_STORAGE_HEALTH_CHECK = "com.mauricio.adaptiveperformance.STORAGE_HEALTH_CHECK";
     public static final String ACTION_PRIVATE_DNS_ENABLE = "com.mauricio.adaptiveperformance.PRIVATE_DNS_ENABLE";
     public static final String ACTION_PRIVATE_DNS_DISABLE = "com.mauricio.adaptiveperformance.PRIVATE_DNS_DISABLE";
     private static final float SOC_LEVEL1_C = 56.0f;
@@ -74,6 +75,8 @@ public class OptimizationService extends Service {
     private DeepSleepController deepSleepController;
     private ThermalBrightnessController thermalBrightnessController;
     private SystemBatteryController systemBatteryController;
+    private AutoTuningController autoTuningController;
+    private StorageHealthController storageHealthController;
     private volatile long nextLoopDelayMs = 60000L;
     private final ExecutorService maintenanceExecutor = idleSingleExecutor("maintenance");
     private final AtomicBoolean maintenanceBusy = new AtomicBoolean(false);
@@ -89,6 +92,8 @@ public class OptimizationService extends Service {
     private final AtomicBoolean brightnessBusy = new AtomicBoolean(false);
     private final ExecutorService systemBatteryExecutor = idleSingleExecutor("battery");
     private final AtomicBoolean systemBatteryBusy = new AtomicBoolean(false);
+    private final ExecutorService storageHealthExecutor = idleSingleExecutor("storage-health");
+    private final AtomicBoolean storageHealthBusy = new AtomicBoolean(false);
 
     private final BroadcastReceiver powerStateReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -97,6 +102,11 @@ public class OptimizationService extends Service {
             boolean wake = Intent.ACTION_SCREEN_ON.equals(action)
                     || Intent.ACTION_POWER_CONNECTED.equals(action)
                     || Intent.ACTION_USER_PRESENT.equals(action);
+            if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                prefs.edit().putLong("storage_idle_since", System.currentTimeMillis()).apply();
+            } else if (Intent.ACTION_SCREEN_ON.equals(action) || Intent.ACTION_USER_PRESENT.equals(action)) {
+                prefs.edit().putLong("storage_idle_since", 0L).apply();
+            }
             if (wake) {
                 prefs.edit()
                         .putBoolean("system_deep_idle_active", false)
@@ -136,6 +146,8 @@ public class OptimizationService extends Service {
             extendedController = new ExtendedDiagnosticsController(OptimizationService.this, prefs, privileged);
             thermalBrightnessController = new ThermalBrightnessController(OptimizationService.this, prefs, privileged);
             systemBatteryController = new SystemBatteryController(OptimizationService.this, prefs, privileged);
+            autoTuningController = new AutoTuningController(OptimizationService.this, prefs);
+            storageHealthController = new StorageHealthController(OptimizationService.this, prefs, privileged);
             final SystemBatteryController initBattery = systemBatteryController;
             systemBatteryExecutor.execute(() -> {
                 try { initBattery.auditWakeLocksNow(prefs.getString("foreground", "")); }
@@ -182,6 +194,8 @@ public class OptimizationService extends Service {
             healthController = null;
             extendedController = null;
             thermalBrightnessController = null;
+            autoTuningController = null;
+            storageHealthController = null;
             systemBatteryController = null;
             privileged = null;
             prefs.edit().putBoolean("shizuku_bound", false).apply();
@@ -506,6 +520,15 @@ public class OptimizationService extends Service {
                     t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
         }
         try {
+            if (autoTuningController != null) {
+                autoTuningController.evaluate(smartBatteryPct, controlTemp, cpuLoad, availPct,
+                        interactive, chargingNow, advanced != null ? advanced.powerW : -1f);
+            }
+        } catch (Throwable t) {
+            prefs.edit().putString("auto_tune_error",
+                    t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+        }
+        try {
             CellularSignalOptimizer.evaluate(this, prefs, privileged);
         } catch (Throwable ignored) {}
         try {
@@ -551,6 +574,20 @@ public class OptimizationService extends Service {
                 try { m.maybeRun(fgCopy); }
                 catch (Throwable ignored) {}
                 finally { maintenanceBusy.set(false); }
+            });
+        }
+
+        if (startupReady && storageHealthController != null && storageHealthBusy.compareAndSet(false, true)) {
+            final StorageHealthController shc = storageHealthController;
+            final boolean shInteractive = interactive;
+            final boolean shCharging = chargingNow;
+            final float shBatteryTemp = tempC;
+            storageHealthExecutor.execute(() -> {
+                try { shc.maybeRun(shInteractive, shCharging, shBatteryTemp); }
+                catch (Throwable t) {
+                    prefs.edit().putString("storage_health_error",
+                            t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+                } finally { storageHealthBusy.set(false); }
             });
         }
 
@@ -1206,6 +1243,40 @@ public class OptimizationService extends Service {
     }
 
 
+    private void runStorageHealthCheck(int retry) {
+        prefs.edit().putString("storage_health_action", "Verificando agora…").apply();
+        if (privileged == null) {
+            bindShizukuIfPossible();
+            if (retry < 8) {
+                handler.postDelayed(() -> runStorageHealthCheck(retry + 1), 900L);
+            } else {
+                prefs.edit().putString("storage_health_action", "Shizuku indisponível para verificar armazenamento").apply();
+                if (!prefs.getBoolean("master", false)) stopSelf();
+            }
+            return;
+        }
+
+        if (storageHealthController == null) {
+            storageHealthController = new StorageHealthController(this, prefs, privileged);
+        }
+        if (!storageHealthBusy.compareAndSet(false, true)) return;
+        final StorageHealthController shc = storageHealthController;
+        final PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
+        final boolean interactive = pm != null && pm.isInteractive();
+        final boolean charging = isChargingNow();
+        final float temp = batteryTemp();
+        storageHealthExecutor.execute(() -> {
+            try { shc.forceCheck(interactive, charging, temp); }
+            catch (Throwable t) {
+                prefs.edit().putString("storage_health_error",
+                        t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+            } finally {
+                storageHealthBusy.set(false);
+                if (!prefs.getBoolean("master", false)) stopSelf();
+            }
+        });
+    }
+
     private String cleanSettingValue(String value) {
         if (value == null) return "";
         value = value.trim();
@@ -1350,6 +1421,11 @@ public class OptimizationService extends Service {
         }
         if (ACTION_STORAGE_TRIM_ABORT.equals(action)) {
             requestStorageTrimAbort();
+            return START_STICKY;
+        }
+
+        if (ACTION_STORAGE_HEALTH_CHECK.equals(action)) {
+            runStorageHealthCheck(0);
             return START_STICKY;
         }
 
@@ -1827,6 +1903,7 @@ public class OptimizationService extends Service {
         });
 
         systemBatteryExecutor.shutdownNow();
+        storageHealthExecutor.shutdownNow();
         maintenanceExecutor.shutdownNow();
         cpuPressureExecutor.shutdownNow();
         manualFreezeExecutor.shutdownNow();

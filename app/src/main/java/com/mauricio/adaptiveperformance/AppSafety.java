@@ -119,6 +119,16 @@ public final class AppSafety {
         return isEligibleForAdaptiveOptimization(context, pkg);
     }
 
+    public static boolean isFrequentlyUsedAuto(Context context, String pkg) {
+        if (pkg == null || pkg.isEmpty()) return false;
+        try {
+            android.content.SharedPreferences p = context.getSharedPreferences("adaptive", Context.MODE_PRIVATE);
+            if (!"auto".equals(p.getString("user_mode", "auto"))) return false;
+            java.util.Set<String> set = p.getStringSet("auto_frequent_apps", java.util.Collections.emptySet());
+            return set != null && set.contains(pkg);
+        } catch (Throwable t) { return false; }
+    }
+
     /** Lista pessoal de apps que nunca devem ser finalizados/congelados automaticamente. */
     public static boolean isNeverFreeze(Context context, String pkg) {
         if (pkg == null || pkg.isEmpty()) return true;
@@ -126,6 +136,7 @@ public final class AppSafety {
             java.util.Set<String> never = context.getSharedPreferences("adaptive", Context.MODE_PRIVATE)
                     .getStringSet("never_freeze_apps", java.util.Collections.emptySet());
             if (never != null && never.contains(pkg)) return true;
+            if (isFrequentlyUsedAuto(context, pkg)) return true;
             // Migra as exceções criadas nas versões anteriores.
             java.util.Set<String> legacy = context.getSharedPreferences("adaptive", Context.MODE_PRIVATE)
                     .getStringSet("auto_protected_apps", java.util.Collections.emptySet());

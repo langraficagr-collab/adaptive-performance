@@ -16,19 +16,20 @@ A proposta é reduzir aquecimento, consumo e travamentos sem aplicar restriçõe
 
 ## Modos Automático e Avançado
 
-A versão 1.8.0 introduz uma experiência simplificada para usuários leigos sem retirar o controle dos usuários avançados.
+A versão 1.9.1 amplia o modo Automático com testes A/B por parâmetro, aprendizado de uso por aplicativo e manutenção inteligente de armazenamento, sem retirar o controle dos usuários avançados.
 
 ### Automático — economia com aprendizado
 
-- Escolhe as configurações automaticamente com prioridade para economia de bateria.
-- Aprende com o padrão real de uso do aparelho.
-- Considera bateria, temperatura, CPU, RAM, consumo estimado e estado da tela.
-- Compara três perfis econômicos em janelas longas de teste.
-- Mede o resultado e passa a favorecer o perfil que apresentar menor consumo com segurança.
+- Escolhe as configurações automaticamente com prioridade para economia de bateria e fluidez.
+- Aprende com o padrão real de uso do aparelho e identifica aplicativos usados com frequência.
+- Protege automaticamente apps frequentes e a lista pessoal de exceções contra congelamento automático.
+- Considera bateria, temperatura, CPU, RAM, potência estimada, estado da tela e estabilidade.
+- Testa individualmente níveis de compactação de RAM, limite de RAM por app, tempo até congelamento, atraso após sair do app e limiares de limpeza.
+- Também compara ativação/desativação de economia com tela apagada, controle de wakeups, economia de rádio e taxa de atualização adaptativa.
+- Mede o resultado de cada janela de teste e mantém as configurações com melhor relação entre consumo, temperatura e desempenho.
 - Pode aumentar a economia quando a bateria está baixa, o aparelho aquece ou a tela permanece desligada.
-- Coordena automaticamente recursos já existentes, incluindo proteção térmica, zRAM/compactação, memória, CPU, Doze, rádio, brilho térmico, apps em segundo plano e proteções de estabilidade.
-- Mantém rollback, proteção contra otimização excessiva e Auto-Reparo ativos.
-- Permite reiniciar o aprendizado a qualquer momento.
+- Mantém sempre ativas as proteções críticas de estabilidade, rollback, Auto-Reparo e segurança térmica.
+- Permite reiniciar todo o aprendizado a qualquer momento.
 - Oculta a maior parte dos controles técnicos para deixar a interface mais simples.
 
 ### Avançado — controle completo
@@ -38,6 +39,18 @@ A versão 1.8.0 introduz uma experiência simplificada para usuários leigos sem
 - Indicado para quem prefere controlar individualmente o comportamento do sistema.
 
 Ao atualizar uma instalação existente, o aplicativo preserva o comportamento/configurações já utilizados. Novas instalações podem começar pela experiência automática simplificada.
+
+
+## Novidades da versão 1.9.1
+
+- Novo motor de autocalibração por testes A/B no modo Automático.
+- Seleção automática dos melhores níveis por parâmetro com base em bateria, temperatura, CPU, RAM e potência estimada.
+- Detecção de aplicativos usados com frequência para reduzir congelamentos inconvenientes.
+- Reinício completo do ciclo de aprendizado sempre que o usuário troca do modo Avançado para o Automático.
+- Monitor de saúde do armazenamento executado a cada hora.
+- Detecção de F2FS, GC, discard, gc_merge e ATGC.
+- Manutenção/TRIM somente em repouso e em condições térmicas seguras.
+- Versão Android: **1.9.1-auto-learning-storage** (versionCode 70).
 
 ## Prints do aplicativo
 
@@ -170,10 +183,14 @@ A aba **Limpeza** permite analisar e remover categorias de arquivos sem apagar a
 - Exibe há quanto tempo cada app não é utilizado.
 - A remoção não é automática: o Android abre a tela oficial de desinstalação.
 
-### Manutenção / TRIM
+### Manutenção / TRIM e saúde do armazenamento
 
-- Aciona rotinas de manutenção compatíveis com Android/F2FS.
-- Usa TRIM/manutenção de flash em vez de desfragmentação tradicional de HDD.
+- Monitora o armazenamento automaticamente a cada hora.
+- Detecta o sistema de arquivos e, em F2FS, verifica GC em segundo plano, gc_merge, discard e ATGC quando disponíveis.
+- Compara alterações de espaço livre entre leituras para decidir se há necessidade real de manutenção.
+- Executa a manutenção oficial do Android/TRIM somente quando o aparelho estiver em repouso, com temperatura segura e energia suficiente.
+- Evita rodar fsck em /data montado; se houver sinal de erro de integridade, recomenda verificação offline.
+- Aciona rotinas de manutenção compatíveis com Android/F2FS em vez de desfragmentação tradicional de HDD.
 - Exibe progresso estimado quando o Android não fornece percentual real.
 - Permite acompanhamento e interrupção segura quando aplicável.
 

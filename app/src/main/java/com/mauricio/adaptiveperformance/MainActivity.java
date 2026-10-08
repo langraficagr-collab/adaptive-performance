@@ -70,12 +70,9 @@ public class MainActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
-        if (!prefs.contains("user_mode")) {
-            // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
-            String initialMode = prefs.contains("master") ? "advanced" : "auto";
-            prefs.edit().putString("user_mode", initialMode).apply();
-        }
-        if (!prefs.contains("user_mode")) {
+        if (BuildConfig.LEAN_MODE) {
+            prefs.edit().putString("user_mode", "auto").putBoolean("master", false).apply();
+        } else if (!prefs.contains("user_mode")) {
             // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
             String initialMode = prefs.contains("master") ? "advanced" : "auto";
             prefs.edit().putString("user_mode", initialMode).apply();
@@ -87,7 +84,7 @@ public class MainActivity extends Activity {
         windowParams.preferredRefreshRate = 60f;
         getWindow().setAttributes(windowParams);
         if (Build.VERSION.SDK_INT >= 23) getWindow().getDecorView().setSystemUiVisibility(0);
-        Shizuku.addRequestPermissionResultListener(permissionListener);
+        if (!BuildConfig.LEAN_MODE) Shizuku.addRequestPermissionResultListener(permissionListener);
         buildUi();
         if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
@@ -372,6 +369,11 @@ public class MainActivity extends Activity {
         alp.setMargins(dp(8), 0, 0, 0);
         advanced.setLayoutParams(alp);
 
+        if (BuildConfig.LEAN_MODE) {
+            advanced.setVisibility(View.GONE);
+            automatic.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(54)));
+        }
+
         boolean advancedMode = isAdvancedUserMode();
         automatic.setBackground(advancedMode
                 ? bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16)
@@ -385,9 +387,11 @@ public class MainActivity extends Activity {
         row.addView(advanced);
         c.addView(row);
 
-        TextView help = text(advancedMode
+        TextView help = text(BuildConfig.LEAN_MODE
+                ? "Modo simples: o aplicativo cuida das otimizações compatíveis com o Android, sem ADB ou Shizuku."
+                : (advancedMode
                 ? "Avançado: todas as opções ficam disponíveis para ajuste manual."
-                : "Automático: o app aprende seu padrão de uso, compara perfis e prioriza menor consumo sem abandonar proteções de estabilidade e temperatura.",
+                : "Automático: o app aprende seu padrão de uso, compara perfis e prioriza menor consumo sem abandonar proteções de estabilidade e temperatura."),
                 12, MUTED, false);
         help.setPadding(dp(4), dp(10), dp(4), 0);
         c.addView(help);
@@ -996,6 +1000,23 @@ public class MainActivity extends Activity {
 
     private void buildSystemCard() {
         LinearLayout c = card();
+        if (BuildConfig.LEAN_MODE) {
+            addSectionTitle(c, "✓", "Modo simples", "Otimizações compatíveis com Android, sem ADB ou Shizuku");
+            shizukuText = text("Sem ADB/Shizuku: recursos que exigem acesso privilegiado ficam ocultos.", 13, MUTED, false);
+            shizukuText.setPadding(0, dp(12), 0, dp(8));
+            c.addView(shizukuText);
+            startButton = actionButton("Iniciar otimização");
+            startButton.setOnClickListener(v -> {
+                if (prefs.getBoolean("master", false)) stopOptimizer(); else startOptimizer();
+            });
+            c.addView(startButton);
+            TextView note = text("Inclui monitoramento de bateria e temperatura, aprendizado automático, proteção térmica, otimizações de memória permitidas pelo Android, apps frequentes e manutenção segura do armazenamento quando o sistema permitir.", 12, MUTED, false);
+            note.setPadding(0, dp(10), 0, 0);
+            c.addView(note);
+            content.addView(c);
+            return;
+        }
+        addSectionTitle(c,"⚙","Sistema e serviço","Shizuku, monitor e controles do aplicativo");
         addSectionTitle(c,"⚙","Sistema e serviço","Shizuku, monitor e controles do aplicativo");
 
         shizukuText = text("Shizuku: verificando…",13,MUTED,false);
@@ -1100,6 +1121,10 @@ public class MainActivity extends Activity {
     }
 
     private void ensurePermissionAndStart() {
+        if (BuildConfig.LEAN_MODE) {
+            startOptimizer();
+            return;
+        }
         if (!Shizuku.pingBinder()) { updateShizuku(); return; }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) startOptimizer();
         else requestShizuku();

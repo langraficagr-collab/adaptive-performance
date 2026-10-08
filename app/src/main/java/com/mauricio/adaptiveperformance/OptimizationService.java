@@ -76,6 +76,7 @@ public class OptimizationService extends Service {
     private ThermalBrightnessController thermalBrightnessController;
     private SystemBatteryController systemBatteryController;
     private AutoTuningController autoTuningController;
+    private AdaptivePreloadController adaptivePreloadController;
     private StorageHealthController storageHealthController;
     private volatile long nextLoopDelayMs = 60000L;
     private final ExecutorService maintenanceExecutor = idleSingleExecutor("maintenance");
@@ -147,6 +148,7 @@ public class OptimizationService extends Service {
             thermalBrightnessController = new ThermalBrightnessController(OptimizationService.this, prefs, privileged);
             systemBatteryController = new SystemBatteryController(OptimizationService.this, prefs, privileged);
             autoTuningController = new AutoTuningController(OptimizationService.this, prefs);
+            adaptivePreloadController = new AdaptivePreloadController(OptimizationService.this, prefs);
             storageHealthController = new StorageHealthController(OptimizationService.this, prefs, privileged);
             final SystemBatteryController initBattery = systemBatteryController;
             systemBatteryExecutor.execute(() -> {
@@ -195,6 +197,7 @@ public class OptimizationService extends Service {
             extendedController = null;
             thermalBrightnessController = null;
             autoTuningController = null;
+            adaptivePreloadController = null;
             storageHealthController = null;
             systemBatteryController = null;
             privileged = null;
@@ -206,11 +209,6 @@ public class OptimizationService extends Service {
         super.onCreate();
         serviceDestroyed = false;
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
-        if (!prefs.contains("user_mode")) {
-            // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
-            String initialMode = prefs.contains("master") ? "advanced" : "auto";
-            prefs.edit().putString("user_mode", initialMode).apply();
-        }
         if (!prefs.contains("user_mode")) {
             // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
             String initialMode = prefs.contains("master") ? "advanced" : "auto";
@@ -297,6 +295,7 @@ public class OptimizationService extends Service {
         PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
         boolean interactive = pm != null && pm.isInteractive();
         boolean batteryChargingNow = isChargingNow();
+        int smartBatteryPct = batteryPercent();
         if (deepSleepController != null && prefs.getBoolean("deep_sleep_monitor", true)) {
             try { deepSleepController.update(interactive); } catch (Throwable ignored) {}
         }
@@ -378,6 +377,30 @@ public class OptimizationService extends Service {
             }
         }
         final boolean chargingNow = advanced != null ? advanced.charging : batteryChargingNow;
+        boolean automaticMode = AutoUserModeController.enabled(prefs);
+        boolean lowBatteryAutomatic = automaticMode && !chargingNow && smartBatteryPct >= 0
+                && smartBatteryPct <= 50;
+        boolean thermalSavingAutomatic = automaticMode
+                && (controlTemp >= 56.0f
+                || tempC >= 38.0f
+                || (thermals.skin > 0f && thermals.skin >= 42.0f)
+                || (advanced != null && advanced.thermalTarget > 0));
+        boolean automaticConservation = lowBatteryAutomatic || thermalSavingAutomatic;
+        boolean deferHeavyDiagnostics = automaticConservation;
+        boolean deferNonCriticalMaintenance = lowBatteryAutomatic && !thermalSavingAutomatic;
+        String automaticReason = thermalSavingAutomatic
+                ? "Resfriamento automático ativo"
+                : (lowBatteryAutomatic ? "Economia automática: bateria " + smartBatteryPct + "%" : "");
+        prefs.edit()
+                .putBoolean("automatic_saving_active", automaticConservation)
+                .putBoolean("automatic_low_battery_active", lowBatteryAutomatic)
+                .putBoolean("automatic_cooling_active", thermalSavingAutomatic)
+                .putString("automatic_saving_reason", automaticReason)
+                .apply();
+        if (lowBatteryAutomatic && !thermalSavingAutomatic && interactive
+                && (advanced == null || advanced.pressureScore < 3)) {
+            nextLoopDelayMs = Math.max(nextLoopDelayMs, 120_000L);
+        }
         SystemBatteryController.Result systemBattery = null;
         if (systemBatteryController != null) {
             try {
@@ -434,7 +457,8 @@ public class OptimizationService extends Service {
             }
         }
 
-        if (healthController != null && healthBusy.compareAndSet(false, true)) {
+        if (healthController != null && !deferHeavyDiagnostics
+                && healthBusy.compareAndSet(false, true)) {
             final SystemHealthController hc = healthController;
             final String healthFg = fg;
             final boolean healthInteractive = interactive;
@@ -474,7 +498,8 @@ public class OptimizationService extends Service {
             }
         }
 
-        if (extendedController != null && extendedBusy.compareAndSet(false, true)) {
+        if (extendedController != null && !deferHeavyDiagnostics
+                && extendedBusy.compareAndSet(false, true)) {
             final ExtendedDiagnosticsController ec = extendedController;
             final String extendedFg = fg;
             final boolean extendedInteractive = interactive;
@@ -499,21 +524,12 @@ public class OptimizationService extends Service {
                 effectivePressure = Math.max(basePressure, effectivePressure - 1);
         }
         final int adaptivePressureScore = effectivePressure;
-        int smartBatteryPct = -1;
-        try {
-            android.content.Intent bi = registerReceiver(null, new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
-            if (bi != null) {
-                int bl = bi.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
-                int bs = bi.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100);
-                if (bl >= 0 && bs > 0) smartBatteryPct = Math.round(bl * 100f / bs);
-            }
-        } catch (Throwable ignored) {}
         try {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
-                    smartBatteryPct, controlTemp, adaptivePressureScore);
+                    smartBatteryPct, tempC, adaptivePressureScore);
         } catch (Throwable ignored) {}
         try {
-            AutoUserModeController.evaluate(prefs, smartBatteryPct, controlTemp, cpuLoad, availPct,
+            AutoUserModeController.evaluate(prefs, smartBatteryPct, tempC, cpuLoad, availPct,
                     interactive, chargingNow, advanced != null ? advanced.powerW : -1f);
         } catch (Throwable t) {
             prefs.edit().putString("auto_user_error",
@@ -521,7 +537,7 @@ public class OptimizationService extends Service {
         }
         try {
             if (autoTuningController != null) {
-                autoTuningController.evaluate(smartBatteryPct, controlTemp, cpuLoad, availPct,
+                autoTuningController.evaluate(smartBatteryPct, tempC, cpuLoad, availPct,
                         interactive, chargingNow, advanced != null ? advanced.powerW : -1f);
             }
         } catch (Throwable t) {
@@ -529,8 +545,24 @@ public class OptimizationService extends Service {
                     t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
         }
         try {
-            CellularSignalOptimizer.evaluate(this, prefs, privileged);
-        } catch (Throwable ignored) {}
+            if (adaptivePreloadController != null) {
+                adaptivePreloadController.evaluate(privileged, availPct, controlTemp, tempC,
+                        interactive, chargingNow, smartBatteryPct, automaticMode);
+            }
+        } catch (Throwable t) {
+            prefs.edit().putString("auto_preload_error",
+                    t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+        }
+        boolean signalTestActive = "testing".equals(
+                prefs.getString("signal_optimizer_phase", "idle"))
+                || prefs.getBoolean("signal_optimizer_changed", false);
+        boolean signalDisabledNeedsRestore = !prefs.getBoolean("signal_optimizer_enabled", false)
+                && prefs.getBoolean("signal_optimizer_changed", false);
+        if (!automaticConservation || signalTestActive || signalDisabledNeedsRestore) {
+            try {
+                CellularSignalOptimizer.evaluate(this, prefs, privileged);
+            } catch (Throwable ignored) {}
+        }
         try {
             LocationBatteryController.evaluate(prefs, privileged, interactive, chargingNow);
         } catch (Throwable ignored) {}
@@ -567,7 +599,8 @@ public class OptimizationService extends Service {
             });
         }
 
-        if (mutationsAllowed && maintenance != null && maintenanceBusy.compareAndSet(false, true)) {
+        if (mutationsAllowed && maintenance != null && !deferNonCriticalMaintenance
+                && maintenanceBusy.compareAndSet(false, true)) {
             final BackgroundMaintenance m = maintenance;
             final String fgCopy = fg;
             maintenanceExecutor.execute(() -> {
@@ -577,7 +610,8 @@ public class OptimizationService extends Service {
             });
         }
 
-        if (startupReady && storageHealthController != null && storageHealthBusy.compareAndSet(false, true)) {
+        if (startupReady && storageHealthController != null && !automaticConservation
+                && storageHealthBusy.compareAndSet(false, true)) {
             final StorageHealthController shc = storageHealthController;
             final boolean shInteractive = interactive;
             final boolean shCharging = chargingNow;
@@ -774,6 +808,23 @@ public class OptimizationService extends Service {
             prefs.edit().putString("deep_idle_unbind_error",
                     t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
         }
+    }
+
+    private int batteryPercent() {
+        try {
+            BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
+            int value = bm == null ? -1 : bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            if (value >= 0 && value <= 100) return value;
+        } catch (Throwable ignored) {}
+        try {
+            Intent b = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (b != null) {
+                int level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+                if (level >= 0 && scale > 0) return Math.round(level * 100f / scale);
+            }
+        } catch (Throwable ignored) {}
+        return -1;
     }
 
     private float batteryTemp() {

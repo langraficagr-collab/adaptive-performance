@@ -53,7 +53,7 @@ public final class SmartRecommendationSuite {
     }
     private static void lowBatteryMode(SharedPreferences p,int pct){
         if(!p.getBoolean("low_battery_adaptive",true))return;
-        int threshold=Math.max(10,Math.min(50,p.getInt("low_battery_threshold",25)));
+        int threshold=Math.max(10,Math.min(50,p.getInt("low_battery_threshold",50)));
         boolean on=pct>=0 && pct<=threshold;
         p.edit().putBoolean("low_battery_active",on).apply();
     }

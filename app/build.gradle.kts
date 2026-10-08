@@ -14,8 +14,8 @@ android {
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
         buildConfigField("boolean", "LEAN_MODE", "false")
-        versionCode = 70
-        versionName = "1.9.1-auto-learning-storage"
+        versionCode = 71
+        versionName = "1.9.2-auto-preload"
     }
 
     flavorDimensions += "edition"

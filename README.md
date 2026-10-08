@@ -16,13 +16,13 @@ A proposta é reduzir aquecimento, consumo e travamentos sem aplicar restriçõe
 
 ## Modos Automático e Avançado
 
-A versão 1.9.1 amplia o modo Automático com testes A/B por parâmetro, aprendizado de uso por aplicativo e manutenção inteligente de armazenamento, sem retirar o controle dos usuários avançados.
+A versão 1.9.2 amplia o modo Automático com testes A/B, pré-carregamento inteligente dos apps usados recentemente, economia automática abaixo de 50% e manutenção inteligente de armazenamento, sem retirar o controle dos usuários avançados.
 
 ### Automático — economia com aprendizado
 
 - Escolhe as configurações automaticamente com prioridade para economia de bateria e fluidez.
 - Aprende com o padrão real de uso do aparelho e identifica aplicativos usados com frequência.
-- Protege automaticamente apps frequentes e a lista pessoal de exceções contra congelamento automático.
+- Não protege nem congela aplicativos automaticamente; o modo Automático mantém o foco no pré-carregamento e respeita as seleções manuais.
 - Considera bateria, temperatura, CPU, RAM, potência estimada, estado da tela e estabilidade.
 - Testa individualmente níveis de compactação de RAM, limite de RAM por app, tempo até congelamento, atraso após sair do app e limiares de limpeza.
 - Também compara ativação/desativação de economia com tela apagada, controle de wakeups, economia de rádio e taxa de atualização adaptativa.
@@ -31,6 +31,15 @@ A versão 1.9.1 amplia o modo Automático com testes A/B por parâmetro, aprendi
 - Mantém sempre ativas as proteções críticas de estabilidade, rollback, Auto-Reparo e segurança térmica.
 - Permite reiniciar todo o aprendizado a qualquer momento.
 - Oculta a maior parte dos controles técnicos para deixar a interface mais simples.
+
+### Pré-carregamento inteligente
+
+- A cada 15 minutos, analisa somente os aplicativos usados na janela recente.
+- Seleciona até quatro apps elegíveis e exibe no painel quais estão mantidos no ciclo.
+- Pré-carrega APK principal, splits e conteúdos selecionados de Android/data, OBB e mídia.
+- Define o orçamento conforme RAM livre, temperatura do SoC e temperatura da bateria.
+- Em modo automático, limita o orçamento a 64 MB quando a bateria está em 50% ou menos; reduz para 32 MB abaixo de 30% e pausa abaixo de 15%.
+- Pausa ou reduz o pré-carregamento quando há pouca RAM ou aquecimento, sem congelar os aplicativos.
 
 ### Avançado — controle completo
 
@@ -41,16 +50,17 @@ A versão 1.9.1 amplia o modo Automático com testes A/B por parâmetro, aprendi
 Ao atualizar uma instalação existente, o aplicativo preserva o comportamento/configurações já utilizados. Novas instalações podem começar pela experiência automática simplificada.
 
 
-## Novidades da versão 1.9.1
+## Novidades da versão 1.9.2
 
 - Novo motor de autocalibração por testes A/B no modo Automático.
 - Seleção automática dos melhores níveis por parâmetro com base em bateria, temperatura, CPU, RAM e potência estimada.
-- Detecção de aplicativos usados com frequência para reduzir congelamentos inconvenientes.
+- Pré-carregamento automático de até quatro apps usados nos últimos 15 minutos, com lista visível no painel.
 - Reinício completo do ciclo de aprendizado sempre que o usuário troca do modo Avançado para o Automático.
 - Monitor de saúde do armazenamento executado a cada hora.
 - Detecção de F2FS, GC, discard, gc_merge e ATGC.
 - Manutenção/TRIM somente em repouso e em condições térmicas seguras.
-- Versão Android: **1.9.1-auto-learning-storage** (versionCode 70).
+- Economia automática abaixo de 50% da bateria e resposta térmica com menor carga de diagnósticos e manutenção.
+- Versão Android: **1.9.2-auto-preload** (versionCode 71).
 
 ## Prints do aplicativo
 
@@ -268,6 +278,10 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 - Autorização VPN do Android é necessária para o firewall DNS.
 
 ## Versão atual
+
+**1.9.2 — pré-carregamento inteligente e economia automática**
+
+Reconhece os quatro apps usados mais recentemente a cada 15 minutos, calcula o orçamento de memória conforme RAM e temperatura, informa os apps mantidos no ciclo e reduz automaticamente o trabalho pesado quando a bateria está baixa ou o telefone aquece.
 
 **1.8.9 — correção do botão Ajustes no modo automático**
 

@@ -323,7 +323,7 @@ public final class AdvancedAdaptiveController {
         for (String line : raw.split("\n")) {
             String x = line.trim();
             if (x.isEmpty() || x.startsWith("__")) continue;
-            String[] parts = x.split("\s+");
+            String[] parts = x.split("\\s+");
             if (parts.length < 2) continue;
             String key = parts[0].replace(":", "");
             long value;

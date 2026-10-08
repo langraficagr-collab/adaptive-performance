@@ -10,7 +10,9 @@ import java.util.*;
 final class AutoTuningController {
     private static final long EVAL_INTERVAL_MS = 30L * 60L * 1000L;
     private static final long TRIAL_MS = 2L * 60L * 60L * 1000L;
-    private static final long USAGE_REFRESH_MS = 6L * 60L * 60L * 1000L;
+    private static final long USAGE_REFRESH_MS = 60L * 1000L;
+    private static final long USAGE_WINDOW_MS = 15L * 60L * 1000L;
+    private static final int TOP_RECENT_APP_COUNT = 4;
 
     private final Context context;
     private final SharedPreferences prefs;
@@ -24,8 +26,6 @@ final class AutoTuningController {
                   boolean interactive, boolean charging, float powerW) {
         if (!"auto".equals(prefs.getString("user_mode", "auto"))) return;
         long now = System.currentTimeMillis();
-        refreshFrequentApps(now);
-
         long last = prefs.getLong("auto_tune_last_eval", 0L);
         if (last > 0L && now - last < EVAL_INTERVAL_MS) {
             applyCurrent();
@@ -69,30 +69,6 @@ final class AutoTuningController {
                 .putString("auto_tune_status", "Testando " + phaseName(phase) + " • nível " + (candidate + 1) + "/" + candidateCount(phase))
                 .apply();
         applyCurrent();
-    }
-
-    private void refreshFrequentApps(long now) {
-        long last = prefs.getLong("auto_frequent_refresh_at", 0L);
-        if (last > 0L && now - last < USAGE_REFRESH_MS) return;
-        Set<String> frequent = new HashSet<>();
-        try {
-            UsageStatsManager usm = (UsageStatsManager) context.getSystemService(Context.USAGE_STATS_SERVICE);
-            if (usm != null) {
-                Map<String, UsageStats> stats = usm.queryAndAggregateUsageStats(now - 7L*24L*60L*60L*1000L, now);
-                for (UsageStats u : stats.values()) {
-                    String pkg = u.getPackageName();
-                    long visible = Build.VERSION.SDK_INT >= 29 ? u.getTotalTimeVisible() : u.getTotalTimeInForeground();
-                    long lastUse = u.getLastTimeUsed();
-                    if ((visible >= 30L*60L*1000L || now - lastUse <= 2L*60L*60L*1000L)
-                            && AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) {
-                        frequent.add(pkg);
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        prefs.edit().putStringSet("auto_frequent_apps", frequent)
-                .putInt("auto_frequent_count", frequent.size())
-                .putLong("auto_frequent_refresh_at", now).apply();
     }
 
     private void applyCurrent() {

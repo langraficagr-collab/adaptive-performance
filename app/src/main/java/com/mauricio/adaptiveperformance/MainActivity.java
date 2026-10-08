@@ -1,8 +1,11 @@
 package com.mauricio.adaptiveperformance;
 
 import android.app.*;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
 import android.os.*;
 import android.content.*;
+import android.provider.Settings;
 import android.content.pm.PackageManager;
 import android.graphics.*;
 import android.graphics.drawable.*;
@@ -15,6 +18,7 @@ import rikka.shizuku.Shizuku;
 public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private TextView shizukuText, statusText, statusSubText;
+    private TextView preloadTuningText, preloadStatusText, preloadAppsText;
     private TextView socValue, batValue, ramValue, cpuValue, freqValue;
     private TextView batteryText, batteryForecastText, maintenanceText, restrictedText, cpuPressureText, freezeStateText, advancedText, healthText, extendedText, limitingDashboardText;
     private TextView thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto;
@@ -398,6 +402,71 @@ public class MainActivity extends Activity {
         content.addView(c);
     }
 
+    private void refreshRecentUsageSelection() {
+        if (!hasUsageAccess()) {
+            Toast.makeText(this, "Permita o acesso ao uso dos apps para ativar o reconhecimento automático.", Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+            } catch (Throwable ignored) {}
+            return;
+        }
+        try {
+            prefs.edit().putLong("auto_preload_cycle_at", 0L).apply();
+            Toast.makeText(this, "O próximo ciclo vai pré-carregar os apps usados nos últimos 15 minutos.", Toast.LENGTH_SHORT).show();
+            recreate();
+        } catch (Throwable error) {
+            Toast.makeText(this, "Não foi possível atualizar os apps usados.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean hasUsageAccess() {
+        try {
+            UsageStatsManager manager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
+            if (manager == null) return false;
+            List<UsageStats> stats = manager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY,
+                    System.currentTimeMillis() - 60_000L,
+                    System.currentTimeMillis());
+            return stats != null && !stats.isEmpty();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private String preloadedAppsText() {
+        Set<String> packages = prefs.getStringSet("auto_preload_apps", Collections.emptySet());
+        if (packages == null || packages.isEmpty()) {
+            return "Apps mantidos neste ciclo: nenhum";
+        }
+
+        StringBuilder out = new StringBuilder("Apps mantidos neste ciclo (")
+                .append(Math.min(4, packages.size())).append("/4):");
+        PackageManager pm = getPackageManager();
+        int shown = 0;
+        for (String pkg : packages) {
+            if (pkg == null || pkg.trim().isEmpty() || shown >= 4) continue;
+            String label = pkg;
+            try {
+                android.content.pm.ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
+                CharSequence appLabel = pm.getApplicationLabel(info);
+                if (appLabel != null && appLabel.length() > 0) label = appLabel.toString();
+            } catch (Throwable ignored) { }
+            out.append("\n• ").append(label);
+            shown++;
+        }
+        return shown == 0 ? "Apps mantidos neste ciclo: nenhum" : out.toString();
+    }
+
+    private void updatePreloadUi() {
+        if (preloadStatusText == null) return;
+        int count = prefs.getInt("auto_preload_count", 0);
+        setTextIfChanged(preloadTuningText, prefs.getString("auto_tune_status",
+                "Preparando primeiro ciclo de testes") + " • apps pré-carregados: " + count + "/4");
+        setTextIfChanged(preloadStatusText, prefs.getString("auto_preload_status",
+                "Pré-carregamento automático aguardando o próximo ciclo"));
+        setTextIfChanged(preloadAppsText, preloadedAppsText());
+    }
+
     private void buildAutomaticModeCard() {
         LinearLayout c = card();
         addSectionTitle(c, "✦", "Otimização automática", "O aplicativo escolhe e testa as melhores configurações por você");
@@ -409,14 +478,38 @@ public class MainActivity extends Activity {
         status.setPadding(dp(4), dp(14), dp(4), dp(8));
         c.addView(status);
 
-        TextView details = text("O modo automático testa gradualmente opções e níveis do modo avançado, mede bateria, temperatura, CPU, RAM e fluidez, e conserva as combinações com melhor resultado. Apps usados com frequência entram automaticamente na proteção contra congelamento.",
+        TextView details = text("O modo automático testa gradualmente opções e níveis do modo avançado, mede bateria, temperatura, CPU, RAM e fluidez, e conserva as combinações com melhor resultado. A cada 15 minutos, ele pré-carrega os apps usados recentemente. Isso não os protege contra congelamento.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
-        TextView tuning = text(prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes") +
-                " • apps frequentes protegidos: " + prefs.getInt("auto_frequent_count", 0), 12, CYAN, true);
-        tuning.setPadding(dp(4), dp(6), dp(4), dp(4));
-        c.addView(tuning);
+        int frequentCount = prefs.getInt("auto_preload_count", 0);
+        int recentWindow = 15;
+        preloadTuningText = text(prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes") +
+                " • apps pré-carregados: " + frequentCount + "/4", 12, CYAN, true);
+        preloadTuningText.setPadding(dp(4), dp(6), dp(4), dp(4));
+        c.addView(preloadTuningText);
+
+        TextView recentHint = text("Reconhecimento inteligente: considera somente os aplicativos usados nos últimos "
+                + recentWindow + " minutos.", 12, MUTED, false);
+        recentHint.setPadding(dp(4), dp(2), dp(4), dp(8));
+        c.addView(recentHint);
+
+        Switch preloadSwitch = actionSwitch("Pré-carregar automaticamente os 4 apps mais usados", "auto_preload_enabled", true);
+        c.addView(preloadSwitch);
+
+        preloadStatusText = text(prefs.getString("auto_preload_status", "Pré-carregamento automático aguardando o próximo ciclo"), 12, TEAL, true);
+        preloadStatusText.setPadding(dp(4), dp(6), dp(4), dp(8));
+        c.addView(preloadStatusText);
+
+        preloadAppsText = text(preloadedAppsText(), 13, TEXT, false);
+        preloadAppsText.setPadding(dp(12), dp(10), dp(12), dp(10));
+        preloadAppsText.setBackground(bordered(CARD_2, Color.rgb(29,69,90), 14));
+        c.addView(preloadAppsText);
+
+        Button refreshRecentApps = actionButton("Pré-carregar apps usados agora");
+        refreshRecentApps.setBackground(bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
+        refreshRecentApps.setOnClickListener(v -> refreshRecentUsageSelection());
+        c.addView(refreshRecentApps);
 
         TextView goalTitle = text("Meta de bateria", 15, TEXT, true);
         goalTitle.setPadding(dp(4), dp(16), dp(4), dp(6));
@@ -1017,7 +1110,6 @@ public class MainActivity extends Activity {
             return;
         }
         addSectionTitle(c,"⚙","Sistema e serviço","Shizuku, monitor e controles do aplicativo");
-        addSectionTitle(c,"⚙","Sistema e serviço","Shizuku, monitor e controles do aplicativo");
 
         shizukuText = text("Shizuku: verificando…",13,MUTED,false);
         shizukuText.setPadding(0,dp(12),0,dp(4));
@@ -1258,6 +1350,7 @@ public class MainActivity extends Activity {
     }
 
     private void updateUi() {
+        updatePreloadUi();
         boolean master=prefs.getBoolean("master",false);
         if (startButton != null && (!lastRenderedMasterValid || lastRenderedMaster != master)) {
             startButton.setText(master ? "Parar otimização" : "Iniciar otimização");
@@ -1310,6 +1403,8 @@ public class MainActivity extends Activity {
             if(lockedLevel > 0) statusSubText.setText("Thermal nível " + lockedLevel + " mantido manualmente");
             else if(thermal>=5) statusSubText.setText("Proteção máxima ativa para reduzir o aquecimento");
             else if(thermal==1) statusSubText.setText("Proteção térmica automática em ação");
+            else if (prefs.getBoolean("automatic_saving_active", false))
+                statusSubText.setText(prefs.getString("automatic_saving_reason", "Economia automática ativa"));
             else if(prefs.getInt("health_antistall",0)>=2) statusSubText.setText("Modo anti-travamento forte em ação");
             else if(prefs.getInt("health_antistall",0)==1) statusSubText.setText("Prevenção de travamentos ativa");
             else if(prefs.getBoolean("cpu_pressure_active",false)) statusSubText.setText("Apps em segundo plano temporariamente limitados");

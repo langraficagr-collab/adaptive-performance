@@ -51,6 +51,7 @@ public final class AutoUserModeController {
         int effective = charging ? variant : trial;
         int goalPressure = batteryGoalPressure(prefs, batteryPct, charging, now);
         effective = Math.max(effective, goalPressure);
+        if (!charging && batteryPct >= 0 && batteryPct <= 50) effective = Math.max(effective, 1);
         if (batteryPct >= 0 && batteryPct <= 20) effective = 2;
         if (tempC >= 39f) effective = Math.max(effective, 2);
         if (!interactive) effective = Math.max(effective, 1);

@@ -252,13 +252,15 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
-**1.8.6 — otimização adaptativa ampliada**
+**1.8.7 — ferramenta Reddit separada**
 
-Os controles automáticos reversíveis agora também consideram apps marcados como preferidos e apps de sistema com UID próprio que não sejam componentes essenciais persistentes. O app em primeiro plano, serviços ativos e infraestrutura central do Android continuam protegidos. O congelamento forçado manual mantém suas próprias proteções. Inclui o monitor de consumo e a estimativa de autonomia da versão 1.8.5.
+A seção de divulgação do Reddit foi removida do Adaptive Performance e agora está em um APK independente. O aplicativo separado prepara um rascunho, abre o formulário oficial para revisão manual e lembra o intervalo entre publicações; não envia posts sozinho. Os controles adaptativos ampliados e o monitor de bateria permanecem no Adaptive Performance.
+
+[Baixar o APK Divulgação Reddit](https://github.com/langraficagr-collab/adaptive-performance/releases/latest/download/Reddit-Promo-1.0.apk)
 
 **1.8.4 — assistente de divulgação no Reddit**
 
-Adiciona uma seção de divulgação assistida: prepara um rascunho com identificação de desenvolvedor, abre o formulário oficial do Reddit para revisão e registra intervalo de 7 dias por comunidade. O app não publica automaticamente nem envia posts em segundo plano.
+O assistente de divulgação que antes fazia parte do Adaptive Performance agora está disponível em um APK separado, para manter a otimização do celular independente das ferramentas de promoção.
 
 A versão 1.8.3 incluiu economia GPS opcional em segundo plano com restauração automática, confirmação de sinal fraco e testes de rede de 10 segundos. A verificação padrão da rede é a cada 1 minuto e o cooldown mínimo é 5 minutos. Mantém as melhorias de repouso da versão 1.8.2: verificações em segundo plano mais espaçadas com tela apagada e aparelho frio, mantendo rapidez quando há calor ou pressão alta.
 

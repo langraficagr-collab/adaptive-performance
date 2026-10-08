@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "AdaptivePerformance"
-include(":app")
+include(":app", ":reddit-promo")

@@ -252,6 +252,10 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
+**1.8.9 — correção do botão Ajustes no modo automático**
+
+Corrige o fechamento do aplicativo ao tocar em Ajustes no modo Automático. A seção de ações agora é inserida corretamente mesmo quando ainda não existe um cartão de ações na tela.
+
 **1.8.8 — congelamento inteligente por tempo de uso**
 
 O congelamento automático agora espera o período escolhido depois que o app sai do primeiro plano. O padrão é 15 minutos e pode ser ajustado entre 5 e 120 minutos. A lista “Apps que nunca devem ser congelados” aceita apps comuns e apps de sistema elegíveis. Componentes essenciais do Android continuam protegidos.

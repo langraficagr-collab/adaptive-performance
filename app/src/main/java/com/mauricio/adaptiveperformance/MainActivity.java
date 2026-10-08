@@ -606,20 +606,33 @@ public class MainActivity extends Activity {
     }
 
     private void openActions() {
+        if (content == null || mainScroll == null) return;
         if (!actionsBuilt) {
-            content.removeView(actionsPlaceholder);
-            actionsPlaceholder = null;
+            // No modo automático não existe placeholder inicial. Insira as ações no fim
+            // da lista em vez de remover uma View nula ou usar índice -1.
+            if (actionsPlaceholder != null) {
+                content.removeView(actionsPlaceholder);
+                actionsPlaceholder = null;
+            }
+            if (actionsInsertIndex < 0 || actionsInsertIndex > content.getChildCount()) {
+                actionsInsertIndex = content.getChildCount();
+            }
             buildActions();
             actionsBuilt = true;
             updateUi();
-            content.getChildAt(actionsInsertIndex).addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
-                @Override public void onLayoutChange(View v, int left, int top, int right, int bottom,
-                        int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                    v.removeOnLayoutChangeListener(this);
-                    mainScroll.post(() -> mainScroll.smoothScrollTo(0, v.getTop()));
-                }
-            });
-        } else {
+            final int insertedIndex = actionsInsertIndex;
+            View inserted = insertedIndex >= 0 && insertedIndex < content.getChildCount()
+                    ? content.getChildAt(insertedIndex) : null;
+            if (inserted != null) {
+                inserted.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                    @Override public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                            int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                        v.removeOnLayoutChangeListener(this);
+                        mainScroll.post(() -> mainScroll.smoothScrollTo(0, v.getTop()));
+                    }
+                });
+            }
+        } else if (actionsInsertIndex >= 0 && actionsInsertIndex < content.getChildCount()) {
             mainScroll.post(() -> mainScroll.smoothScrollTo(0, content.getChildAt(actionsInsertIndex).getTop()));
         }
     }

@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 67
-        versionName = "1.8.8-smart-freeze"
+        versionCode = 68
+        versionName = "1.8.9-auto-settings-fix"
     }
 
     buildTypes {

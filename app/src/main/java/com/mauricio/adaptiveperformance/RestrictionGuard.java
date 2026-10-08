@@ -37,7 +37,7 @@ public final class RestrictionGuard {
     public static boolean background(android.content.Context c, SharedPreferences p, IPrivilegedService s, String pkg) {
         if (pkg == null || !pkg.matches("[A-Za-z0-9_.]+")
                 || !AppSafety.isEligibleForAdaptiveOptimization(c, pkg)
-                || pkg.equals(p.getString("foreground", "")) || AppProfilePolicy.protectedActive(c, p, pkg)) return false;
+                || pkg.equals(p.getString("foreground", ""))) return false;
         try {
             String top = s.exec("dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'");
             String services = s.exec("dumpsys activity services " + pkg);

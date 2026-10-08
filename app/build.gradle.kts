@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 66
-        versionName = "1.8.7-reddit-split"
+        versionCode = 67
+        versionName = "1.8.8-smart-freeze"
     }
 
     buildTypes {

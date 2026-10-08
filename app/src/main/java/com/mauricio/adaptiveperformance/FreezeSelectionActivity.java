@@ -79,7 +79,7 @@ public class FreezeSelectionActivity extends Activity {
         top.addView(titles,new LinearLayout.LayoutParams(0,-2,1f));
         page.addView(top);
 
-        TextView note=tv("Apps críticos ficam protegidos. Apps de sistema elegíveis aparecem marcados como [Sistema].",13,MUTED,false);
+        TextView note=tv("Apps críticos ficam protegidos. Apps de sistema elegíveis aparecem marcados como [Sistema] e podem ser congelados quando necessário.",13,MUTED,false);
         note.setPadding(dp(4),dp(12),dp(4),dp(12));
         page.addView(note);
 

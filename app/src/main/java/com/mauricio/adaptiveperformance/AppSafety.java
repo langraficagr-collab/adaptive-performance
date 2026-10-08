@@ -1,6 +1,7 @@
 package com.mauricio.adaptiveperformance;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 
@@ -115,9 +116,40 @@ public final class AppSafety {
     }
 
     public static boolean isEligibleForManualFreeze(Context context, String pkg) {
-        return !isCritical(context, pkg)
-                && isAppUidCandidate(context, pkg)
-                && isUserFacing(context, pkg);
+        return isEligibleForAdaptiveOptimization(context, pkg);
+    }
+
+    /** Lista pessoal de apps que nunca devem ser finalizados/congelados automaticamente. */
+    public static boolean isNeverFreeze(Context context, String pkg) {
+        if (pkg == null || pkg.isEmpty()) return true;
+        try {
+            java.util.Set<String> never = context.getSharedPreferences("adaptive", Context.MODE_PRIVATE)
+                    .getStringSet("never_freeze_apps", java.util.Collections.emptySet());
+            if (never != null && never.contains(pkg)) return true;
+            // Migra as exceções criadas nas versões anteriores.
+            java.util.Set<String> legacy = context.getSharedPreferences("adaptive", Context.MODE_PRIVATE)
+                    .getStringSet("auto_protected_apps", java.util.Collections.emptySet());
+            return legacy != null && legacy.contains(pkg);
+        } catch (Throwable t) { return false; }
+    }
+
+    /** Atualiza a última utilização em primeiro plano e o pacote atualmente ativo. */
+    public static void recordForegroundUsage(SharedPreferences prefs, String pkg) {
+        if (prefs == null || pkg == null || !pkg.matches("[A-Za-z0-9_.]+")) return;
+        long now = System.currentTimeMillis();
+        prefs.edit().putString("foreground", pkg)
+                .putLong("app_last_foreground_at_" + Integer.toHexString(pkg.hashCode()), now)
+                .apply();
+    }
+
+    /** Aguarda o período configurado após o app sair do primeiro plano. */
+    public static boolean hasLeftForegroundLongEnough(SharedPreferences prefs, String pkg) {
+        if (prefs == null || pkg == null || pkg.isEmpty()) return false;
+        if (pkg.equals(prefs.getString("foreground", ""))) return false;
+        long delayMinutes = Math.max(1L, Math.min(360L,
+                prefs.getLong("freeze_delay_minutes", 15L)));
+        long last = prefs.getLong("app_last_foreground_at_" + Integer.toHexString(pkg.hashCode()), 0L);
+        return last <= 0L || System.currentTimeMillis() - last >= delayMinutes * 60_000L;
     }
 
     public static boolean isSystemApp(Context context, String pkg) {

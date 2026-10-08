@@ -70,12 +70,12 @@ public class AppExceptionActivity extends Activity {
 
         LinearLayout titles=new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
-        titles.addView(tv("Exceções por aplicativo",23,TEXT,true));
-        titles.addView(tv("Apps marcados nunca serão limitados automaticamente",13,MUTED,false));
+        titles.addView(tv("Apps que nunca devem ser congelados",23,TEXT,true));
+        titles.addView(tv("Apps marcados ficam fora do congelamento automático",13,MUTED,false));
         top.addView(titles,new LinearLayout.LayoutParams(0,-2,1f));
         page.addView(top);
 
-        TextView note=tv("A proteção térmica global continua funcionando. A exceção impede apenas congelamento, idle, force-stop e restrições automáticas específicas daquele app.",13,MUTED,false);
+        TextView note=tv("Escolha aqui os apps que nunca devem ser finalizados ou congelados automaticamente. Apps em primeiro plano sempre esperam o período configurado antes de serem congelados.",13,MUTED,false);
         note.setPadding(dp(4),dp(12),dp(4),dp(12));
         page.addView(note);
 
@@ -101,7 +101,7 @@ public class AppExceptionActivity extends Activity {
         page.addView(scroll,new LinearLayout.LayoutParams(-1,0,1f));
 
         Button save=new Button(this);
-        save.setText("Salvar exceções");
+        save.setText("Salvar lista");
         save.setTextColor(Color.WHITE);
         save.setTextSize(15);
         save.setAllCaps(false);
@@ -114,12 +114,13 @@ public class AppExceptionActivity extends Activity {
 
         setContentView(page);
 
+        workingSelected.addAll(prefs.getStringSet("never_freeze_apps",Collections.emptySet()));
+        // Migra automaticamente a lista de exceções das versões anteriores.
         workingSelected.addAll(prefs.getStringSet("auto_protected_apps",Collections.emptySet()));
         PackageManager pm=getPackageManager();
         for(ApplicationInfo ai:pm.getInstalledApplications(0)) {
             String pkg=ai.packageName;
-            if(AppSafety.isCritical(this,pkg)) continue;
-            if(!AppSafety.isAppUidCandidate(this,pkg) || !AppSafety.isUserFacing(this,pkg)) continue;
+            if(!AppSafety.isEligibleForAdaptiveOptimization(this,pkg)) continue;
             items.add(new Item(pkg,AppSafety.label(this,pkg),AppSafety.isSystemApp(this,pkg)));
         }
         items.sort((a,b)->a.label.compareToIgnoreCase(b.label));
@@ -132,7 +133,8 @@ public class AppExceptionActivity extends Activity {
         });
 
         save.setOnClickListener(v->{
-            prefs.edit().putStringSet("auto_protected_apps",new HashSet<>(workingSelected)).apply();
+            prefs.edit().putStringSet("never_freeze_apps",new HashSet<>(workingSelected))
+                    .putStringSet("auto_protected_apps",new HashSet<>(workingSelected)).apply();
             finish();
         });
     }
@@ -159,7 +161,7 @@ public class AppExceptionActivity extends Activity {
             cb.setOnCheckedChangeListener((button,checked)->{
                 if(checked) workingSelected.add(item.pkg);
                 else workingSelected.remove(item.pkg);
-                countText.setText(items.size()+" apps disponíveis • "+workingSelected.size()+" protegido(s)");
+                countText.setText(items.size()+" apps disponíveis • "+workingSelected.size()+" nunca congelar");
             });
             cb.setBackground(bg(CARD,BORDER,14));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
@@ -169,6 +171,6 @@ public class AppExceptionActivity extends Activity {
             list.addView(cb);
             shown++;
         }
-        countText.setText(shown+" apps exibidos • "+workingSelected.size()+" protegido(s)");
+        countText.setText(shown+" apps exibidos • "+workingSelected.size()+" nunca congelar");
     }
 }

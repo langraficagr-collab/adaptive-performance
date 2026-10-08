@@ -252,6 +252,10 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
+**1.8.8 — congelamento inteligente por tempo de uso**
+
+O congelamento automático agora espera o período escolhido depois que o app sai do primeiro plano. O padrão é 15 minutos e pode ser ajustado entre 5 e 120 minutos. A lista “Apps que nunca devem ser congelados” aceita apps comuns e apps de sistema elegíveis. Componentes essenciais do Android continuam protegidos.
+
 **1.8.7 — ferramenta Reddit separada**
 
 A seção de divulgação do Reddit foi removida do Adaptive Performance e agora está em um APK independente. O aplicativo separado prepara um rascunho, abre o formulário oficial para revisão manual e lembra o intervalo entre publicações; não envia posts sozinho. Os controles adaptativos ampliados e o monitor de bateria permanecem no Adaptive Performance.

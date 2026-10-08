@@ -30,6 +30,8 @@ public final class EmergencyRamController {
             for (String pkg : packages) {
                 if (actions.size() >= max) break;
                 if (pkg.equals(foreground)
+                        || AppSafety.isNeverFreeze(c, pkg)
+                        || !AppSafety.hasLeftForegroundLongEnough(p, pkg)
                         || p.getStringSet("manual_freeze_selected", Collections.emptySet()).contains(pkg)
                         || !RestrictionGuard.background(c, p, service, pkg)
                         || !RestrictionGuard.claim(p, pkg, "emergency", "cached/background RAM relief")) continue;

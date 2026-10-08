@@ -251,7 +251,7 @@ public class CpuPressureController {
     }
 
     private boolean isProtected(String pkg) {
-        return !AppSafety.isEligibleForAdaptiveOptimization(context, pkg) || AppProfilePolicy.protectedActive(context, prefs, pkg);
+        return !AppSafety.isEligibleForAdaptiveOptimization(context, pkg);
     }
 
     private void setState(boolean on) {

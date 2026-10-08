@@ -332,6 +332,7 @@ public class OptimizationService extends Service {
             } catch (Throwable ignored) {}
         }
 
+        if (!fg.isEmpty()) AppSafety.recordForegroundUsage(prefs, fg);
         float controlTemp = thermals.hasSoc() ? thermals.soc : tempC;
         String profile;
         if (!interactive) profile = "Economia/repouso";
@@ -1610,7 +1611,8 @@ public class OptimizationService extends Service {
     private void requireSafeBackgroundApp(String pkg) throws Exception {
         if (pkg == null || !pkg.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
                 || !AppSafety.isEligibleForAdaptiveOptimization(this, pkg)
-                || AppProfilePolicy.protectedActive(this, prefs, pkg)) {
+                || AppSafety.isNeverFreeze(this, pkg)
+                || !AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) {
             throw new IllegalStateException("App ausente, protegido, do sistema ou inelegível: " + pkg);
         }
         String services = privileged.exec("dumpsys activity services " + pkg);

@@ -718,6 +718,31 @@ public class MainActivity extends Activity {
         Switch smartSuiteSwitch = actionSwitch("Modo automático geral: RAM + PSI + temperatura + bateria", "smart_suite_enabled", true);
         Switch smartCleanupSwitch = actionSwitch("Limpeza automática com pouco armazenamento e tela apagada", "smart_auto_cleanup", false);
         Switch adaptiveFreezeSwitch = actionSwitch("Congelamento adaptativo de apps ociosos/restritos", "adaptive_freeze_enabled", false);
+        TextView freezeDelayTitle = text("Aguardar após sair do app antes de congelar", 13, TEXT, true);
+        freezeDelayTitle.setPadding(dp(12), dp(12), dp(8), dp(2));
+        Spinner freezeDelaySpinner = new Spinner(this);
+        String[] freezeDelayLabels = {"5 minutos", "15 minutos (recomendado)", "30 minutos", "60 minutos", "120 minutos"};
+        long[] freezeDelayValues = {5L, 15L, 30L, 60L, 120L};
+        ArrayAdapter<String> freezeDelayAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, freezeDelayLabels);
+        freezeDelayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        freezeDelaySpinner.setAdapter(freezeDelayAdapter);
+        long savedFreezeDelay = Math.max(1L, Math.min(360L, prefs.getLong("freeze_delay_minutes", 15L)));
+        int freezeDelayIndex = 1;
+        for (int i = 0; i < freezeDelayValues.length; i++) {
+            if (freezeDelayValues[i] == savedFreezeDelay) { freezeDelayIndex = i; break; }
+        }
+        freezeDelaySpinner.setSelection(freezeDelayIndex, false);
+        freezeDelaySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position >= 0 && position < freezeDelayValues.length) {
+                    prefs.edit().putLong("freeze_delay_minutes", freezeDelayValues[position]).apply();
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        TextView freezeDelayHint = text("O relógio começa no último momento em que o app esteve em primeiro plano. Apps em uso nunca são congelados.", 12, MUTED, false);
+        freezeDelayHint.setPadding(dp(12), dp(2), dp(8), dp(6));
         Switch recurrenceSwitch = actionSwitch("Detectar processos que reiniciam repetidamente", "restart_recurrence_guard", true);
         Switch lowBatterySwitch = actionSwitch("Modo automático de bateria baixa (≤25%)", "low_battery_adaptive", true);
         Switch thrashSwitch = actionSwitch("Proteção contra thrashing da ZRAM/swap", "zram_thrash_guard", true);
@@ -867,6 +892,7 @@ public class MainActivity extends Activity {
         c.addView(zramProfileTitle); c.addView(zramProfileSpinner); c.addView(zramProfileHint);
         c.addView(appRamLimiterSwitch); c.addView(appRamLimitLabel); c.addView(appRamLimitSeekBar);
         c.addView(aggressiveMemorySwitch); c.addView(bugCleanupSwitch);
+        c.addView(freezeDelayTitle); c.addView(freezeDelaySpinner); c.addView(freezeDelayHint);
         c.addView(unusedRestrictSwitch); c.addView(cpuPressureSwitch);
         c.addView(advancedAdaptiveSwitch); c.addView(screenOffSwitch); c.addView(wakeupGuardSwitch);
         c.addView(healthGuardSwitch); c.addView(autoCalibrationSwitch); c.addView(appLearningSwitch);
@@ -892,7 +918,7 @@ public class MainActivity extends Activity {
         freezeSelect.setOnClickListener(v->startActivity(new Intent(this, FreezeSelectionActivity.class)));
         c.addView(freezeSelect);
 
-        Button appExceptions = actionButton("Apps que nunca devem ser limitados automaticamente");
+        Button appExceptions = actionButton("Apps que nunca devem ser congelados automaticamente");
         appExceptions.setOnClickListener(v->startActivity(new Intent(this, AppExceptionActivity.class)));
         c.addView(appExceptions);
         c.addView(notifySwitch);

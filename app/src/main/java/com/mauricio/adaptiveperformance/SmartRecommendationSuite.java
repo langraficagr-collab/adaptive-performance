@@ -81,7 +81,9 @@ public final class SmartRecommendationSuite {
         Set<String> restricted=p.getStringSet("auto_restricted",Collections.emptySet());
         int n=0;
         for(String pkg:new HashSet<>(restricted)){
-            if(n>=3||pkg.equals(fg)||AppSafety.isAutoProtected(c,pkg)||AppSafety.isSystemApp(c,pkg))continue;
+            if(n>=3||pkg.equals(fg)||AppSafety.isNeverFreeze(c,pkg)
+                    ||!AppSafety.isEligibleForAdaptiveOptimization(c,pkg)
+                    ||!AppSafety.hasLeftForegroundLongEnough(p,pkg))continue;
             long seen=p.getLong("app_last_seen_"+Integer.toHexString(pkg.hashCode()),0);
             if(seen>0&&seen<cutoff&&RestrictionGuard.command(s,"am force-stop --user 0 "+pkg)){n++;}
         }

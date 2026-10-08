@@ -171,7 +171,8 @@ public class BackgroundMaintenance {
             String pkg = e.getKey();
             double cpu = e.getValue();
             if (cpu < HOT_CPU) continue;
-            if (pkg.equals(foregroundPackage) || isProtected(pkg)) continue;
+            if (pkg.equals(foregroundPackage) || isProtected(pkg)
+                    || !AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) continue;
             if (hasForegroundService(pkg)) continue;
             hotNow.add(pkg);
             int count = hotCounts.getOrDefault(pkg, 0) + 1;
@@ -220,7 +221,8 @@ public class BackgroundMaintenance {
             int limitMb = SmartRecommendationSuite.ramLimitFor(prefs, pkg, defaultLimitMb);
             long limitKb = limitMb * 1024L;
             if (rssKb < limitKb) continue;
-            if (pkg.equals(foregroundPackage) || isProtected(pkg) || hasForegroundService(pkg)) continue;
+            if (pkg.equals(foregroundPackage) || isProtected(pkg) || hasForegroundService(pkg)
+                    || !AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) continue;
             highNow.add(pkg);
             int count = highRamCounts.getOrDefault(pkg, 0) + 1;
             highRamCounts.put(pkg, count);
@@ -407,14 +409,15 @@ public class BackgroundMaintenance {
         Set<String> out = new HashSet<>();
         try {
             for (ApplicationInfo ai : pm.getInstalledApplications(0)) {
-                if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) == 0) out.add(ai.packageName);
+                if (AppSafety.isEligibleForAdaptiveOptimization(context, ai.packageName)) out.add(ai.packageName);
             }
         } catch (Throwable ignored) {}
         return out;
     }
 
     private boolean isProtected(String pkg) {
-        return !AppSafety.isEligibleForAdaptiveOptimization(context, pkg) || AppProfilePolicy.protectedActive(context, prefs, pkg);
+        return !AppSafety.isEligibleForAdaptiveOptimization(context, pkg)
+                || AppSafety.isNeverFreeze(context, pkg);
     }
 
     private String label(String pkg) { return AppSafety.label(context, pkg); }

@@ -31,7 +31,7 @@ public class ManualFreezeManager {
         for (String pkg : new ArrayList<>(active)) {
             try {
                 if (!enabled || !selected.contains(pkg) || !AppSafety.isEligibleForManualFreeze(context, pkg)
-                        || AppSafety.isSystemApp(context, pkg) || AppSafety.isAutoProtected(context, pkg)) {
+                        || AppSafety.isNeverFreeze(context, pkg)) {
                     unfreeze(pkg, false);
                 } else if (pkg.equals(foregroundPackage)) {
                     active.remove(pkg);
@@ -46,7 +46,8 @@ public class ManualFreezeManager {
         if (!enabled) return;
 
         for (String pkg : new HashSet<>(openedByUser)) {
-            if (!pkg.equals(foregroundPackage)) {
+            if (!pkg.equals(foregroundPackage)
+                    && AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) {
                 openedByUser.remove(pkg);
                 freeze(pkg);
             }
@@ -56,8 +57,8 @@ public class ManualFreezeManager {
             if (active.contains(pkg) || pkg.equals(foregroundPackage)) continue;
             String reason = null;
             if (!AppSafety.isEligibleForManualFreeze(context, pkg)) reason = "inelegível/protegido";
-            else if (AppSafety.isSystemApp(context, pkg)) reason = "app de sistema";
-            else if (AppSafety.isAutoProtected(context, pkg)) reason = "exceção do usuário";
+            else if (AppSafety.isNeverFreeze(context, pkg)) reason = "lista nunca congelar";
+            else if (!AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) reason = "aguardando período após uso";
             if (reason != null) {
                 prefs.edit().putString("manual_freeze_last_reason", pkg + ": " + reason).apply();
                 continue;

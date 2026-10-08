@@ -23,8 +23,8 @@ android {
         create("lean") {
             dimension = "edition"
             applicationIdSuffix = ".lite"
-            versionCode = 170
-            versionName = "1.0.0-lite"
+            versionCode = 171
+            versionName = "1.1.0-lite"
             buildConfigField("boolean", "LEAN_MODE", "true")
         }
         create("full") {

@@ -209,6 +209,7 @@ public class OptimizationService extends Service {
         super.onCreate();
         serviceDestroyed = false;
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        if (!BuildConfig.LEAN_MODE && "auto".equals(prefs.getString("user_mode", "auto"))) ConservativeTuningController.recoverAfterRestart(prefs);
         if (!prefs.contains("user_mode")) {
             // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
             String initialMode = prefs.contains("master") ? "advanced" : "auto";
@@ -244,6 +245,8 @@ public class OptimizationService extends Service {
             userServiceArgs = new Shizuku.UserServiceArgs(
                     new ComponentName(this, PrivilegedService.class))
                     .processNameSuffix("optimizer")
+                    .tag(BuildConfig.APPLICATION_ID + ".optimizer")
+                    .version(BuildConfig.VERSION_CODE)
                     .daemon(false);
             Shizuku.bindUserService(userServiceArgs, connection);
         } catch (Throwable ignored) {
@@ -363,7 +366,7 @@ public class OptimizationService extends Service {
                     .putString("time_predicted_profile", predictedProfile).apply();
         }
 
-        learnApp(fg, cpuLoad);
+        if (!BuildConfig.CONSERVATIVE_MODE || prefs.getBoolean("app_learning", false)) learnApp(fg, cpuLoad);
 
         AdvancedAdaptiveController.Result advanced = null;
         if (advancedController != null) {
@@ -457,13 +460,17 @@ public class OptimizationService extends Service {
             }
         }
 
-        if (healthController != null && !deferHeavyDiagnostics
+        if (healthController != null && (!deferHeavyDiagnostics || BuildConfig.CONSERVATIVE_MODE)
                 && healthBusy.compareAndSet(false, true)) {
             final SystemHealthController hc = healthController;
             final String healthFg = fg;
             final boolean healthInteractive = interactive;
             healthExecutor.execute(() -> {
-                try { hc.maybeRunExpensive(healthFg, healthInteractive); }
+                try {
+                    if (BuildConfig.CONSERVATIVE_MODE && deferHeavyDiagnostics)
+                        hc.sampleConservativeFrames(healthFg, healthInteractive);
+                    else hc.maybeRunExpensive(healthFg, healthInteractive);
+                }
                 catch (Throwable ignored) {}
                 finally { healthBusy.set(false); }
             });
@@ -524,6 +531,8 @@ public class OptimizationService extends Service {
                 effectivePressure = Math.max(basePressure, effectivePressure - 1);
         }
         final int adaptivePressureScore = effectivePressure;
+        prefs.edit().putFloat("thermal_soc_c", thermals.soc).apply();
+        if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
                     smartBatteryPct, tempC, adaptivePressureScore);
@@ -544,10 +553,12 @@ public class OptimizationService extends Service {
             prefs.edit().putString("auto_tune_error",
                     t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
         }
+        if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             if (adaptivePreloadController != null) {
                 adaptivePreloadController.evaluate(privileged, availPct, controlTemp, tempC,
-                        interactive, chargingNow, smartBatteryPct, automaticMode);
+                        interactive, chargingNow, smartBatteryPct, automaticMode,
+                        advanced != null ? advanced.powerW : -1f);
             }
         } catch (Throwable t) {
             prefs.edit().putString("auto_preload_error",
@@ -730,17 +741,20 @@ public class OptimizationService extends Service {
                 .putLong("last_sample", System.currentTimeMillis())
                 .apply();
 
-        try {
-            AdaptiveIntelligenceController.update(this, prefs, fg, controlTemp,
-                    advanced != null ? advanced.tempTrendCPerMin : 0f, cpuLoad, availPct,
-                    advanced != null ? advanced.psiMemory : prefs.getFloat("psi_memory", -1f),
-                    prefs.getString("probable_cause", "Sem causa anormal detectada"));
-        } catch (Throwable t) {
-            prefs.edit().putString("adaptive_intelligence_error", t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+        if (!BuildConfig.CONSERVATIVE_MODE || prefs.getBoolean("time_usage_learning", false)
+                || prefs.getBoolean("update_regression_detector", false)
+                || prefs.getBoolean("action_effectiveness", false)) {
+            try {
+                AdaptiveIntelligenceController.update(this, prefs, fg, controlTemp,
+                        advanced != null ? advanced.tempTrendCPerMin : 0f, cpuLoad, availPct,
+                        advanced != null ? advanced.psiMemory : prefs.getFloat("psi_memory", -1f),
+                        prefs.getString("probable_cause", "Sem causa anormal detectada"));
+            } catch (Throwable t) {
+                prefs.edit().putString("adaptive_intelligence_error", t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+            }
+            AppProfilePolicy.batch(this, prefs, fg, 4);
+            AutoRepairController.evaluate(prefs, cpuPressureController);
         }
-
-        AppProfilePolicy.batch(this, prefs, fg, 4);
-        AutoRepairController.evaluate(prefs, cpuPressureController);
         NotificationManager nm = getSystemService(NotificationManager.class);
         long notificationNow = SystemClock.elapsedRealtime();
         if (nm != null && (!status.equals(lastNotificationStatus)
@@ -754,6 +768,44 @@ public class OptimizationService extends Service {
             long cost = Math.max(0L, SystemClock.elapsedRealtime() - cycleStarted);
             healthController.recordCycleCost(cost);
             nextLoopDelayMs = healthController.watchdogMinimumDelay(nextLoopDelayMs);
+        }
+        if (BuildConfig.CONSERVATIVE_MODE) {
+            boolean urgent = thermalLevelApplied > 0 || tempC >= 38.0f
+                    || (thermals.soc > 0f && thermals.soc >= 54.0f)
+                    || cpuLoad >= 85d || adaptivePressureScore >= 4
+                    || (health != null && health.antiStallLevel >= 2);
+            if (!urgent) {
+                nextLoopDelayMs = Math.max(nextLoopDelayMs, interactive ? 60_000L : 300_000L);
+            }
+        }
+        if (!BuildConfig.LEAN_MODE && "auto".equals(prefs.getString("user_mode", "auto"))
+                && prefs.getInt("conservative_tune_phase", 0) < 26
+                && prefs.getLong("conservative_tune_completed_at", 0L) == 0L) {
+            // Baseline AND candidate need comparable samples, including while display is off.
+            nextLoopDelayMs = Math.min(nextLoopDelayMs, 30_000L);
+        }
+    }
+
+    private void restoreConservativeOptionIfNeeded() {
+        String key = prefs.getString("conservative_tune_restore_pending", "");
+        if (key.isEmpty()) return;
+        try {
+            if (key.equals("cpu_pressure_control")) {
+                if (cpuPressureController == null) return;
+                cpuPressureController.restoreAll();
+                if (!prefs.getStringSet("cpu_limited_set", java.util.Collections.emptySet()).isEmpty()) return;
+            } else if (key.equals("thermal_brightness_control")) {
+                if (thermalBrightnessController == null) return;
+                thermalBrightnessController.restore();
+                if (prefs.getBoolean("thermal_brightness_applied", false)) return;
+            } else if (key.startsWith("system_") || key.equals("dynamic_doze_whitelist")
+                    || key.equals("adaptive_screen_timeout") || key.equals("maximum_battery_mode")) {
+                if (systemBatteryController == null) return;
+                if (!systemBatteryController.restoreConservativeOption(key)) return;
+            }
+            prefs.edit().remove("conservative_tune_restore_pending").commit();
+        } catch (Throwable t) {
+            prefs.edit().putString("auto_tune_status", "Restauração pendente: " + key).apply();
         }
     }
 
@@ -1894,6 +1946,7 @@ public class OptimizationService extends Service {
     }
 
     @Override public void onDestroy() {
+        if (prefs != null) ConservativeTuningController.stopIfNeeded(prefs);
         serviceDestroyed = true;
         handler.removeCallbacksAndMessages(null);
         sampleExecutor.shutdownNow();

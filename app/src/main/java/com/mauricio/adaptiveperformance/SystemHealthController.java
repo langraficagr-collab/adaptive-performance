@@ -176,6 +176,15 @@ public final class SystemHealthController {
         return r;
     }
 
+    private long lastConservativeFrames;
+    public synchronized void sampleConservativeFrames(String fg, boolean interactive) {
+        if (!interactive) return;
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastConservativeFrames < 5L * 60L * 1000L) return;
+        lastConservativeFrames = now;
+        try { scanGfx(fg); } catch (Throwable t) { cachedJank = -1f; }
+    }
+
     public synchronized void maybeRunExpensive(String fg, boolean interactive) {
         if (!prefs.getBoolean("health_guard", true) || !interactive) return;
         long now = SystemClock.elapsedRealtime();
@@ -277,11 +286,11 @@ public final class SystemHealthController {
 
     private void scanGfx(String fg) throws Exception {
         String pkg = safePackage(fg);
-        if (pkg.isEmpty()) return;
+        if (pkg.isEmpty()) { cachedJank = -1f; return; }
         String raw = privileged.exec("dumpsys gfxinfo " + pkg + " 2>/dev/null | head -80");
         Matcher tf = Pattern.compile("Total frames rendered:\\s*([0-9]+)").matcher(raw == null ? "" : raw);
         Matcher jf = Pattern.compile("Janky frames:\\s*([0-9]+)").matcher(raw == null ? "" : raw);
-        if (!tf.find() || !jf.find()) return;
+        if (!tf.find() || !jf.find()) { cachedJank = -1f; return; }
         Gfx cur = new Gfx();
         try {
             cur.total = Long.parseLong(tf.group(1));
@@ -292,7 +301,11 @@ public final class SystemHealthController {
         if (old != null && cur.total >= old.total && cur.janky >= old.janky) {
             long df = cur.total - old.total;
             long dj = cur.janky - old.janky;
-            if (df >= 15) cachedJank = 100f * dj / df;
+            if (df >= 15) {
+                cachedJank = 100f * dj / df;
+                prefs.edit().putLong("jank_sample_at", System.currentTimeMillis())
+                        .putFloat("jank_pct", cachedJank).apply();
+            }
         } else {
             // First sample is only a baseline. Lifetime jank since process start is not
             // representative of current UI smoothness and can create false positives.

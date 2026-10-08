@@ -14,8 +14,10 @@ android {
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
         buildConfigField("boolean", "LEAN_MODE", "false")
-        versionCode = 71
-        versionName = "1.9.2-auto-preload"
+        buildConfigField("boolean", "CONSERVATIVE_MODE", "false")
+        resValue("string", "app_name", "Adaptive Performance")
+        versionCode = 72
+        versionName = "1.9.3-i18n-auto2min"
     }
 
     flavorDimensions += "edition"
@@ -30,6 +32,16 @@ android {
         create("full") {
             dimension = "edition"
             buildConfigField("boolean", "LEAN_MODE", "false")
+            buildConfigField("boolean", "CONSERVATIVE_MODE", "false")
+        }
+        create("conservative") {
+            dimension = "edition"
+            applicationIdSuffix = ".conservative"
+            versionCode = 275
+            versionName = "1.0.4-conservative"
+            buildConfigField("boolean", "LEAN_MODE", "false")
+            buildConfigField("boolean", "CONSERVATIVE_MODE", "true")
+            resValue("string", "app_name", "Adaptive Performance Conservador")
         }
     }
 

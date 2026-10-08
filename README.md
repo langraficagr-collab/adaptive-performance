@@ -8,6 +8,22 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [Site oficial](https://langraficagr-collab.github.io/adaptive-performance/) · [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
 
+## Idiomas / Languages
+
+[🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
+
+## Novidades da versão 1.9.3 — português / English
+
+O Adaptive Performance agora permite trocar entre **Português** e **English** diretamente na tela inicial, sem alterar o idioma do Android. A preferência fica salva.
+
+No **modo Automático**, ele mede uma referência por **2 minutos** e ativa **uma função reversível por vez**, acompanhando o resultado por mais **2 minutos**. Compara consumo elétrico estimado, CPU, RAM disponível, temperatura e fluidez (quando os sensores fornecem dados confiáveis). **Só mantém ajustes que comprovem melhoria sem regressão; os piores ou inconclusivos são desativados ou revertidos**. Testes são pausados em condições de risco, como aquecimento, carregamento e bateria baixa. Recursos sem restauração segura não entram nessa avaliação.
+
+> **Limitação:** duas janelas curtas são indicadores comparativos, não garantia de aumento da autonomia. O resultado depende do aparelho e da carga de trabalho.
+
+**English:** Adaptive Performance 1.9.3 adds an in-app **English / Português** language selector. In **Automatic** mode, it measures a **2-minute baseline**, enables **one reversible setting**, and observes it for **another 2 minutes**. It compares estimated power draw, CPU load, available RAM, temperature, and responsiveness. Only measurable improvements are kept; regressions and inconclusive trials are rolled back. Unsafe or irreversible changes are excluded. See the [complete English guide](README.en.md).
+
+**APK:** [Baixar versão 1.9.3 / Download 1.9.3](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.9.3).
+
 ## Visão geral
 
 O aplicativo monitora continuamente o estado do aparelho e tenta agir somente quando há necessidade real. As decisões podem considerar temperatura, memória disponível, pressão PSI, uso de CPU, swap/zRAM, bateria, atividade em segundo plano, estabilidade, wakeups e outros indicadores.
@@ -16,7 +32,7 @@ A proposta é reduzir aquecimento, consumo e travamentos sem aplicar restriçõe
 
 ## Modos Automático e Avançado
 
-A versão 1.9.2 amplia o modo Automático com testes A/B, pré-carregamento inteligente dos apps usados recentemente, economia automática abaixo de 50% e manutenção inteligente de armazenamento, sem retirar o controle dos usuários avançados.
+A versão 1.9.3 acrescenta suporte a português/inglês e testes sequenciais reversíveis de 2 minutos no modo Automático, preservando o pré-carregamento inteligente de aplicativos e a manutenção segura de armazenamento.
 
 ### Automático — economia com aprendizado
 
@@ -24,9 +40,9 @@ A versão 1.9.2 amplia o modo Automático com testes A/B, pré-carregamento inte
 - Aprende com o padrão real de uso do aparelho e identifica aplicativos usados com frequência.
 - Não protege nem congela aplicativos automaticamente; o modo Automático mantém o foco no pré-carregamento e respeita as seleções manuais.
 - Considera bateria, temperatura, CPU, RAM, potência estimada, estado da tela e estabilidade.
-- Testa individualmente níveis de compactação de RAM, limite de RAM por app, tempo até congelamento, atraso após sair do app e limiares de limpeza.
-- Também compara ativação/desativação de economia com tela apagada, controle de wakeups, economia de rádio e taxa de atualização adaptativa.
-- Mede o resultado de cada janela de teste e mantém as configurações com melhor relação entre consumo, temperatura e desempenho.
+- Avalia sequencialmente opções reversíveis elegíveis, com referência de 2 minutos e observação de 2 minutos por ajuste; operações irreversíveis ou sem restauração segura não entram nos testes.
+- Compara energia, uso de CPU, RAM livre, temperatura e fluidez, quando os indicadores são confiáveis; testes ruins ou inconclusivos são revertidos.
+- Mantém apenas ajustes com melhoria mensurável sem regressão relevante; a observação curta não garante autonomia maior em longo prazo.
 - Pode aumentar a economia quando a bateria está baixa, o aparelho aquece ou a tela permanece desligada.
 - Mantém sempre ativas as proteções críticas de estabilidade, rollback, Auto-Reparo e segurança térmica.
 - Permite reiniciar todo o aprendizado a qualquer momento.
@@ -50,7 +66,7 @@ A versão 1.9.2 amplia o modo Automático com testes A/B, pré-carregamento inte
 Ao atualizar uma instalação existente, o aplicativo preserva o comportamento/configurações já utilizados. Novas instalações podem começar pela experiência automática simplificada.
 
 
-## Novidades da versão 1.9.2
+## Histórico da versão 1.9.2
 
 - Novo motor de autocalibração por testes A/B no modo Automático.
 - Seleção automática dos melhores níveis por parâmetro com base em bateria, temperatura, CPU, RAM e potência estimada.

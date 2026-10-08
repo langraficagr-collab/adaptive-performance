@@ -216,9 +216,11 @@ public class MainActivity extends Activity {
         return g;
     }
 
+    private String tr(String s) { return UiLanguage.tr(prefs, s); }
+
     private TextView text(String s, float sp, int color, boolean bold) {
         TextView v = new TextView(this);
-        v.setText(s);
+        v.setText(tr(s));
         v.setTextSize(sp);
         v.setTextColor(color);
         v.setGravity(Gravity.CENTER_VERTICAL);
@@ -279,7 +281,7 @@ public class MainActivity extends Activity {
 
     private Switch actionSwitch(String title, String key, boolean def) {
         Switch sw = new Switch(this);
-        sw.setText(title);
+        sw.setText(tr(title));
         sw.setTextColor(TEXT);
         sw.setTextSize(14);
         sw.setPadding(dp(12), dp(10), dp(8), dp(10));
@@ -298,7 +300,7 @@ public class MainActivity extends Activity {
 
     private Button actionButton(String title) {
         Button b = new Button(this);
-        b.setText(title);
+        b.setText(tr(title));
         b.setTextColor(Color.WHITE);
         b.setTextSize(15);
         b.setAllCaps(false);
@@ -328,8 +330,9 @@ public class MainActivity extends Activity {
         page.addView(mainScroll, new LinearLayout.LayoutParams(-1,0,1f));
 
         buildHeader();
+        buildLanguageSelector();
         buildHero();
-        buildModeSelector();
+        if (!BuildConfig.CONSERVATIVE_MODE) buildModeSelector();
         if (isAdvancedUserMode()) {
             buildThermal();
             buildActionsPlaceholder();
@@ -343,13 +346,39 @@ public class MainActivity extends Activity {
         setContentView(page);
     }
 
+    private void buildLanguageSelector() {
+        LinearLayout line = new LinearLayout(this);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setPadding(dp(6), 0, dp(6), dp(10));
+        TextView prompt = text(UiLanguage.english(prefs) ? "Language" : "Idioma", 13, MUTED, true);
+        line.addView(prompt, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        for (String lang : new String[]{"pt", "en"}) {
+            Button button = actionButton(lang.equals("pt") ? "Português" : "English");
+            boolean selected = lang.equals(prefs.getString("app_language", "pt"));
+            button.setLayoutParams(new LinearLayout.LayoutParams(dp(96), dp(40)));
+            button.setTextSize(12f);
+            button.setBackground(selected ? gradient(Color.rgb(21,153,112), Color.rgb(15,107,155), 10)
+                    : bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 10));
+            button.setOnClickListener(v -> {
+                if (!lang.equals(prefs.getString("app_language", "pt"))) {
+                    prefs.edit().putString("app_language", lang).commit();
+                    recreate();
+                }
+            });
+            line.addView(button);
+        }
+        content.addView(line);
+    }
+
     private boolean isAdvancedUserMode() {
-        return "advanced".equals(prefs.getString("user_mode", "auto"));
+        return !BuildConfig.CONSERVATIVE_MODE && "advanced".equals(prefs.getString("user_mode", "auto"));
     }
 
     private void setUserMode(String mode) {
         String normalized = "advanced".equals(mode) ? "advanced" : "auto";
         if (normalized.equals(prefs.getString("user_mode", "auto"))) return;
+        if ("advanced".equals(normalized))
+            ConservativeTuningController.stopIfNeeded(prefs);
         prefs.edit().putString("user_mode", normalized).apply();
         if ("auto".equals(normalized)) {
             prefs.edit().putLong("auto_user_last_apply", 0L).apply();
@@ -391,11 +420,16 @@ public class MainActivity extends Activity {
         row.addView(advanced);
         c.addView(row);
 
-        TextView help = text(BuildConfig.LEAN_MODE
+        TextView help = text(UiLanguage.english(prefs)
+                ? (BuildConfig.LEAN_MODE
+                ? "Simple mode: Android-compatible optimization without ADB or Shizuku."
+                : advancedMode ? "Advanced: all controls are available for manual tuning."
+                : "Automatic: reversible options are tested individually for 2 minutes, keeping proven improvements only.")
+                : BuildConfig.LEAN_MODE
                 ? "Modo simples: o aplicativo cuida das otimizações compatíveis com o Android, sem ADB ou Shizuku."
                 : (advancedMode
                 ? "Avançado: todas as opções ficam disponíveis para ajuste manual."
-                : "Automático: o app aprende seu padrão de uso, compara perfis e prioriza menor consumo sem abandonar proteções de estabilidade e temperatura."),
+                : "Automático: o app mede uma referência e testa cada opção reversível por 2 minutos, mantendo somente melhorias comprovadas."),
                 12, MUTED, false);
         help.setPadding(dp(4), dp(10), dp(4), 0);
         c.addView(help);
@@ -439,12 +473,15 @@ public class MainActivity extends Activity {
             return "Apps mantidos neste ciclo: nenhum";
         }
 
-        StringBuilder out = new StringBuilder("Apps mantidos neste ciclo (")
-                .append(Math.min(4, packages.size())).append("/4):");
+        int limit = BuildConfig.CONSERVATIVE_MODE ? 2 : 4;
+        String title = BuildConfig.CONSERVATIVE_MODE
+                ? "APKs aquecidos neste ciclo (" : "Itens pré-carregados neste ciclo (";
+        StringBuilder out = new StringBuilder(title)
+                .append(Math.min(limit, packages.size())).append("/").append(limit).append("):");
         PackageManager pm = getPackageManager();
         int shown = 0;
         for (String pkg : packages) {
-            if (pkg == null || pkg.trim().isEmpty() || shown >= 4) continue;
+            if (pkg == null || pkg.trim().isEmpty() || shown >= limit) continue;
             String label = pkg;
             try {
                 android.content.pm.ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
@@ -460,11 +497,17 @@ public class MainActivity extends Activity {
     private void updatePreloadUi() {
         if (preloadStatusText == null) return;
         int count = prefs.getInt("auto_preload_count", 0);
-        setTextIfChanged(preloadTuningText, prefs.getString("auto_tune_status",
-                "Preparando primeiro ciclo de testes") + " • apps pré-carregados: " + count + "/4");
+        String tuneStatus = prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes");
+        int limit = BuildConfig.CONSERVATIVE_MODE ? 2 : 4;
+        setTextIfChanged(preloadTuningText,
+                tuneStatus + (UiLanguage.english(prefs) ? " • preloaded apps: " : " • apps pré-carregados: ")
+                + count + "/" + limit);
         setTextIfChanged(preloadStatusText, prefs.getString("auto_preload_status",
                 "Pré-carregamento automático aguardando o próximo ciclo"));
-        setTextIfChanged(preloadAppsText, preloadedAppsText());
+        setTextIfChanged(preloadAppsText, BuildConfig.CONSERVATIVE_MODE
+                ? (count == 0 ? "Nenhum APK foi aquecido neste ciclo"
+                        : preloadedAppsText() + "\nO Android pode liberar esse cache a qualquer momento.")
+                : preloadedAppsText());
     }
 
     private void buildAutomaticModeCard() {
@@ -478,30 +521,45 @@ public class MainActivity extends Activity {
         status.setPadding(dp(4), dp(14), dp(4), dp(8));
         c.addView(status);
 
-        TextView details = text("O modo automático testa gradualmente opções e níveis do modo avançado, mede bateria, temperatura, CPU, RAM e fluidez, e conserva as combinações com melhor resultado. A cada 15 minutos, ele pré-carrega os apps usados recentemente. Isso não os protege contra congelamento.",
+        TextView details = text(UiLanguage.english(prefs) ?
+                "Automatic mode measures a 2-minute baseline, then trials one reversible setting at a time for 2 minutes. It compares power draw, CPU, available RAM, temperature and smoothness. Regressions or inconclusive results are rolled back. App preloading still runs every 15 minutes." :
+                BuildConfig.CONSERVATIVE_MODE
+                ? "Testa uma opção por vez e desfaz se houver piora. Pré-aquece no máximo 2 APKs usados nos últimos 15 min, a cada 15 min, com limite total de 32 MB. Pausa em bateria baixa, carregamento, pouca RAM ou calor; desativa ciclos futuros se medir aumento relevante de consumo ou temperatura. O Android pode liberar o cache; os apps não ficam presos na RAM."
+                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível de cada vez por 2 minutos. Compara energia, CPU, RAM, temperatura e fluidez; desfaz se piorar ou não houver prova de melhora. A cada 15 minutos, ele pré-carrega os apps usados recentemente. Isso não os protege contra congelamento.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
         int frequentCount = prefs.getInt("auto_preload_count", 0);
         int recentWindow = 15;
         preloadTuningText = text(prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes") +
-                " • apps pré-carregados: " + frequentCount + "/4", 12, CYAN, true);
+                (UiLanguage.english(prefs) ? " • preloaded apps: " : " • apps pré-carregados: ")
+                + frequentCount +
+                (BuildConfig.CONSERVATIVE_MODE ? "/2" : "/4"), 12, CYAN, true);
         preloadTuningText.setPadding(dp(4), dp(6), dp(4), dp(4));
         c.addView(preloadTuningText);
 
-        TextView recentHint = text("Reconhecimento inteligente: considera somente os aplicativos usados nos últimos "
-                + recentWindow + " minutos.", 12, MUTED, false);
+        TextView recentHint = text(UiLanguage.english(prefs)
+                ? "Recent apps: only apps used during the last " + recentWindow
+                  + " minutes; preloading runs every 15 minutes."
+                : "Reconhecimento inteligente: considera somente os aplicativos usados nos últimos "
+                  + recentWindow + " minutos; o ciclo roda a cada 15 minutos.", 12, MUTED, false);
         recentHint.setPadding(dp(4), dp(2), dp(4), dp(8));
         c.addView(recentHint);
 
-        Switch preloadSwitch = actionSwitch("Pré-carregar automaticamente os 4 apps mais usados", "auto_preload_enabled", true);
-        c.addView(preloadSwitch);
+        String preloadLabel = BuildConfig.CONSERVATIVE_MODE
+                ? "Pré-aquecer até 2 APKs a cada 15 minutos"
+                : "Pré-carregar automaticamente os 4 apps mais usados";
+        Switch preloadSwitch = actionSwitch(preloadLabel, "auto_preload_enabled", true);
+        if (!BuildConfig.CONSERVATIVE_MODE) c.addView(preloadSwitch);
 
-        preloadStatusText = text(prefs.getString("auto_preload_status", "Pré-carregamento automático aguardando o próximo ciclo"), 12, TEAL, true);
+        preloadStatusText = text(prefs.getString("auto_preload_status",
+                "Pré-carregamento automático aguardando o próximo ciclo"), 12, TEAL, true);
         preloadStatusText.setPadding(dp(4), dp(6), dp(4), dp(8));
         c.addView(preloadStatusText);
 
-        preloadAppsText = text(preloadedAppsText(), 13, TEXT, false);
+        preloadAppsText = text(BuildConfig.CONSERVATIVE_MODE
+                ? "Nenhum APK foi aquecido neste ciclo"
+                : preloadedAppsText(), 13, TEXT, false);
         preloadAppsText.setPadding(dp(12), dp(10), dp(12), dp(10));
         preloadAppsText.setBackground(bordered(CARD_2, Color.rgb(29,69,90), 14));
         c.addView(preloadAppsText);
@@ -509,7 +567,24 @@ public class MainActivity extends Activity {
         Button refreshRecentApps = actionButton("Pré-carregar apps usados agora");
         refreshRecentApps.setBackground(bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
         refreshRecentApps.setOnClickListener(v -> refreshRecentUsageSelection());
-        c.addView(refreshRecentApps);
+        if (BuildConfig.CONSERVATIVE_MODE) {
+            refreshRecentApps.setText(tr("Atualizar seleção de apps recentes"));
+        }
+        if (!BuildConfig.CONSERVATIVE_MODE) c.addView(refreshRecentApps);
+
+        if (BuildConfig.CONSERVATIVE_MODE) {
+            TextView rules = text("Fila automática: " + prefs.getInt("conservative_tune_option_count", 26)
+                    + " ajustes avaliáveis. Primeiro mede uma referência de 2 min; depois testa "
+                    + "um ajuste por 2 min. Se reverter, mede uma nova referência antes do próximo. "
+                    + "Sem medições confiáveis, não aprova. Dependências indisponíveis aparecem como não testadas. "
+                    + "Proteções ficam ativas; ações sem restauração ficam desativadas.", 12, MUTED, false);
+            rules.setPadding(dp(4), dp(12), dp(4), dp(8));
+            c.addView(rules);
+            TextView result = text(prefs.getString("conservative_tune_last_result", "Sem testes concluídos"), 12, TEAL, true);
+            c.addView(result);
+            content.addView(c);
+            return;
+        }
 
         TextView goalTitle = text("Meta de bateria", 15, TEXT, true);
         goalTitle.setPadding(dp(4), dp(16), dp(4), dp(6));
@@ -741,6 +816,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildActions() {
+        if (BuildConfig.CONSERVATIVE_MODE) return;
         LinearLayout c = card();
         addSectionTitle(c,"⚡","Ações inteligentes","Automatize estabilidade, temperatura e segundo plano");
 
@@ -1268,7 +1344,8 @@ public class MainActivity extends Activity {
 
     private void setTextIfChanged(TextView view, CharSequence value) {
         if (view == null) return;
-        if (!android.text.TextUtils.equals(view.getText(), value)) view.setText(value);
+        CharSequence translated = tr(value == null ? "" : value.toString());
+        if (!android.text.TextUtils.equals(view.getText(), translated)) view.setText(translated);
     }
 
 
@@ -1353,7 +1430,7 @@ public class MainActivity extends Activity {
         updatePreloadUi();
         boolean master=prefs.getBoolean("master",false);
         if (startButton != null && (!lastRenderedMasterValid || lastRenderedMaster != master)) {
-            startButton.setText(master ? "Parar otimização" : "Iniciar otimização");
+            startButton.setText(tr(master ? "Parar otimização" : "Iniciar otimização"));
             startButton.setBackground(master
                     ? gradient(Color.rgb(22,157,220),Color.rgb(17,105,210),16)
                     : gradient(Color.rgb(35,178,105),Color.rgb(17,126,91),16));

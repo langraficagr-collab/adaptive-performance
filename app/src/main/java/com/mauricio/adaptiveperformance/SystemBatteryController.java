@@ -146,11 +146,11 @@ public final class SystemBatteryController {
                     .apply();
         }
 
-        if (!interactive && now - lastWakeAudit >= WAKELOCK_AUDIT_MS) {
+        if (!BuildConfig.CONSERVATIVE_MODE && !interactive && now - lastWakeAudit >= WAKELOCK_AUDIT_MS) {
             lastWakeAudit = now;
             auditPersistentWakeLocks(foreground);
         }
-        if (now - lastSyncAudit >= SYNC_AUDIT_MS) {
+        if (!BuildConfig.CONSERVATIVE_MODE && now - lastSyncAudit >= SYNC_AUDIT_MS) {
             lastSyncAudit = now;
             auditStuckSyncs();
         }
@@ -317,6 +317,57 @@ public final class SystemBatteryController {
         restoreSetting("global", "mobile_data_always_on", "mobile_always");
         restoreSetting("system", "screen_off_timeout", "screen_timeout");
         restoreSetting("secure", "double_tap_to_wake", "double_tap");
+    }
+
+    public synchronized boolean restoreConservativeOption(String key) {
+        String[][] settings;
+        if ("system_radio_savings".equals(key)) {
+            settings = new String[][]{{"global","wifi_scan_throttle_enabled","wifi_scan_throttle"},
+                {"global","wifi_scan_always_enabled","wifi_scan_always"},
+                {"global","wifi_wakeup_enabled","wifi_wakeup"},
+                {"global","mobile_data_always_on","mobile_always"}};
+        } else if ("adaptive_screen_timeout".equals(key)) {
+            settings = new String[][]{{"system","screen_off_timeout","screen_timeout"}};
+        } else if ("maximum_battery_mode".equals(key)) {
+            settings = new String[][]{{"secure","double_tap_to_wake","double_tap"}};
+        } else if ("dynamic_doze_whitelist".equals(key)) {
+            settings = new String[0][];
+        } else {
+            settings = new String[][]{{"global","wifi_scan_throttle_enabled","wifi_scan_throttle"},
+                {"global","wifi_scan_always_enabled","wifi_scan_always"},
+                {"global","wifi_wakeup_enabled","wifi_wakeup"},
+                {"global","mobile_data_always_on","mobile_always"},
+                {"system","screen_off_timeout","screen_timeout"},
+                {"secure","double_tap_to_wake","double_tap"}};
+        }
+        try {
+            for (String[] setting : settings) {
+                String applied = "sys_applied_" + setting[2];
+                if (!prefs.contains(applied)) continue;
+                String expected = prefs.getString("baseline_sys_" + setting[2], "null");
+                String command = "null".equals(expected) || expected.isEmpty()
+                        ? "settings delete " + setting[0] + " " + setting[1]
+                        : "settings put " + setting[0] + " " + setting[1] + " " + shellSafe(expected);
+                privileged.exec(command);
+                String actual = privileged.exec("settings get " + setting[0] + " " + setting[1]);
+                if (actual == null || !actual.trim().equals(expected.isEmpty() ? "null" : expected)) return false;
+                prefs.edit().remove(applied).commit();
+            }
+            if ("dynamic_doze_whitelist".equals(key) || "system_battery_guard".equals(key)) {
+                Set<String> removed = new HashSet<>(prefs.getStringSet("doze_removed_by_adaptive", Collections.emptySet()));
+                for (String pkg : removed) {
+                    if (!pkg.matches("[A-Za-z0-9_.]+")) return false;
+                    privileged.exec("cmd deviceidle whitelist +" + pkg);
+                    String actual = privileged.exec("cmd deviceidle whitelist");
+                    if (actual == null || !actual.contains("," + pkg + ",")) return false;
+                    Set<String> remaining = new HashSet<>(prefs.getStringSet("doze_removed_by_adaptive", Collections.emptySet()));
+                    remaining.remove(pkg);
+                    prefs.edit().putStringSet("doze_removed_by_adaptive", remaining).commit();
+                }
+            }
+            lastPolicy = 0L;
+            return true;
+        } catch (Throwable t) { return false; }
     }
 
     public synchronized void restoreAll() {

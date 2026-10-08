@@ -18,6 +18,34 @@ public final class AutoUserModeController {
                                 boolean charging, float powerW) {
         if (!enabled(prefs)) return;
         long now = System.currentTimeMillis();
+        if (BuildConfig.CONSERVATIVE_MODE) {
+            if (!prefs.getBoolean("conservative_preload_configured_v2", false)) {
+                prefs.edit().putBoolean("auto_preload_enabled", true)
+                        .putBoolean("conservative_preload_configured_v2", true)
+                        .putInt("auto_preload_max_apps", 2)
+                        .putInt("auto_preload_budget_cap_mb", 32)
+                        .putLong("auto_preload_cycle_at", 0L)
+                        .putString("auto_preload_status",
+                                "Pré-carga ativada: até 2 APKs a cada 15 min, máx. 32 MB")
+                        .apply();
+            }
+            long lastApply = prefs.getLong("auto_user_last_apply", 0L);
+            if (prefs.getBoolean("conservative_profile_initialized", false)
+                    && lastApply > 0L && now - lastApply < APPLY_INTERVAL_MS) return;
+            applyConservativeProfile(prefs, now, batteryPct, tempC);
+            return;
+        }
+        // A/B evaluator exclusively owns automatic option changes. Avoid a second
+        // policy loop re-enabling settings in the middle of a 2-minute trial.
+        if (!prefs.getBoolean("auto_user_two_minute_mode", false)) {
+            prefs.edit().putBoolean("auto_user_two_minute_mode", true)
+                    .putString("auto_user_status",
+                            "Teste automático reversível: uma função por vez, durante 2 minutos")
+                    .commit();
+        }
+        updateLearning(prefs, now, batteryPct, tempC, cpuLoad, powerW, charging);
+        return;
+        /*
         long last = prefs.getLong("auto_user_last_apply", 0L);
         if (last > 0L && now - last < APPLY_INTERVAL_MS) return;
 
@@ -61,6 +89,66 @@ public final class AutoUserModeController {
                 .putLong("auto_user_last_apply", now)
                 .putString("auto_user_status", describe(effective, trial, variant, batteryPct, tempC)
                         + batteryGoalStatus(prefs, batteryPct, charging, now))
+                .apply();
+        */
+    }
+
+
+    private static void applyConservativeProfile(SharedPreferences prefs, long now,
+                                                 int batteryPct, float tempC) {
+        if (!prefs.getBoolean("conservative_profile_initialized", false)) {
+            SharedPreferences.Editor e = prefs.edit()
+                    .putBoolean("conservative_profile_initialized", true)
+                    .putBoolean("smart_suite_enabled", true)
+                    .putBoolean("advanced_adaptive", true)
+                    .putBoolean("auto_calibration", false)
+                    .putBoolean("app_learning", false)
+                    .putBoolean("app_profiles", false)
+                    .putBoolean("thermal_prediction", false)
+                    .putBoolean("health_guard", true)
+                    .putBoolean("rollback_guard", true)
+                    .putBoolean("over_optimization_guard", true)
+                    .putBoolean("auto_repair", false)
+                    .putBoolean("action_effectiveness", false)
+                    .putBoolean("time_usage_learning", false)
+                    .putBoolean("history_24h", false)
+                    .putBoolean("deep_sleep_monitor", false)
+                    .putBoolean("screen_off_optimization", false)
+                    .putBoolean("system_battery_guard", false)
+                    .putBoolean("system_deep_idle", false)
+                    .putBoolean("dynamic_doze_whitelist", false)
+                    .putBoolean("adaptive_screen_timeout", false)
+                    .putBoolean("adaptive_refresh", true)
+                    .putBoolean("low_battery_adaptive", true)
+                    .putBoolean("zram_thrash_guard", true)
+                    .putBoolean("memory_leak_detector", false)
+                    .putBoolean("thermal_brightness_control", true)
+                    .putBoolean("critical_cleanup", false)
+                    .putBoolean("auto_bug_cleanup", false)
+                    .putBoolean("auto_unused_restrict", false)
+                    .putBoolean("wakeup_network_guard", false)
+                    .putBoolean("cpu_pressure_control", false)
+                    .putBoolean("adaptive_aggressiveness", false)
+                    .putBoolean("diagnostic_only", false)
+                    .putBoolean("extended_safe_mode_manual", false)
+                    .putBoolean("aggressive_memory_cleanup", false)
+                    .putBoolean("maximum_battery_mode", false)
+                    .putBoolean("smart_auto_cleanup", false)
+                    .putBoolean("app_ram_limiter_enabled", false)
+                    .putBoolean("adaptive_freeze_enabled", false)
+                    .putBoolean("auto_preload_enabled", true)
+                    .putString("thermal_mode", "auto")
+                    .putString("zram_profile", "normal");
+            ConservativeTuningController.applySafeDefaults(e);
+            e.apply();
+        }
+        ConservativeTuningController.initialize(prefs);
+        String battery = batteryPct >= 0 ? " • bateria " + batteryPct + "%" : "";
+        String heat = tempC > 0f ? String.format(java.util.Locale.US, " • %.1f°C", tempC) : "";
+        prefs.edit().putLong("auto_user_last_apply", now)
+                .putString("auto_user_status",
+                        "Perfil conservador • até 2 APKs/15 min • cache limitado e pausado por calor, RAM ou bateria"
+                                + battery + heat)
                 .apply();
     }
 

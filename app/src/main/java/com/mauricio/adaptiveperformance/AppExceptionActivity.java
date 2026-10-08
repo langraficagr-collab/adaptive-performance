@@ -44,7 +44,7 @@ public class AppExceptionActivity extends Activity {
 
     private TextView tv(String s, float sp, int color, boolean bold) {
         TextView v=new TextView(this);
-        v.setText(s); v.setTextSize(sp); v.setTextColor(color);
+        v.setText(UiLanguage.tr(prefs,s)); v.setTextSize(sp); v.setTextColor(color);
         if(bold) v.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         return v;
     }
@@ -80,7 +80,7 @@ public class AppExceptionActivity extends Activity {
         page.addView(note);
 
         EditText search=new EditText(this);
-        search.setHint("Buscar aplicativo ou pacote");
+        search.setHint(UiLanguage.tr(prefs,"Buscar aplicativo ou pacote"));
         search.setHintTextColor(Color.rgb(99,130,150));
         search.setTextColor(TEXT);
         search.setSingleLine(true);
@@ -101,7 +101,7 @@ public class AppExceptionActivity extends Activity {
         page.addView(scroll,new LinearLayout.LayoutParams(-1,0,1f));
 
         Button save=new Button(this);
-        save.setText("Salvar lista");
+        save.setText(UiLanguage.tr(prefs,"Salvar lista"));
         save.setTextColor(Color.WHITE);
         save.setTextSize(15);
         save.setAllCaps(false);

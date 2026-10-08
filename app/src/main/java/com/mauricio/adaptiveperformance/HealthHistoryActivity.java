@@ -168,7 +168,7 @@ public class HealthHistoryActivity extends Activity {
 
     private TextView text(String s,float sp,int color,boolean bold) {
         TextView v=new TextView(this);
-        v.setText(s); v.setTextSize(sp); v.setTextColor(color);
+        v.setText(UiLanguage.tr(prefs,s)); v.setTextSize(sp); v.setTextColor(color);
         if(bold) v.setTypeface(Typeface.DEFAULT_BOLD);
         return v;
     }

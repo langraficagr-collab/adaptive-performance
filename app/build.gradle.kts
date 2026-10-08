@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         buildConfigField("boolean", "ADS_TEST_MODE", "false")
-        versionCode = 64
-        versionName = "1.8.5-battery-forecast"
+        versionCode = 65
+        versionName = "1.8.6-all-apps"
     }
 
     buildTypes {

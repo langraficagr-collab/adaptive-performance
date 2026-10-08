@@ -421,7 +421,7 @@ public final class SystemBatteryController {
             boolean termuxBusy = termux && (prefs.getBoolean("treat_termux_wakelock_expected", true) || isTermuxWorkActive());
             boolean foregroundService = !worstPkg.isEmpty() && hasForegroundService(worstPkg);
             boolean userCandidate = !worstPkg.isEmpty()
-                    && AppSafety.isEligibleForAutomaticRestriction(context, worstPkg);
+                    && AppSafety.isEligibleForAdaptiveOptimization(context, worstPkg);
 
             String previousPkg = prefs.getString("persistent_wakelock_candidate_pkg", "");
             int confirmations = prefs.getInt("persistent_wakelock_confirmations", 0);
@@ -556,7 +556,7 @@ public final class SystemBatteryController {
                 while (c.find()) {
                     String candidate = c.group(1);
                     if (candidate.equals(foreground)) continue;
-                    if (AppSafety.isEligibleForAutomaticRestriction(context, candidate)) {
+                    if (AppSafety.isEligibleForAdaptiveOptimization(context, candidate)) {
                         backgroundApps.add(candidate);
                     }
                 }

@@ -80,6 +80,33 @@ public final class AppSafety {
         } catch (Throwable t) { return false; }
     }
 
+    /**
+     * Pacotes seguros para otimização adaptativa reversível em segundo plano.
+     * Não depende da lista pessoal de exceções nem do sinalizador FLAG_SYSTEM:
+     * apps em uso, serviços ativos e componentes persistentes são filtrados nos
+     * controladores que aplicam cada ação.
+     */
+    public static boolean isEligibleForAdaptiveOptimization(Context context, String pkg) {
+        if (pkg == null || pkg.isEmpty() || pkg.equals(context.getPackageName())) return false;
+        if (pkg.startsWith("com.mauricio.") || pkg.startsWith("io.appium.")) return false;
+        // Mantém a infraestrutura essencial protegida, mas permite pacotes de sistema
+        // instalados com UID próprio (>= 10000) e sem processo persistente.
+        if (pkg.equals("android") || pkg.startsWith("android.")) return false;
+        if (pkg.startsWith("com.android.systemui") || pkg.startsWith("com.android.phone")
+                || pkg.startsWith("com.android.server") || pkg.startsWith("com.android.providers.")
+                || pkg.startsWith("com.android.inputmethod") || pkg.startsWith("com.google.android.inputmethod")
+                || pkg.startsWith("com.android.networkstack") || pkg.startsWith("com.google.android.networkstack")
+                || pkg.startsWith("com.miui.security") || pkg.startsWith("com.lbe.security")
+                || pkg.startsWith("com.miui.home") || pkg.startsWith("com.miui.powerkeeper")
+                || pkg.equals("com.xiaomi.xmsf") || pkg.equals("com.google.android.gms")
+                || pkg.equals("com.google.android.gsf") || pkg.equals("com.android.permissioncontroller")
+                || pkg.equals("com.google.android.permissioncontroller") || pkg.equals("com.android.settings")
+                || pkg.equals("com.android.bluetooth") || pkg.equals("com.android.nfc")
+                || pkg.equals("com.android.webview") || pkg.equals("com.google.android.webview")
+                || pkg.equals("moe.shizuku.privileged.api")) return false;
+        return isAppUidCandidate(context, pkg);
+    }
+
     public static boolean isEligibleForAutomaticRestriction(Context context, String pkg) {
         return !isCritical(context, pkg)
                 && !isAutoProtected(context, pkg)

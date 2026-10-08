@@ -134,7 +134,7 @@ public class CpuPressureController {
                 try { pid = Integer.parseInt(m.group(1)); } catch (Exception e) { continue; }
                 String proc = m.group(2);
                 String pkg = proc.contains(":") ? proc.substring(0, proc.indexOf(':')) : proc;
-                if (!AppSafety.isEligibleForAutomaticRestriction(context, pkg) || AppSafety.isSystemApp(context, pkg)) continue;
+                if (!AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) continue;
                 packagePids.computeIfAbsent(pkg, k -> new ArrayList<>()).add(pid);
             }
 
@@ -251,7 +251,7 @@ public class CpuPressureController {
     }
 
     private boolean isProtected(String pkg) {
-        return AppSafety.isCritical(context, pkg) || AppSafety.isAutoProtected(context, pkg);
+        return !AppSafety.isEligibleForAdaptiveOptimization(context, pkg) || AppProfilePolicy.protectedActive(context, prefs, pkg);
     }
 
     private void setState(boolean on) {

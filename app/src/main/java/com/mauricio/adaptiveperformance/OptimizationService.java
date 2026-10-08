@@ -1609,8 +1609,8 @@ public class OptimizationService extends Service {
     // All detected-package mutations pass through the same fail-closed guard.
     private void requireSafeBackgroundApp(String pkg) throws Exception {
         if (pkg == null || !pkg.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
-                || !AppSafety.isEligibleForAutomaticRestriction(this, pkg)
-                || AppSafety.isSystemApp(this, pkg) || AppProfilePolicy.protectedActive(this, prefs, pkg)) {
+                || !AppSafety.isEligibleForAdaptiveOptimization(this, pkg)
+                || AppProfilePolicy.protectedActive(this, prefs, pkg)) {
             throw new IllegalStateException("App ausente, protegido, do sistema ou inelegível: " + pkg);
         }
         String services = privileged.exec("dumpsys activity services " + pkg);

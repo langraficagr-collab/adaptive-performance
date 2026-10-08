@@ -327,7 +327,7 @@ public final class SystemHealthController {
             if (delta >= 2) {
                 newLoops++;
                 if (prefs.getBoolean("crash_loop_guard", true) &&
-                        AppSafety.isEligibleForAutomaticRestriction(context, e.getKey()) &&
+                        AppSafety.isEligibleForAdaptiveOptimization(context, e.getKey()) &&
                         !e.getKey().equals(fg)) {
                     try {
                         privileged.exec("cmd activity make-uid-idle --user 0 " + e.getKey());

@@ -647,7 +647,7 @@ public final class AdvancedAdaptiveController {
             for (String pkg : seen) {
                 if (count >= max) break;
                 if (pkg.equals(foreground) || fgs.contains(pkg)) continue;
-                if (!AppSafety.isEligibleForAutomaticRestriction(context, pkg)) continue;
+                if (!AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) continue;
                 privileged.exec("cmd activity make-uid-idle --user 0 " + pkg);
                 count++;
             }
@@ -784,7 +784,7 @@ public final class AdvancedAdaptiveController {
     private boolean safeToIdle(String pkg, String foreground) {
         if (!AdaptiveIntelligenceController.mutationAllowed(prefs)) return false;
         if (pkg == null || pkg.equals(foreground)) return false;
-        return AppSafety.isEligibleForAutomaticRestriction(context, pkg);
+        return AppSafety.isEligibleForAdaptiveOptimization(context, pkg);
     }
 
     private void maybeNotifyStorage(float pct, long now) {

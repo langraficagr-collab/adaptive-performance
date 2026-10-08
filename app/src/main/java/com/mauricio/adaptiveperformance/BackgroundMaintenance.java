@@ -263,7 +263,7 @@ public class BackgroundMaintenance {
 
         for (ApplicationInfo ai : pm.getInstalledApplications(0)) {
             String pkg = ai.packageName;
-            if (!isEligibleForAutoRestriction(pkg) || AppSafety.isSystemApp(context, pkg)
+            if (!isEligibleForAutoRestriction(pkg)
                     || pkg.equals(prefs.getString("foreground", ""))) continue;
             if (newlyRestricted >= AppProfilePolicy.batch(context, prefs, prefs.getString("foreground", ""), 4)) break;
             if (restricted.contains(pkg)) continue;
@@ -320,7 +320,7 @@ public class BackgroundMaintenance {
         Set<String> restricted = new HashSet<>(prefs.getStringSet("auto_restricted", Collections.emptySet()));
         if (restricted.isEmpty()) return;
         for (String pkg : new ArrayList<>(restricted)) {
-            if (AppSafety.isAutoProtected(context, pkg)) {
+            if (AppSafety.isAutoProtected(context, pkg) && !AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) {
                 restoreAutoRestriction(pkg, restricted);
                 log("Exceção do usuário restaurada: " + label(pkg) + ".");
             }
@@ -339,7 +339,7 @@ public class BackgroundMaintenance {
     }
 
     private boolean isEligibleForAutoRestriction(String pkg) {
-        return AppSafety.isEligibleForAutomaticRestriction(context, pkg);
+        return AppSafety.isEligibleForAdaptiveOptimization(context, pkg);
     }
 
     private void restoreAutoRestriction(String pkg, Set<String> restricted) throws Exception {
@@ -414,7 +414,7 @@ public class BackgroundMaintenance {
     }
 
     private boolean isProtected(String pkg) {
-        return AppSafety.isCritical(context, pkg) || AppSafety.isAutoProtected(context, pkg) || AppProfilePolicy.protectedActive(context, prefs, pkg);
+        return !AppSafety.isEligibleForAdaptiveOptimization(context, pkg) || AppProfilePolicy.protectedActive(context, prefs, pkg);
     }
 
     private String label(String pkg) { return AppSafety.label(context, pkg); }

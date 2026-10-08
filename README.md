@@ -252,9 +252,9 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
-**1.8.5 — monitor de consumo e autonomia**
+**1.8.6 — otimização adaptativa ampliada**
 
-Exibe percentual atual, consumo recente por hora e uma estimativa de tempo restante baseada na queda observada durante o uso. A estimativa começa após pelo menos 15 minutos e uma queda mensurável; ela é aproximada e muda conforme uso, sinal, brilho e temperatura. As amostras são coletadas enquanto o painel está aberto e são reiniciadas ao conectar o carregador. Mantém também o assistente de divulgação da versão 1.8.4.
+Os controles automáticos reversíveis agora também consideram apps marcados como preferidos e apps de sistema com UID próprio que não sejam componentes essenciais persistentes. O app em primeiro plano, serviços ativos e infraestrutura central do Android continuam protegidos. O congelamento forçado manual mantém suas próprias proteções. Inclui o monitor de consumo e a estimativa de autonomia da versão 1.8.5.
 
 **1.8.4 — assistente de divulgação no Reddit**
 

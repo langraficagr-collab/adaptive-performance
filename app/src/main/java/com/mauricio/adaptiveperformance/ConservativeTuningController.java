@@ -340,7 +340,6 @@ final class ConservativeTuningController {
     static void stopIfNeeded(SharedPreferences prefs) {
         String stage = prefs.getString(P + "stage", "baseline");
         if (!"trial".equals(stage) && !"probation".equals(stage)) return;
-        int phase = prefs.getInt(P + "phase", 0);
         restoreSnapshot(prefs);
         prefs.edit().putString(P + "stage", "baseline")
                 .putLong(P + "stage_started", System.currentTimeMillis())

@@ -655,7 +655,7 @@ final class ConservativeTuningController {
     static void recoverAfterRestart(SharedPreferences p) {
         initialize(p);
         if (trialActive(p)) {
-            restoreSnapshot(p, p.getInt(P + "phase", 0));
+            restoreSnapshot(p);
             startWindow(p, "baseline", System.currentTimeMillis());
             setStatus(p, "Teste interrompido pelo reinício • ajuste restaurado; medindo nova referência");
         }

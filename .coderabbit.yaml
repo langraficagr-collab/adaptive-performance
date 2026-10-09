@@ -19,6 +19,10 @@ reviews:
     enabled: true
     auto_incremental_review: true
     drafts: false
+    # Explicitly allow pull requests to main (and only main).
+    # Prevent provider UI/default-branch mismatches from skipping review.
+    base_branches:
+      - main
   path_instructions:
     - path: "app/src/main/java/**/*.java"
       instructions: |

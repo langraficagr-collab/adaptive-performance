@@ -37,11 +37,12 @@ jobs:
         with:
           gradle-version: '9.4.1'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # Ubuntu runners include a preinstalled Android SDK and sdkmanager.
+      # setup-android@v3 tried installing the removed "tools" package.
       - name: Install Android platform and build tools
-        run: sdkmanager "platforms;android-35" "build-tools;36.0.0"
+        run: |
+          command -v sdkmanager
+          sdkmanager "platforms;android-35" "build-tools;36.0.0"
 
       - name: Adapt Termux-only build settings for CI
         run: |

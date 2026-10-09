@@ -12,6 +12,19 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
+## Versão atual: 1.11.1 — revisão de estabilidade
+
+**Versão Android:** `1.11.1-review-fixes` (versionCode **83**). [Baixar APK completo v1.11.1](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release v1.11.1](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).
+
+Esta atualização mantém os dez recursos do **Adaptive Brain 2.0** e todas as funções anteriores. Corrige:
+
+- **Integridade do modelo ML local:** ao serializar o histórico de transições, ignora registros que não cabem no limite de 6.500 caracteres sem descartar registros menores posteriores. Há teste de regressão dedicado.
+- **Consulta CodeRabbit:** o script do Termux filtra o login exato do bot e evita misturar mensagens de outras contas.
+- **GitHub Actions / Android Lint:** detecta a instalação Android SDK do runner, só instala plataformas e build tools se estiverem ausentes e lida com licenças, evitando a falha com o pacote obsoleto `tools`.
+- **Revisão de código:** CodeRabbit no PR #4; testes locais e verificadores do GitHub (Android Lint, análise Java e CodeQL). A revisão completa do PR precede o merge.
+
+**Não houve adição de módulos em segundo plano.** A melhoria do ML é para preservação de dados do histórico, não uma promessa de economia de bateria. O APK é uma **compilação de desenvolvimento assinada** e só atualiza preservando dados quando a assinatura é compatível.
+
 ## Novidades da versão 1.11.0 — Adaptive Brain 2.0
 
 **Versão Android:** `1.11.0-adaptive-brain2` (versionCode **82**). [Baixar APK completo v1.11.0](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.0/Adaptive-Performance-v1.11.0.apk) · [Release e código-fonte](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0).
@@ -335,7 +348,7 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 - Acesso ao uso é necessário para recomendações baseadas no histórico de apps.
 - Autorização VPN do Android é necessária para o firewall DNS.
 
-## Versão atual
+## Histórico de versões
 
 **1.11.0 — Adaptive Brain 2.0**, código 82. Confira a tabela de melhorias no início e [baixe o APK oficial](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0). As versões abaixo são históricas.
 

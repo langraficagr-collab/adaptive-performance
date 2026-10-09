@@ -4,6 +4,19 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
+## Current release: 1.11.1 — stability review
+
+**Android build:** `1.11.1-review-fixes` (**versionCode 83**). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).
+
+This update retains all ten Adaptive Brain 2.0 extensions and existing features, with targeted fixes:
+
+- **Local ML data integrity:** when serializing app transitions, skip entries that do not fit the 6,500-character limit but preserve later, shorter entries. Dedicated regression test included.
+- **CodeRabbit query script:** filter by the bot's exact GitHub login, excluding unrelated accounts.
+- **Android Lint CI:** discover the runner's Android SDK, avoid reinstalling installed Android packages, and accept licenses only when installation is necessary. This removes the obsolete `tools` package failure.
+- **Review and verification:** CodeRabbit PR #4, on-device build, local regression checks, Android Lint, Java analysis and CodeQL on GitHub.
+
+No additional always-on services. This update does not claim proven battery savings. The APK is **development/debug signed**, so in-place updates require a matching signing certificate.
+
 ## What's new in 1.11.0 — Adaptive Brain 2.0
 
 **Android build:** `1.11.0-adaptive-brain2` (versionCode **82**). [Download the full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.0/Adaptive-Performance-v1.11.0.apk) · [Release and source code](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0).

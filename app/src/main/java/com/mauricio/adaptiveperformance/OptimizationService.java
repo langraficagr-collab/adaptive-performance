@@ -88,6 +88,8 @@ public class OptimizationService extends Service {
     private PersonalUsageML personalUsageML;
     private AdaptiveBrainV2 adaptiveBrainV2;
     private long lastEventPollMs = 0L;
+    // A screen-on event must survive a currently running sampling cycle.
+    private final AtomicBoolean screenWakeSamplePending = new AtomicBoolean(false);
     private final AppCostGuard appCostGuard = new AppCostGuard();
     private final ExecutorService maintenanceExecutor = idleSingleExecutor("maintenance");
     private final AtomicBoolean maintenanceBusy = new AtomicBoolean(false);
@@ -121,6 +123,7 @@ public class OptimizationService extends Service {
             if (Intent.ACTION_SCREEN_OFF.equals(action)) {
                 // Let Android enter deep sleep.  Do not immediately run a shell
                 // polling cycle just because the display went dark.
+                screenWakeSamplePending.set(false);
                 handler.removeCallbacks(loop);
                 nextLoopDelayMs = 600_000L;
                 handler.postDelayed(loop, 600_000L);
@@ -134,6 +137,14 @@ public class OptimizationService extends Service {
                 nextLoopDelayMs = 60_000L;
                 lastShizukuBindAttemptElapsed = 0L;
                 bindShizukuIfPossible();
+                if (Intent.ACTION_SCREEN_ON.equals(action)
+                        || Intent.ACTION_USER_PRESENT.equals(action)) {
+                    // Do not let the event debounce hold a stale 10-minute timer.
+                    screenWakeSamplePending.set(true);
+                    handler.removeCallbacks(loop);
+                    handler.post(loop);
+                    return;
+                }
             }
             requestEventSample();
         }
@@ -300,6 +311,7 @@ public class OptimizationService extends Service {
 
             // Never overlap cycles. The active worker will schedule the next one.
             if (!sampleBusy.compareAndSet(false, true)) return;
+            screenWakeSamplePending.set(false);
 
             sampleExecutor.execute(() -> {
                 try {
@@ -309,7 +321,17 @@ public class OptimizationService extends Service {
                             t.getClass().getSimpleName()+": "+t.getMessage()).apply();
                 } finally {
                     sampleBusy.set(false);
-                    if (!serviceDestroyed && prefs.getBoolean("master", true)) {
+                    // All scheduling is serialized on the handler thread, alongside
+                    // SCREEN_ON/OFF broadcasts, so stale callbacks cannot multiply.
+                    handler.post(() -> {
+                    if (serviceDestroyed || !prefs.getBoolean("master", true)
+                            || sampleBusy.get()) return;
+                    if (screenWakeSamplePending.getAndSet(false)) {
+                        handler.removeCallbacks(loop);
+                        handler.post(loop);
+                        return;
+                    }
+                    {
                         PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
                         long fallback = (pm != null && pm.isInteractive()) ? 60_000L : 300_000L;
                         long delay = nextLoopDelayMs >= 3_000L && nextLoopDelayMs <= 900_000L
@@ -323,8 +345,10 @@ public class OptimizationService extends Service {
                         if (pm != null && !pm.isInteractive()) {
                             delay = Math.max(delay, 600_000L);
                         }
+                        handler.removeCallbacks(loop);
                         handler.postDelayed(loop, delay);
                     }
+                    });
                 }
             });
         }

@@ -2155,7 +2155,6 @@ public class OptimizationService extends Service {
         // Never execute them on the main thread during service teardown.
         final SystemBatteryController sbc = systemBatteryController;
         final ThermalBrightnessController bc = thermalBrightnessController;
-        final ManualFreezeManager mfm = manualFreezeManager;
         final CpuPressureController cpc = cpuPressureController;
         final boolean restoreRefreshNeeded = lowRefreshApplied;
         final boolean resetThermalNeeded = thermalLevelApplied > 0;

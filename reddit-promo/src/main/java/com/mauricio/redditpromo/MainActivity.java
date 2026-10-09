@@ -49,8 +49,8 @@ public final class MainActivity extends Activity {
     }
     private void recordPost(){String sub=community.getText().toString().trim().replaceFirst("(?i)^r/","");if(!sub.matches("[A-Za-z0-9_]{2,21}")){community.setError("Informe um nome válido");return;}prefs.edit().putString("community",sub).putString("last_community",sub).putLong("last_post",System.currentTimeMillis()).apply();status.setText("Intervalo de 7 dias registrado para r/"+sub+".");}
     private void styleInput(EditText e){e.setTextColor(Color.WHITE);e.setHintTextColor(MUTED);e.setPadding(dp(12),dp(8),dp(12),dp(8));e.setBackground(shape(0xFF0E1722,dp(12)));}
-    private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(null,Typeface.BOLD);return t;}
+    private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold) { t.setTypeface(null,Typeface.BOLD); } return t;}
     private GradientDrawable shape(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
-    private LinearLayout.LayoutParams lp(int w,int h,int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));if(top>0)p.topMargin=dp(top);return p;}
+    private LinearLayout.LayoutParams lp(int w,int h,int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));if(top>0) { p.topMargin=dp(top); } return p;}
     private int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
 }

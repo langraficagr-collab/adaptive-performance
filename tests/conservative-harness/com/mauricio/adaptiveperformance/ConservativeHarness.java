@@ -5,23 +5,23 @@ public class ConservativeHarness {
  static final String P="conservative_tune_";
  static class Prefs implements SharedPreferences {
   Map<String,Object> m=new HashMap<>();
-  public Map<String,?> getAll(){return new HashMap<>(m);}
-  public boolean contains(String k){return m.containsKey(k);}
-  public boolean getBoolean(String k,boolean d){return (Boolean)m.getOrDefault(k,d);}
-  public int getInt(String k,int d){return (Integer)m.getOrDefault(k,d);}
-  public long getLong(String k,long d){return (Long)m.getOrDefault(k,d);}
-  public float getFloat(String k,float d){return (Float)m.getOrDefault(k,d);}
-  public String getString(String k,String d){return (String)m.getOrDefault(k,d);}
-  public Editor edit(){return new Editor(){
+  @Override public Map<String,?> getAll(){return new HashMap<>(m);}
+  @Override public boolean contains(String k){return m.containsKey(k);}
+  @Override public boolean getBoolean(String k,boolean d){return (Boolean)m.getOrDefault(k,d);}
+  @Override public int getInt(String k,int d){return (Integer)m.getOrDefault(k,d);}
+  @Override public long getLong(String k,long d){return (Long)m.getOrDefault(k,d);}
+  @Override public float getFloat(String k,float d){return (Float)m.getOrDefault(k,d);}
+  @Override public String getString(String k,String d){return (String)m.getOrDefault(k,d);}
+  @Override public Editor edit(){return new Editor(){
    Map<String,Object> changes=new HashMap<>();
-   public Editor putBoolean(String k,boolean v){changes.put(k,v);return this;}
-   public Editor putInt(String k,int v){changes.put(k,v);return this;}
-   public Editor putLong(String k,long v){changes.put(k,v);return this;}
-   public Editor putFloat(String k,float v){changes.put(k,v);return this;}
-   public Editor putString(String k,String v){changes.put(k,v);return this;}
-   public Editor remove(String k){changes.put(k,null);return this;}
-   public void apply(){commit();}
-   public boolean commit(){changes.forEach((k,v)->{if(v==null)m.remove(k);else m.put(k,v);});return true;}
+   @Override public Editor putBoolean(String k,boolean v){changes.put(k,v);return this;}
+   @Override public Editor putInt(String k,int v){changes.put(k,v);return this;}
+   @Override public Editor putLong(String k,long v){changes.put(k,v);return this;}
+   @Override public Editor putFloat(String k,float v){changes.put(k,v);return this;}
+   @Override public Editor putString(String k,String v){changes.put(k,v);return this;}
+   @Override public Editor remove(String k){changes.put(k,null);return this;}
+   @Override public void apply(){commit();}
+   @Override public boolean commit(){changes.forEach((k,v)->{if(v==null)m.remove(k);else m.put(k,v);});return true;}
   };}
  }
  static void ok(boolean b,String why){if(!b)throw new AssertionError(why);}

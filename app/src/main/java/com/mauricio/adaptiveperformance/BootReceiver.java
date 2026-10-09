@@ -6,6 +6,15 @@ import android.os.Build;
 
 public class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
+        // A receiver declared exported can receive unexpected intents. Only
+        // system boot and own package replacement events should restart services.
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action)
+                && !Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
+                && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            return;
+        }
         android.content.SharedPreferences p=context.getSharedPreferences("adaptive",Context.MODE_PRIVATE);
         ServiceContinuityMonitor.markBoot(p);
         boolean enabled=p.getBoolean("master",false);

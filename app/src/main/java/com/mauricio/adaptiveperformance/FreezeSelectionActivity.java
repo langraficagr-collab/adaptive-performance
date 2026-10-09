@@ -166,12 +166,12 @@ public class FreezeSelectionActivity extends Activity {
         }, "AP-freeze-package-loader").start();
 
         search.addTextChangedListener(new TextWatcher() {
-            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int b,int c) {
+            @Override public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            @Override public void onTextChanged(CharSequence s,int st,int b,int c) {
                 visibleLimit = PAGE_SIZE;
                 if (listReady) rebuildList(s.toString(),null);
             }
-            public void afterTextChanged(Editable e){}
+            @Override public void afterTextChanged(Editable e){}
         });
 
         save.setOnClickListener(v->{

@@ -629,13 +629,13 @@ public class MainActivity extends Activity {
         pctSeek.setMax(40);
         pctSeek.setProgress(Math.max(0, Math.min(40, goalPct - 10)));
         pctSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
                 int v = 10 + progress;
                 setTextIfChanged(pctLabel, "Bateria mínima: " + v + "%");
                 if (fromUser) prefs.edit().putInt("battery_goal_pct", v).putLong("auto_user_last_apply", 0L).apply();
             }
-            public void onStartTrackingTouch(SeekBar b) {}
-            public void onStopTrackingTouch(SeekBar b) { recreate(); }
+            @Override public void onStartTrackingTouch(SeekBar b) {}
+            @Override public void onStopTrackingTouch(SeekBar b) { recreate(); }
         });
         c.addView(pctSeek);
 
@@ -645,12 +645,12 @@ public class MainActivity extends Activity {
         hourSeek.setMax(23);
         hourSeek.setProgress(Math.max(0, Math.min(23, goalHour)));
         hourSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
                 setTextIfChanged(hourLabel, "Horário alvo: " + String.format(Locale.US, "%02d:00", progress));
                 if (fromUser) prefs.edit().putInt("battery_goal_hour", progress).putLong("auto_user_last_apply", 0L).apply();
             }
-            public void onStartTrackingTouch(SeekBar b) {}
-            public void onStopTrackingTouch(SeekBar b) { recreate(); }
+            @Override public void onStartTrackingTouch(SeekBar b) {}
+            @Override public void onStopTrackingTouch(SeekBar b) { recreate(); }
         });
         c.addView(hourSeek);
 

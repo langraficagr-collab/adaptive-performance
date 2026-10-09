@@ -41,8 +41,13 @@ jobs:
       # setup-android@v3 tried installing the removed "tools" package.
       - name: Install Android platform and build tools
         run: |
-          command -v sdkmanager
-          sdkmanager "platforms;android-35" "build-tools;36.0.0"
+          # The hosted runner includes Android command-line tools, but its
+          # sdkmanager may not be present in PATH.
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -maxdepth 4 -type f -name sdkmanager -print -quit)"
+          test -n "$SDKMANAGER"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platforms;android-35" "build-tools;36.0.0"
 
       - name: Adapt Termux-only build settings for CI
         run: |

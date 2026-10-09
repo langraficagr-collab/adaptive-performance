@@ -14,7 +14,7 @@ public final class AutoUserModeController {
     }
 
     public static void evaluate(SharedPreferences prefs, int batteryPct, float tempC,
-                                double cpuLoad, double freeRamPct, boolean interactive,
+                                double cpuLoad,
                                 boolean charging, float powerW) {
         if (!enabled(prefs)) return;
         long now = System.currentTimeMillis();
@@ -87,8 +87,8 @@ public final class AutoUserModeController {
         applyVariant(prefs, effective, freeRamPct, batteryPct, interactive);
         prefs.edit()
                 .putLong("auto_user_last_apply", now)
-                .putString("auto_user_status", describe(effective, trial, variant, batteryPct, tempC)
-                        + batteryGoalStatus(prefs, batteryPct, charging, now))
+                .putString("auto_user_status", describe(effective, trial, variant, batteryPct)
+                        + batteryGoalStatus(prefs, batteryPct, charging))
                 .apply();
         */
     }
@@ -173,7 +173,7 @@ public final class AutoUserModeController {
         return 0;
     }
 
-    private static String batteryGoalStatus(SharedPreferences prefs, int batteryPct, boolean charging, long now) {
+    private static String batteryGoalStatus(SharedPreferences prefs, int batteryPct, boolean charging) {
         if (charging || batteryPct < 0) return "";
         int target = prefs.getInt("battery_goal_pct", 20);
         int hour = prefs.getInt("battery_goal_hour", 22);
@@ -266,7 +266,7 @@ public final class AutoUserModeController {
         return drain * 10f + power * 1.5f + heatPenalty + cpu * 0.03f;
     }
 
-    private static String describe(int effective, int trial, int best, int batteryPct, float tempC) {
+    private static String describe(int effective, int trial, int best, int batteryPct) {
         String[] names = {"Equilibrado econômico", "Economia adaptativa", "Máxima economia"};
         String n = names[Math.max(0, Math.min(2, effective))];
         return n + " • aprendendo pelo uso • teste " + (trial + 1) + "/3 • melhor " + (best + 1)

@@ -64,7 +64,7 @@ public final class SystemBatteryController {
     }
 
     public Result evaluate(boolean interactive, boolean charging, float socTemp,
-                           float batteryTemp, double cpuLoad, String foreground) {
+                           float batteryTemp, double cpuLoad) {
         long now = SystemClock.elapsedRealtime();
         if (interactive) {
             screenOffSince = 0L;

@@ -31,7 +31,7 @@ public final class CellularSignalOptimizer {
 
     private CellularSignalOptimizer() {}
 
-    public static void evaluate(Context c, SharedPreferences p, IPrivilegedService s) {
+    public static void evaluate(SharedPreferences p, IPrivilegedService s) {
         if (s == null) return;
         boolean enabled = p.getBoolean("signal_optimizer_enabled", false);
         if (!enabled) {

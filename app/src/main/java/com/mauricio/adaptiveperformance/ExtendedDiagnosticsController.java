@@ -133,8 +133,8 @@ public final class ExtendedDiagnosticsController {
     }
 
     public Result update(String fg, float socTemp, float batteryTemp, float tempTrend,
-                         double cpuLoad, double ramFreePct, float powerW,
-                         int thermalLevel, int pressureScore,
+                         double cpuLoad, float powerW,
+                         int thermalLevel,
                          int healthThermal, int healthMemory, int healthCpu,
                          int healthIo, int healthBattery, int healthUi,
                          int lmkDelta, float jankPct, boolean interactive) {
@@ -236,7 +236,7 @@ public final class ExtendedDiagnosticsController {
         return r;
     }
 
-    public synchronized void maybeRunDiagnostics(String fg, boolean interactive) {
+    public synchronized void maybeRunDiagnostics(String fg) {
         if (!prefs.getBoolean("extended_diagnostics", true)) return;
         long now = SystemClock.elapsedRealtime();
         if (now < safeModeUntil || prefs.getBoolean("extended_safe_mode_manual", false)) return;

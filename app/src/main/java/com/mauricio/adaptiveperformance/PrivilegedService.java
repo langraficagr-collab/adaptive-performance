@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 
 public class PrivilegedService extends IPrivilegedService.Stub {
     public PrivilegedService() { cleanupSiblingServices(); }
-    public PrivilegedService(Context context) { cleanupSiblingServices(); }
 
     private void cleanupSiblingServices() {
         try {

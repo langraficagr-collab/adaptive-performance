@@ -123,7 +123,7 @@ public final class SystemHealthController {
             else if (hard >= 70 || r.learnedRisk >= 2 || (r.lmkDelta >= 8 && ramFreePct < 20)) r.antiStallLevel = 1;
         }
 
-        r.profile = learnedProfile(fg, r.learnedRisk, r.antiStallLevel);
+        r.profile = learnedProfile(r.learnedRisk, r.antiStallLevel);
         r.watchdogSlow = now < expensivePauseUntil;
 
         if (prefs.getBoolean("rollback_guard", true) && now >= rollbackCooldownUntil) {
@@ -388,7 +388,7 @@ public final class SystemHealthController {
         return Math.min(3, risk);
     }
 
-    private String learnedProfile(String pkg, int risk, int antiStall) {
+    private String learnedProfile(int risk, int antiStall) {
         if (antiStall >= 2) return "Anti-travamento forte";
         if (antiStall == 1) return "Anti-travamento preventivo";
         if (risk >= 2) return "App acima do padrão aprendido";

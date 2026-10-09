@@ -127,9 +127,9 @@ public class AppExceptionActivity extends Activity {
         rebuildList("");
 
         search.addTextChangedListener(new TextWatcher() {
-            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int b,int c){ rebuildList(s.toString()); }
-            public void afterTextChanged(Editable e){}
+            @Override public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            @Override public void onTextChanged(CharSequence s,int st,int b,int c){ rebuildList(s.toString()); }
+            @Override public void afterTextChanged(Editable e){}
         });
 
         save.setOnClickListener(v->{

@@ -247,7 +247,6 @@ final class ConservativeTuningController {
         }
 
         Metrics baseline = readBaseline(prefs);
-        int candidate = prefs.getInt(P + "candidate", 0);
         String verdict = verdict(baseline, current);
         boolean keep = "MELHORA".equals(verdict);
         if (keep) {

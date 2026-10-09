@@ -65,7 +65,7 @@ public final class LiteMainActivity extends Activity {
     }
     private TextView label(String value,int size,int color,boolean bold){
         TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);
-        if(bold)t.setTypeface(null,Typeface.BOLD);return t;
+        if(bold) { t.setTypeface(null,Typeface.BOLD); } return t;
     }
     private TextView metric(LinearLayout parent){TextView t=label("Aguardando leitura...",15,TEXT,false);t.setPadding(0,dp(12),0,0);parent.addView(t);return t;}
     private Button button(LinearLayout parent,String title,Runnable action){

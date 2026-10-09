@@ -49,7 +49,13 @@ public final class SmartRecommendationSuite {
     }
     private static long val(String raw,String key){
         Matcher m=Pattern.compile("(?m)^"+key+"\\s+(\\d+)").matcher(raw);
-        return m.find()?Long.parseLong(m.group(1)):0;
+        if (!m.find()) return 0;
+        try {
+            return Long.parseLong(m.group(1));
+        } catch (NumberFormatException ignored) {
+            // A malformed or out-of-range /proc/vmstat value must not stop monitoring.
+            return 0;
+        }
     }
     private static void lowBatteryMode(SharedPreferences p,int pct){
         if(!p.getBoolean("low_battery_adaptive",true))return;
@@ -62,7 +68,11 @@ public final class SmartRecommendationSuite {
         String raw=s.exec("ps -A -o ARGS 2>/dev/null | grep -E '^[a-zA-Z][a-zA-Z0-9_.]+(:[a-zA-Z0-9_.]+)?$' | head -120");
         if(raw==null)return;
         Set<String> now=new HashSet<>();
-        for(String x:raw.split("\n")){x=x.trim();if(x.contains(":"))x=x.substring(0,x.indexOf(':'));if(x.contains("."))now.add(x);}
+        for (String x : raw.split("\n")) {
+            x = x.trim();
+            if (x.contains(":")) x = x.substring(0, x.indexOf(':'));
+            if (x.contains(".")) now.add(x);
+        }
         String last=p.getString("recurrence_last_packages","");
         Set<String> prev=new HashSet<>(Arrays.asList(last.split(",")));
         for(String pkg:now) if(!pkg.equals(fg) && !prev.contains(pkg)) restartCounts.put(pkg,restartCounts.getOrDefault(pkg,0)+1);

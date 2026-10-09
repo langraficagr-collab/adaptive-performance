@@ -146,16 +146,16 @@ public class SignalOptimizerActivity extends Activity {
 
     private SeekBar.OnSeekBarChangeListener listener(java.util.function.IntConsumer c){
         return new SeekBar.OnSeekBarChangeListener(){
-            public void onProgressChanged(SeekBar s,int p,boolean f){if(f)c.accept(p);}
-            public void onStartTrackingTouch(SeekBar s){}
-            public void onStopTrackingTouch(SeekBar s){}
+            @Override public void onProgressChanged(SeekBar s,int p,boolean f){if(f)c.accept(p);}
+            @Override public void onStartTrackingTouch(SeekBar s){}
+            @Override public void onStopTrackingTouch(SeekBar s){}
         };
     }
     private Switch sw(String title,String key,boolean def,int color){
         Switch x=new Switch(this); x.setText(title); x.setTextColor(color); x.setTextSize(14); x.setPadding(dp(5),dp(8),dp(5),dp(8)); x.setChecked(prefs.getBoolean(key,def));
         x.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean(key,v).commit()); return x;
     }
-    private TextView t(String s,int z,int color,boolean bold){TextView v=new TextView(this);v.setText(UiLanguage.tr(prefs,s));v.setTextSize(z);v.setTextColor(color);if(bold)v.setTypeface(null, android.graphics.Typeface.BOLD);return v;}
+    private TextView t(String s,int z,int color,boolean bold){TextView v=new TextView(this);v.setText(UiLanguage.tr(prefs,s));v.setTextSize(z);v.setTextColor(color);if(bold) { v.setTypeface(null, android.graphics.Typeface.BOLD); } return v;}
     private LinearLayout card(int color){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(14),dp(14),dp(14),dp(14));l.setBackgroundColor(color);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(7),0,dp(7));l.setLayoutParams(p);return l;}
     private Button btn(String s){Button b=new Button(this);b.setText(UiLanguage.tr(prefs,s));b.setAllCaps(false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(56));p.setMargins(0,dp(8),0,0);b.setLayoutParams(p);return b;}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}

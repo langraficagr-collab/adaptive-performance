@@ -410,8 +410,8 @@ public final class SystemHealthController {
         float alpha = n < 30 ? 0.10f : 0.025f;
         SharedPreferences.Editor e = prefs.edit();
         if (temp > 0) e.putFloat("cal_temp", ema(prefs.getFloat("cal_temp", -1f), temp, alpha));
-        if (cpu >= 0) e.putFloat("cal_cpu", ema(prefs.getFloat("cal_cpu", -1f), (float)cpu, alpha));
-        if (ramFree >= 0) e.putFloat("cal_ram_used", ema(prefs.getFloat("cal_ram_used", -1f), (float)(100.0 - ramFree), alpha));
+        e.putFloat("cal_cpu", ema(prefs.getFloat("cal_cpu", -1f), (float)cpu, alpha));
+        e.putFloat("cal_ram_used", ema(prefs.getFloat("cal_ram_used", -1f), (float)(100.0 - ramFree), alpha));
         if (power > 0) e.putFloat("cal_power", ema(prefs.getFloat("cal_power", -1f), power, alpha));
         e.putFloat("cal_ram_free", ema(prefs.getFloat("cal_ram_free", -1), (float)ramFree, alpha));
         e.putFloat("cal_psi_memory", ema(prefs.getFloat("cal_psi_memory", -1), prefs.getFloat("psi_memory", 0), alpha));

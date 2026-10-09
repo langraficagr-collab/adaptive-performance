@@ -528,7 +528,6 @@ public final class ExtendedDiagnosticsController {
         }
     }
 
-    private final Map<String,Integer> duplicateStreaks = new HashMap<>();
     private final DuplicateProcessDetector duplicateDetector = new DuplicateProcessDetector();
     private void scanDuplicates() throws Exception {
         String raw;

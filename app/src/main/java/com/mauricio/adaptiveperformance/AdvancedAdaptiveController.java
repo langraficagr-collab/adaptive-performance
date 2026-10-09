@@ -704,7 +704,7 @@ public final class AdvancedAdaptiveController {
                 float oldEma = prefs.getFloat("wake_ema_" + h, -1f);
                 float baseline = oldEma < 0f ? 0f : oldEma;
                 long threshold = Math.max(180L, Math.round(baseline * 2.5f));
-                boolean anomaly = delta >= threshold && delta >= 180L;
+                boolean anomaly = delta >= threshold;
                 int streak = anomaly ? prefs.getInt("wake_streak_" + h, 0) + 1 : 0;
                 float newEma = oldEma < 0f ? delta : oldEma * 0.80f + delta * 0.20f;
 
@@ -746,7 +746,7 @@ public final class AdvancedAdaptiveController {
                 float oldEma = prefs.getFloat("net_ema_" + h, -1f);
                 float baseline = oldEma < 0f ? 0f : oldEma;
                 long threshold = Math.max(800L, Math.round(baseline * 2.5f));
-                boolean anomaly = delta >= threshold && delta >= 800L;
+                boolean anomaly = delta >= threshold;
                 int streak = anomaly ? prefs.getInt("net_streak_" + h, 0) + 1 : 0;
                 float newEma = oldEma < 0f ? delta : oldEma * 0.80f + delta * 0.20f;
 

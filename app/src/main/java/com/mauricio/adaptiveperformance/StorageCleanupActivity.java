@@ -227,7 +227,7 @@ public class StorageCleanupActivity extends Activity {
         startForegroundService(i); status.setText("Limpando…");
     }
 
-    private final Runnable refreshLoop=new Runnable(){ public void run(){ refresh(); h.postDelayed(this,1500); }};
+    private final Runnable refreshLoop=new Runnable(){ @Override public void run(){ refresh(); h.postDelayed(this,1500); }};
     private void refresh(){
         String st=prefs.getString("storage_cleanup_status","Ainda não analisado"); status.setText(st);
         long kb=prefs.getLong("storage_scan_total_kb",0L);
@@ -260,7 +260,8 @@ public class StorageCleanupActivity extends Activity {
             pct=(int)Math.min(95L,5L+(elapsed*90L/expected));
             if(pct<5)pct=5;
         }
-        if(pct<0)pct=0; if(pct>100)pct=100;
+        if(pct<0) { pct=0; }
+        if(pct>100) { pct=100; }
         trimProgress.setProgress(pct);
         String state=running?"em andamento":paused?"pausado":"parado";
         if(pct>=100) state="estimativa concluída";
@@ -278,7 +279,7 @@ public class StorageCleanupActivity extends Activity {
         return x;
     }
     private Button btn(String s){ Button b=new Button(this); b.setText(UiLanguage.tr(prefs,s)); b.setTextColor(Color.WHITE); b.setTextSize(15); b.setAllCaps(false); b.setBackground(bg(Color.rgb(25,132,220),Color.rgb(39,188,255),15)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(56)); p.setMargins(0,dp(10),0,0); b.setLayoutParams(p); return b; }
-    private TextView t(String s,float z,int c,boolean bold){ TextView t=new TextView(this); t.setText(UiLanguage.tr(prefs,s)); t.setTextColor(c); t.setTextSize(z); if(bold)t.setTypeface(null,android.graphics.Typeface.BOLD); return t; }
+    private TextView t(String s,float z,int c,boolean bold){ TextView t=new TextView(this); t.setText(UiLanguage.tr(prefs,s)); t.setTextColor(c); t.setTextSize(z); if(bold) { t.setTypeface(null,android.graphics.Typeface.BOLD); } return t; }
     private GradientDrawable bg(int c,int stroke,int r){ GradientDrawable g=new GradientDrawable(); g.setColor(c); g.setCornerRadius(dp(r)); g.setStroke(dp(1),stroke); return g; }
     private int dp(int v){ return (int)(v*getResources().getDisplayMetrics().density+0.5f); }
 }

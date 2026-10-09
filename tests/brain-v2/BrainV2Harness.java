@@ -11,6 +11,15 @@ public final class BrainV2Harness {
         UsageTransitionModel saved=UsageTransitionModel.parse(m.serialize());
         check(saved.predict("com.whatsapp").equals("com.instagram.android"),"persisted transitions");
         check(UsageTransitionModel.parse("garbage").edgeCount()==0,"corruption safe");
+        UsageTransitionModel large = new UsageTransitionModel();
+        String prefix = "com.test." + "long".repeat(33);
+        for(int i=0;i<40;i++) {
+            large.observe(prefix + (i%2==0?".a":".b")+i);
+        }
+        String bounded = large.serialize();
+        check(bounded.length() <= 6500, "serialized model must be bounded");
+        check(UsageTransitionModel.parse(bounded).edgeCount()>0,
+                "bounded serialized model must remain readable");
         check(RoutineProfileClassifier.neverWarm(
                 RoutineProfileClassifier.classify(true,"com.google.android.apps.maps",false)),
                 "navigation must be preserved");

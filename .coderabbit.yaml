@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit auto-review for pull requests into the default GitHub branch.
+# Installing/authorizing the CodeRabbit GitHub App is still required.
+language: pt-BR
+early_access: false
+reviews:
+  profile: assertive
+  high_level_summary: true
+  poem: false
+  request_changes_workflow: false
+  path_filters:
+    - "!**/build/**"
+    - "!dist/**"
+    - "!**/*.apk"
+    - "!**/*.aab"
+    - "!docs/screenshots/**"
+    - "!docs/branding/**"
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    # Explicitly allow pull requests to main (and only main).
+    # Prevent provider UI/default-branch mismatches from skipping review.
+    base_branches:
+      - main
+  path_instructions:
+    - path: "app/src/main/java/**/*.java"
+      instructions: |
+        Android Java app; identify reproducible crashes, concurrency races, expensive
+        polling, battery regressions, ANRs and leaked Activities or handlers.
+        Check permission and Shizuku failures; never assume root.
+        Pay special attention to thermal-safety protections and automatic rollback.
+        Report real bugs with exact file and line and minimal safe patches.
+        Do not suggest bypassing OEM thermal throttling, killing critical Android
+        services, weakening app safety lists, or logging user secrets.
+    - path: "app/src/main/java/**/AdaptiveBrainV2.java"
+      instructions: |
+        Verify ML gating at 48 samples, no cloud data transfer, false positives,
+        memory limits, monotonic time for durations, and fail-closed behavior.
+        ML must never force-stop apps or override thermal status.
+    - path: "tests/**/*.java"
+      instructions: |
+        Verify assertions detect regressions and tests are runnable without
+        privileged device access when feasible. Prefer deterministic inputs.
+    - path: "app/src/main/AndroidManifest.xml"
+      instructions: |
+        Audit exported components, sensitive permissions, foreground services,
+        Android 8-16 compatibility and permission handling.
+    - path: ".github/workflows/**"
+      instructions: |
+        Audit permissions, untrusted PR execution, script injection and
+        reproducibility of Gradle Android builds.

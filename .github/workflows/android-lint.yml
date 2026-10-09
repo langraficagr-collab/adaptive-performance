@@ -37,11 +37,22 @@ jobs:
         with:
           gradle-version: '9.4.1'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # Ubuntu runners include a preinstalled Android SDK and sdkmanager.
+      # setup-android@v3 tried installing the removed "tools" package.
       - name: Install Android platform and build tools
-        run: sdkmanager "platforms;android-35" "build-tools;36.0.0"
+        run: |
+          # The hosted runner includes Android command-line tools, but its
+          # sdkmanager may not be present in PATH.
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          if [ -d "$SDK_ROOT/platforms/android-35" ] && [ -d "$SDK_ROOT/build-tools/36.0.0" ]; then
+            echo "Android SDK packages already installed; skipping network access."
+            exit 0
+          fi
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -maxdepth 4 -type f -name sdkmanager -print -quit)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses > /dev/null || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platforms;android-35" "build-tools;36.0.0"
 
       - name: Adapt Termux-only build settings for CI
         run: |

@@ -20,6 +20,8 @@ public class MainActivity extends Activity {
     private TextView shizukuText, statusText, statusSubText;
     private TextView preloadTuningText, preloadStatusText, preloadAppsText;
     private TextView socValue, batValue, ramValue, cpuValue, freqValue;
+    private TextView appCostText, evidencePanelText, thermalForecastText, serviceContinuityText, incidentDiagText, personalMlText, brainV2Text;
+    private UiFrameSampler uiFrameSampler;
     private TextView batteryText, batteryForecastText, maintenanceText, restrictedText, cpuPressureText, freezeStateText, advancedText, healthText, extendedText, limitingDashboardText;
     private TextView thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto;
     private Switch autoRepairSwitch, effectivenessSwitch, profilesSwitch, restrictionGuardSwitch, emergencySwitch, startupSwitch;
@@ -74,6 +76,7 @@ public class MainActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        uiFrameSampler = new UiFrameSampler(this,prefs);
         if (BuildConfig.LEAN_MODE) {
             prefs.edit().putString("user_mode", "auto").putBoolean("master", false).apply();
         } else if (!prefs.contains("user_mode")) {
@@ -139,11 +142,11 @@ public class MainActivity extends Activity {
         }
 
         AlertDialog.Builder b = new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(body);
+                .setTitle(tr(title))
+                .setMessage(tr(body));
 
         if (failure && canRetry) {
-            b.setPositiveButton("Tentar novamente", (d, w) -> {
+            b.setPositiveButton(tr("Tentar novamente"), (d, w) -> {
                 Intent service = new Intent(this, OptimizationService.class)
                         .setAction(OptimizationService.ACTION_APPLY_CAUSE_FIX)
                         .putExtra(CauseResolutionNotifier.EXTRA_CAUSE_ID, id)
@@ -153,12 +156,12 @@ public class MainActivity extends Activity {
                     if (Build.VERSION.SDK_INT >= 26) startForegroundService(service);
                     else startService(service);
                 } catch (Throwable t) {
-                    Toast.makeText(this, "Não foi possível iniciar a nova tentativa.",
+                    Toast.makeText(this, tr("Não foi possível iniciar a nova tentativa."),
                             Toast.LENGTH_LONG).show();
                 }
             });
         } else if (spec != null && spec.autoFix) {
-            b.setPositiveButton("Aplicar solução", (d, w) -> {
+            b.setPositiveButton(tr("Aplicar solução"), (d, w) -> {
                 Intent service = new Intent(this, OptimizationService.class)
                         .setAction(OptimizationService.ACTION_APPLY_CAUSE_FIX)
                         .putExtra(CauseResolutionNotifier.EXTRA_CAUSE_ID, id)
@@ -169,15 +172,15 @@ public class MainActivity extends Activity {
                     if (Build.VERSION.SDK_INT >= 26) startForegroundService(service);
                     else startService(service);
                 } catch (Throwable t) {
-                    Toast.makeText(this, "Não foi possível iniciar a correção: " + t.getMessage(),
+                    Toast.makeText(this, tr("Não foi possível iniciar a correção: ") + t.getMessage(),
                             Toast.LENGTH_LONG).show();
                 }
             });
         } else {
-            b.setPositiveButton("Entendi", null);
+            b.setPositiveButton(tr("Entendi"), null);
         }
 
-        b.setNegativeButton("Manter assim", (d, w) -> {
+        b.setNegativeButton(tr("Manter assim"), (d, w) -> {
             prefs.edit()
                     .putString("cause_kept_id", id)
                     .putLong("cause_kept_at", System.currentTimeMillis())
@@ -379,8 +382,19 @@ public class MainActivity extends Activity {
         if (normalized.equals(prefs.getString("user_mode", "auto"))) return;
         if ("advanced".equals(normalized))
             ConservativeTuningController.stopIfNeeded(prefs);
-        prefs.edit().putString("user_mode", normalized).apply();
+        SharedPreferences.Editor modeEditor = prefs.edit().putString("user_mode", normalized);
+        if ("auto".equals(normalized)) modeEditor.putString("thermal_mode", "auto");
+        modeEditor.apply();
         if ("auto".equals(normalized)) {
+            if (prefs.getBoolean("master",false)) {
+                try {
+                    Intent i = new Intent(this,OptimizationService.class)
+                            .setAction(OptimizationService.ACTION_SET_THERMAL_MODE)
+                            .putExtra("mode","auto");
+                    if (Build.VERSION.SDK_INT>=26) startForegroundService(i);
+                    else startService(i);
+                } catch (Throwable ignored) {}
+            }
             prefs.edit().putLong("auto_user_last_apply", 0L).apply();
             AutoTuningController.resetSession(prefs);
         }
@@ -438,7 +452,7 @@ public class MainActivity extends Activity {
 
     private void refreshRecentUsageSelection() {
         if (!hasUsageAccess()) {
-            Toast.makeText(this, "Permita o acesso ao uso dos apps para ativar o reconhecimento automático.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Permita o acesso ao uso dos apps para ativar o reconhecimento automático."), Toast.LENGTH_LONG).show();
             try {
                 startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
             } catch (Throwable ignored) {}
@@ -446,10 +460,10 @@ public class MainActivity extends Activity {
         }
         try {
             prefs.edit().putLong("auto_preload_cycle_at", 0L).apply();
-            Toast.makeText(this, "O próximo ciclo vai pré-carregar os apps usados nos últimos 15 minutos.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, tr("O próximo ciclo vai pré-carregar os apps usados nos últimos 15 minutos."), Toast.LENGTH_SHORT).show();
             recreate();
         } catch (Throwable error) {
-            Toast.makeText(this, "Não foi possível atualizar os apps usados.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, tr("Não foi possível atualizar os apps usados."), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -522,13 +536,24 @@ public class MainActivity extends Activity {
         c.addView(status);
 
         TextView details = text(UiLanguage.english(prefs) ?
-                "Automatic mode measures a 2-minute baseline, then trials one reversible setting at a time for 2 minutes. It compares power draw, CPU, available RAM, temperature and smoothness. Regressions or inconclusive results are rolled back. App preloading still runs every 15 minutes." :
+                "Automatic mode takes a 2-minute baseline, trials one reversible setting for 2 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. App preloading still runs every 15 minutes." :
                 BuildConfig.CONSERVATIVE_MODE
                 ? "Testa uma opção por vez e desfaz se houver piora. Pré-aquece no máximo 2 APKs usados nos últimos 15 min, a cada 15 min, com limite total de 32 MB. Pausa em bateria baixa, carregamento, pouca RAM ou calor; desativa ciclos futuros se medir aumento relevante de consumo ou temperatura. O Android pode liberar o cache; os apps não ficam presos na RAM."
-                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível de cada vez por 2 minutos. Compara energia, CPU, RAM, temperatura e fluidez; desfaz se piorar ou não houver prova de melhora. A cada 15 minutos, ele pré-carrega os apps usados recentemente. Isso não os protege contra congelamento.",
+                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível por 2 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. A cada 15 minutos, pré-carrega aplicativos recentes, sem protegê-los contra congelamento.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
+        Button trimRamNow = actionButton("Limpar RAM agora");
+        trimRamNow.setOnClickListener(v -> {
+            prefs.edit().putString("manual_ram_trim_result", "Solicitando liberação de memória…").apply();
+            Intent task = new Intent(this, OptimizationService.class)
+                    .setAction(OptimizationService.ACTION_MEMORY_TRIM_NOW);
+            startService(task);
+            Toast.makeText(this, tr("Solicitação enviada; o Android decide quanto liberar"), Toast.LENGTH_LONG).show();
+        });
+        c.addView(trimRamNow);
+        TextView trimResult = text(prefs.getString("manual_ram_trim_result", "Liberação de memória sob demanda"), 12, MUTED, false);
+        c.addView(trimResult);
         int frequentCount = prefs.getInt("auto_preload_count", 0);
         int recentWindow = 15;
         preloadTuningText = text(prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes") +
@@ -606,7 +631,7 @@ public class MainActivity extends Activity {
         pctSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
                 int v = 10 + progress;
-                pctLabel.setText("Bateria mínima: " + v + "%");
+                setTextIfChanged(pctLabel, "Bateria mínima: " + v + "%");
                 if (fromUser) prefs.edit().putInt("battery_goal_pct", v).putLong("auto_user_last_apply", 0L).apply();
             }
             public void onStartTrackingTouch(SeekBar b) {}
@@ -621,7 +646,7 @@ public class MainActivity extends Activity {
         hourSeek.setProgress(Math.max(0, Math.min(23, goalHour)));
         hourSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar b, int progress, boolean fromUser) {
-                hourLabel.setText("Horário alvo: " + String.format(Locale.US, "%02d:00", progress));
+                setTextIfChanged(hourLabel, "Horário alvo: " + String.format(Locale.US, "%02d:00", progress));
                 if (fromUser) prefs.edit().putInt("battery_goal_hour", progress).putLong("auto_user_last_apply", 0L).apply();
             }
             public void onStartTrackingTouch(SeekBar b) {}
@@ -645,7 +670,9 @@ public class MainActivity extends Activity {
                     .putString("auto_user_status", "Aprendizado reiniciado • coletando novos dados")
                     .apply();
             AutoTuningController.resetSession(prefs);
-            Toast.makeText(this, "Aprendizado automático reiniciado.", Toast.LENGTH_SHORT).show();
+            PersonalUsageML.reset(prefs);
+            AdaptiveBrainV2.clearLearning(prefs);
+            Toast.makeText(this, tr("Aprendizado automático reiniciado."), Toast.LENGTH_SHORT).show();
             recreate();
         });
         c.addView(resetLearning);
@@ -783,8 +810,24 @@ public class MainActivity extends Activity {
         content.addView(c, actionsInsertIndex);
     }
 
+    private long readFreezeDelayMinutes() {
+        // Older versions stored this preference as int; newer ones use long.
+        Object raw = prefs.getAll().get("freeze_delay_minutes");
+        long minutes = raw instanceof Number ? ((Number) raw).longValue() : 15L;
+        return Math.max(1L, Math.min(360L, minutes));
+    }
+
     private void openActions() {
         if (content == null || mainScroll == null) return;
+        // Advanced controls are not initialized in automatic mode. Never build
+        // them on demand: their view references can be null and crash the UI.
+        if (!isAdvancedUserMode()) {
+            mainScroll.post(() -> mainScroll.smoothScrollTo(0, 0));
+            android.widget.Toast.makeText(this,
+                    tr("Configurações automáticas no início da tela. Para opções manuais, selecione Avançado."),
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
         if (!actionsBuilt) {
             // No modo automático não existe placeholder inicial. Insira as ações no fim
             // da lista em vez de remover uma View nula ou usar índice -1.
@@ -851,21 +894,21 @@ public class MainActivity extends Activity {
         c.addView(limitingDashboardText);
         Button dashboard = actionButton("Ver o que está limitando agora");
         dashboard.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("Limitações e inteligência adaptativa")
+                .setTitle(tr("Limitações e inteligência adaptativa"))
                 .setMessage(prefs.getString("limiting_dashboard", "Nenhuma limitação ativa") + "\n\n" +
                         "Estratégia: " + prefs.getString("recurrence_strategy", "Estratégia normal") + "\n" +
                         "Confiança: " + prefs.getInt("cause_confidence",0) + "%\n" +
                         "Eficácia: " + prefs.getInt("action_effectiveness_score",0) + "%\n" +
                         (prefs.getBoolean("app_regression_detected",false) ? prefs.getString("app_regression_report","") : "Sem regressão pós-atualização detectada") + "\n\n" +
                         AdaptiveIntelligenceController.comparative24h(prefs))
-                .setPositiveButton("Fechar", null).show());
+                .setPositiveButton(tr("Fechar"), null).show());
         c.addView(dashboard);
 
         Button incidents = actionButton("Histórico de incidentes e correções");
         incidents.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("Incidentes e correções")
-                .setMessage(prefs.getString("incident_history", "Nenhum incidente registrado."))
-                .setPositiveButton("Fechar", null).show());
+                .setTitle(tr("Incidentes e correções"))
+                .setMessage(tr(prefs.getString("incident_history", "Nenhum incidente registrado.")))
+                .setPositiveButton(tr("Fechar"), null).show());
         c.addView(incidents);
 
         refreshSwitch = actionSwitch("Reduzir a tela para 60 Hz somente com aquecimento","adaptive_refresh",true);
@@ -878,7 +921,7 @@ public class MainActivity extends Activity {
         int compactionThreshold = Math.max(50, Math.min(95,
                 prefs.getInt("memory_compaction_threshold_pct", 50)));
         memoryCompactionSeekBar.setProgress(compactionThreshold - 50);
-        memoryCompactionLabel.setText("Compactar quando RAM livre ≤ " + compactionThreshold + "%");
+        setTextIfChanged(memoryCompactionLabel, "Compactar quando RAM livre ≤ " + compactionThreshold + "%");
 
         TextView zramProfileTitle = text("Perfil de ZRAM", 13, TEXT, true);
         zramProfileTitle.setPadding(dp(12), dp(12), dp(8), dp(2));
@@ -919,7 +962,7 @@ public class MainActivity extends Activity {
                 android.R.layout.simple_spinner_item, freezeDelayLabels);
         freezeDelayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         freezeDelaySpinner.setAdapter(freezeDelayAdapter);
-        long savedFreezeDelay = Math.max(1L, Math.min(360L, prefs.getLong("freeze_delay_minutes", 15L)));
+        long savedFreezeDelay = Math.max(1L, Math.min(360L, readFreezeDelayMinutes()));
         int freezeDelayIndex = 1;
         for (int i = 0; i < freezeDelayValues.length; i++) {
             if (freezeDelayValues[i] == savedFreezeDelay) { freezeDelayIndex = i; break; }
@@ -945,7 +988,7 @@ public class MainActivity extends Activity {
         for (Switch x : new Switch[]{smartSuiteSwitch,smartCleanupSwitch,adaptiveFreezeSwitch,recurrenceSwitch,lowBatterySwitch,
                 thrashSwitch,psiSmartSwitch,perAppProfileSwitch,leak2Switch,thermalSmartSwitch}) c.addView(x);
         Button economyDashboard = actionButton("Painel de economia e automação");
-        economyDashboard.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Economia e automação")
+        economyDashboard.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(tr("Economia e automação"))
                 .setMessage(prefs.getString("economy_dashboard","Aguardando dados do monitor…")+"\n\n"+
                         "Reinício recorrente: "+prefs.getString("restart_recurrence_pkg","nenhum")+" ("+
                         prefs.getInt("restart_recurrence_count",0)+")\n"+
@@ -961,7 +1004,7 @@ public class MainActivity extends Activity {
         appRamLimitSeekBar.setMax(1400); // 100–1500 MB
         int appRamLimitMb = Math.max(100, Math.min(1500, prefs.getInt("app_ram_limit_mb", 500)));
         appRamLimitSeekBar.setProgress(appRamLimitMb - 100);
-        appRamLimitLabel.setText("Limite por app em segundo plano: " + appRamLimitMb + " MB");
+        setTextIfChanged(appRamLimitLabel, "Limite por app em segundo plano: " + appRamLimitMb + " MB");
 
         aggressiveMemorySwitch = actionSwitch("Modo RAM agressivo: agir quando RAM livre < 20%","aggressive_memory_cleanup",false);
         bugCleanupSwitch = actionSwitch("Finalizar apps anormais travados em segundo plano","auto_bug_cleanup",true);
@@ -1005,7 +1048,7 @@ public class MainActivity extends Activity {
         memoryCompactionSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 int pct = 50 + progress;
-                memoryCompactionLabel.setText("Compactar quando RAM livre ≤ " + pct + "%");
+                setTextIfChanged(memoryCompactionLabel, "Compactar quando RAM livre ≤ " + pct + "%");
                 if (fromUser) prefs.edit()
                         .putInt("memory_compaction_threshold_pct", pct)
                         .apply();
@@ -1021,7 +1064,7 @@ public class MainActivity extends Activity {
                         .putInt("zstd_requested_level",
                                 "extreme".equals(profile) ? 19 : ("maximum".equals(profile) ? 1 : ("auto".equals(profile) ? 19 : 0)))
                         .apply();
-                if (zramProfileHint != null) zramProfileHint.setText(zramProfileDescription(profile));
+                setTextIfChanged(zramProfileHint, zramProfileDescription(profile));
                 boolean aggressiveMode = !"normal".equals(profile);
                 if (aggressiveMemorySwitch != null && aggressiveMemorySwitch.isChecked() != aggressiveMode) {
                     aggressiveMemorySwitch.setChecked(aggressiveMode);
@@ -1033,7 +1076,7 @@ public class MainActivity extends Activity {
         appRamLimitSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 int mb = 100 + progress;
-                appRamLimitLabel.setText("Limite por app em segundo plano: " + mb + " MB");
+                setTextIfChanged(appRamLimitLabel, "Limite por app em segundo plano: " + mb + " MB");
                 if (fromUser) prefs.edit().putInt("app_ram_limit_mb", mb).apply();
             }
             @Override public void onStartTrackingTouch(SeekBar bar) {}
@@ -1114,6 +1157,17 @@ public class MainActivity extends Activity {
         appExceptions.setOnClickListener(v->startActivity(new Intent(this, AppExceptionActivity.class)));
         c.addView(appExceptions);
         c.addView(notifySwitch);
+        Button trimRamNow = actionButton("Limpar RAM agora");
+        trimRamNow.setOnClickListener(v -> {
+            prefs.edit().putString("manual_ram_trim_result", "Solicitando liberação de memória…").apply();
+            Intent task = new Intent(this, OptimizationService.class)
+                    .setAction(OptimizationService.ACTION_MEMORY_TRIM_NOW);
+            startService(task);
+            Toast.makeText(this, tr("Solicitação enviada; o Android decide quanto liberar"), Toast.LENGTH_LONG).show();
+        });
+        c.addView(trimRamNow);
+        TextView trimResult = text(prefs.getString("manual_ram_trim_result", "Liberação de memória sob demanda"), 12, MUTED, false);
+        c.addView(trimResult);
 
         freezeStateText = text("",12,MUTED,false);
         freezeStateText.setPadding(dp(8),dp(10),0,0);
@@ -1161,6 +1215,78 @@ public class MainActivity extends Activity {
         Button historyButton = actionButton("Histórico de saúde — 24 horas");
         historyButton.setOnClickListener(v -> startActivity(new Intent(this, HealthHistoryActivity.class)));
         content.addView(historyButton);
+
+        Button auditButton = actionButton("Auditoria de compatibilidade");
+        auditButton.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle(tr("Auditoria de compatibilidade"))
+                .setMessage(CompatibilityAudit.report(this, prefs))
+                .setPositiveButton(tr("Fechar"), (dialog, which) -> dialog.dismiss())
+                .show());
+        content.addView(auditButton);
+        appCostText = text(selfCostStatus(), 12, MUTED, false);
+        content.addView(appCostText);
+
+        LinearLayout mlCard = card();
+        addSectionTitle(mlCard,"◎","Aprendizado de máquina local","Personaliza o uso sem servidores ou modelos pesados");
+        Switch personalLearning = actionSwitch(
+                "Aprender meus padrões de uso neste aparelho", "ml_enabled", true);
+        mlCard.addView(personalLearning);
+        personalMlText = text(PersonalUsageML.summary(prefs, UiLanguage.english(prefs)),
+                12, MUTED, false);
+        personalMlText.setPadding(dp(4),dp(8),dp(4),dp(8));
+        mlCard.addView(personalMlText);
+        Button clearPersonalMl = actionButton("Apagar aprendizado de máquina");
+        clearPersonalMl.setBackground(bordered(Color.rgb(18,44,60),
+                Color.rgb(44,91,116),16));
+        clearPersonalMl.setOnClickListener(v -> {
+            PersonalUsageML.reset(prefs);
+            AdaptiveBrainV2.clearLearning(prefs);
+            if (brainV2Text != null) setTextIfChanged(brainV2Text,
+                    AdaptiveBrainV2.dashboard(prefs,UiLanguage.english(prefs)));
+            setTextIfChanged(personalMlText,
+                    PersonalUsageML.summary(prefs, UiLanguage.english(prefs)));
+            Toast.makeText(this,tr("Modelo local apagado. Aprendizado reiniciado."),
+                    Toast.LENGTH_SHORT).show();
+        });
+        mlCard.addView(clearPersonalMl);
+        content.addView(mlCard);
+
+        LinearLayout brainCard = card();
+        addSectionTitle(brainCard,"◉","Adaptive Brain 2.0",
+                "ML contextual, proteção térmica, autorrecuperação e laboratório");
+        brainCard.addView(actionSwitch("Ativar cérebro adaptativo 2.0","v2_enabled",true));
+        brainCard.addView(actionSwitch("Aprender próximo aplicativo","v2_next_app_enabled",true));
+        brainCard.addView(actionSwitch("Testar estratégias reversíveis por contexto",
+                "v2_strategy_enabled",true));
+        brainCard.addView(actionSwitch("Reconhecer rotinas e proteger navegação/jogos",
+                "v2_routines_enabled",true));
+        brainCard.addView(actionSwitch("Medir fluidez da interface sem monitorar continuamente",
+                "v2_ui_frames_enabled",true));
+        brainV2Text=text(AdaptiveBrainV2.dashboard(prefs,UiLanguage.english(prefs)),
+                12,MUTED,false);
+        brainV2Text.setPadding(dp(4),dp(10),dp(4),dp(8));
+        brainCard.addView(brainV2Text);
+        Button brainLab = actionButton("Resultados e histórico do laboratório");
+        brainLab.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle(tr("Laboratório Adaptive Brain 2.0"))
+                .setMessage(AdaptiveBrainV2.dashboard(prefs,UiLanguage.english(prefs))
+                        + "\n\n" + ConservativeTuningController.evidenceSummary(prefs)
+                        + "\n\n" + prefs.getString("v2_last_rollback","Sem rollback do Brain 2.0"))
+                .setPositiveButton(tr("Fechar"),null).show());
+        brainCard.addView(brainLab);
+        content.addView(brainCard);
+
+        LinearLayout evidenceCard = card();
+        addSectionTitle(evidenceCard, "◷", "Economia comprovada", "Resultado dos testes de 24 horas");
+        evidencePanelText = text(ConservativeTuningController.evidenceSummary(prefs), 12, MUTED, false);
+        evidenceCard.addView(evidencePanelText);
+        thermalForecastText = text("", 12, MUTED, false);
+        evidenceCard.addView(thermalForecastText);
+        incidentDiagText = text("", 12, MUTED, false);
+        evidenceCard.addView(incidentDiagText);
+        serviceContinuityText = text("", 12, MUTED, false);
+        evidenceCard.addView(serviceContinuityText);
+        content.addView(evidenceCard);
 
         Button exportButton = actionButton("Exportar diagnóstico para Downloads");
         exportButton.setOnClickListener(v -> exportDiagnostics());
@@ -1318,7 +1444,7 @@ public class MainActivity extends Activity {
                     .putBoolean("service_running", false)
                     .putString("last_error", "Falha ao iniciar serviço: " + t.getClass().getSimpleName())
                     .apply();
-            Toast.makeText(this, "Não foi possível iniciar a otimização.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Não foi possível iniciar a otimização."), Toast.LENGTH_LONG).show();
             updateUi();
         }
     }
@@ -1339,7 +1465,7 @@ public class MainActivity extends Activity {
             else if(Shizuku.checkSelfPermission()==PackageManager.PERMISSION_GRANTED) s="Shizuku autorizado • acesso shell ativo";
             else s="Shizuku ativo • aguardando autorização";
         } catch(Throwable t){ s="Shizuku indisponível"; }
-        if (shizukuText != null) shizukuText.setText(s);
+        setTextIfChanged(shizukuText, s);
     }
 
     private void setTextIfChanged(TextView view, CharSequence value) {
@@ -1426,7 +1552,49 @@ public class MainActivity extends Activity {
         try { return Long.parseLong(value); } catch (Exception ignored) { return fallback; }
     }
 
+    private String selfCostStatus() {
+        float cpu = prefs.getFloat("app_cost_cpu_pct", -1f);
+        if (cpu < 0f) return tr("Aguardando medição do consumo do próprio aplicativo");
+        boolean en = UiLanguage.english(prefs);
+        String cost = String.format(Locale.US, en
+                ? "App CPU %.2f%% • estimated CPU energy %.3f mWh • %d monitor polls • %s"
+                : "CPU do app %.2f%% • energia CPU estimada %.3f mWh • %d coletas • %s",
+                cpu, prefs.getFloat("app_cost_estimated_mwh", 0f),
+                prefs.getInt("app_cost_poll_count", 0),
+                prefs.getBoolean("app_cost_throttled", false)
+                ? (en ? "slower monitoring" : "monitoramento reduzido")
+                : (en ? "normal" : "normal"));
+        if (prefs.getBoolean("charging_low_impact_monitor", false))
+            cost += en
+                    ? (prefs.getBoolean("hot_hardware_guard", false)
+                        ? "\nHot-device protection: background maintenance paused"
+                        : "\nCharging: low-impact monitor, maintenance paused")
+                    : "\n" + prefs.getString("charging_low_impact_note",
+                          "Monitoramento leve; manutenção pausada");
+        return cost;
+    }
+
     private void updateUi() {
+        if (appCostText != null) setTextIfChanged(appCostText, selfCostStatus());
+        if (personalMlText != null) setTextIfChanged(personalMlText,
+                PersonalUsageML.summary(prefs, UiLanguage.english(prefs)));
+        if (brainV2Text != null) setTextIfChanged(brainV2Text,
+                AdaptiveBrainV2.dashboard(prefs,UiLanguage.english(prefs)));
+        if (evidencePanelText != null) setTextIfChanged(evidencePanelText,
+                ConservativeTuningController.evidenceSummary(prefs));
+        if (thermalForecastText != null) setTextIfChanged(thermalForecastText,
+                (UiLanguage.english(prefs) ? "Native thermal forecast: " : "Previsão térmica nativa: ")
+                + prefs.getString("native_thermal_forecast",
+                    prefs.getString("native_thermal_api", "aguardando leitura")));
+        if (incidentDiagText != null) setTextIfChanged(incidentDiagText,
+                (UiLanguage.english(prefs) ? "Temporary diagnostics: " : "Diagnóstico temporário: ")
+                    + (UiLanguage.english(prefs)
+                        ? (prefs.getString("incident_probe_status", "").startsWith("Análise")
+                            ? "active (3-minute incident sampling)"
+                            : prefs.contains("incident_probe_started_at") ? "completed / idle" : "inactive")
+                        : prefs.getString("incident_probe_status", "inativo")));
+        if (serviceContinuityText != null) setTextIfChanged(serviceContinuityText,
+                ServiceContinuityMonitor.summary(prefs, UiLanguage.english(prefs)));
         updatePreloadUi();
         boolean master=prefs.getBoolean("master",false);
         if (startButton != null && (!lastRenderedMasterValid || lastRenderedMaster != master)) {
@@ -1477,15 +1645,15 @@ public class MainActivity extends Activity {
 
         if(statusSubText!=null) {
             int lockedLevel = manualThermalLevel(thermalMode);
-            if(lockedLevel > 0) statusSubText.setText("Thermal nível " + lockedLevel + " mantido manualmente");
-            else if(thermal>=5) statusSubText.setText("Proteção máxima ativa para reduzir o aquecimento");
-            else if(thermal==1) statusSubText.setText("Proteção térmica automática em ação");
+            if(lockedLevel > 0) setTextIfChanged(statusSubText, "Thermal nível " + lockedLevel + " mantido manualmente");
+            else if(thermal>=5) setTextIfChanged(statusSubText, "Proteção máxima ativa para reduzir o aquecimento");
+            else if(thermal==1) setTextIfChanged(statusSubText, "Proteção térmica automática em ação");
             else if (prefs.getBoolean("automatic_saving_active", false))
-                statusSubText.setText(prefs.getString("automatic_saving_reason", "Economia automática ativa"));
-            else if(prefs.getInt("health_antistall",0)>=2) statusSubText.setText("Modo anti-travamento forte em ação");
-            else if(prefs.getInt("health_antistall",0)==1) statusSubText.setText("Prevenção de travamentos ativa");
-            else if(prefs.getBoolean("cpu_pressure_active",false)) statusSubText.setText("Apps em segundo plano temporariamente limitados");
-            else statusSubText.setText("Desempenho e temperatura sob controle");
+                setTextIfChanged(statusSubText, prefs.getString("automatic_saving_reason", "Economia automática ativa"));
+            else if(prefs.getInt("health_antistall",0)>=2) setTextIfChanged(statusSubText, "Modo anti-travamento forte em ação");
+            else if(prefs.getInt("health_antistall",0)==1) setTextIfChanged(statusSubText, "Prevenção de travamentos ativa");
+            else if(prefs.getBoolean("cpu_pressure_active",false)) setTextIfChanged(statusSubText, "Apps em segundo plano temporariamente limitados");
+            else setTextIfChanged(statusSubText, "Desempenho e temperatura sob controle");
         }
 
         if (batteryForecastText != null) {
@@ -1527,13 +1695,13 @@ public class MainActivity extends Activity {
 
         int sel=prefs.getStringSet("manual_freeze_selected",Collections.emptySet()).size();
         int active=prefs.getInt("manual_frozen_active_count",0);
-        if(freezeStateText!=null) freezeStateText.setText(sel+" selecionado(s) • "+active+" congelado(s) agora\n"+prefs.getString("last_effectiveness_summary", ""));
-        if(limitingDashboardText!=null) limitingDashboardText.setText(prefs.getString("limiting_dashboard", "Nenhuma limitação ativa"));
+        if(freezeStateText!=null) setTextIfChanged(freezeStateText, sel+" selecionado(s) • "+active+" congelado(s) agora\n"+prefs.getString("last_effectiveness_summary", ""));
+        if(limitingDashboardText!=null) setTextIfChanged(limitingDashboardText, prefs.getString("limiting_dashboard", "Nenhuma limitação ativa"));
 
         if(cpuPressureText!=null) {
             if(prefs.getBoolean("cpu_pressure_active",false))
-                cpuPressureText.setText("Proteção de pressão ativa • "+prefs.getInt("cpu_limited_apps",0)+" apps limitados");
-            else cpuPressureText.setText("Pressão combinada: normal");
+                setTextIfChanged(cpuPressureText, "Proteção de pressão ativa • "+prefs.getInt("cpu_limited_apps",0)+" apps limitados");
+            else setTextIfChanged(cpuPressureText, "Pressão combinada: normal");
         }
 
         if(advancedText!=null) {
@@ -1686,6 +1854,48 @@ public class MainActivity extends Activity {
                     "\nEstratégia: " + prefs.getString("recurrence_strategy", "Estratégia normal") +
                     "\nConfiança da causa: " + prefs.getInt("cause_confidence",0) + "%" +
                     "\nEficácia da última ação: " + prefs.getInt("action_effectiveness_score",0) + "%";
+            report += "\n\n=== Custo do próprio Adaptive Performance ==="
+                    + "\n" + prefs.getString("app_cost_status", "Sem leituras")
+                    + "\nAmostragens (proxy, não wakeups reais): "
+                    + prefs.getInt("app_cost_poll_count", 0)
+                    + "\nCPU do processo: " + prefs.getFloat("app_cost_cpu_pct", -1f) + "%"
+                    + "\nEstimativa CPU mWh (não mede bateria do app): "
+                    + prefs.getFloat("app_cost_estimated_mwh", -1f)
+                    + "\n\n=== Leituras atuais ==="
+                    + "\nTemperatura bateria °C: " + prefs.getFloat("temp_c", -1f)
+                    + "\nTemperatura SoC °C: " + prefs.getFloat("thermal_soc_c", -1f)
+                    + "\nRAM livre %: " + prefs.getFloat("ram_free_pct", -1f)
+                    + "\nCPU %: " + prefs.getFloat("cpu_load", -1f)
+                    + "\nPotência W: " + prefs.getFloat("power_w", -1f)
+                    + "\nBateria: " + getSystemService(android.os.BatteryManager.class).getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) + "%"
+                    + "\nTRIM automático: " + prefs.getString("auto_trim_result", "não executado")
+                    + "\nTRIM manual: " + prefs.getString("manual_ram_trim_result", "não executado")
+                    + "\n\n=== Proteção durante a carga ==="
+                    + "\n" + prefs.getString("charging_low_impact_note", "Inativo")
+                    + "\nHardware quente: " + prefs.getBoolean("hot_hardware_guard", false)
+                    + "\nCadência (ms): "
+                    + prefs.getLong("charging_low_impact_interval_ms", -1L)
+                    + "\n\n=== Testes automáticos ==="
+                    + "\nEtapa: " + prefs.getString("conservative_tune_stage", "baseline")
+                    + "\nFase: " + prefs.getInt("conservative_tune_phase", 0)
+                    + "\n" + prefs.getString("auto_tune_status", "")
+                    + "\n" + prefs.getString("auto_tune_decision_history", "Sem decisões")
+                    + "\n\n=== Compatibilidade ===\n"
+                    + CompatibilityAudit.report(this, prefs)
+                    + "\n\n=== Adaptive Brain 2.0 / laboratório ===\n"
+                    + AdaptiveBrainV2.dashboard(prefs,UiLanguage.english(prefs))
+                    + "\nÚltima reversão: "
+                    + prefs.getString("v2_last_rollback","nenhuma")
+                    + "\n\n=== Aprendizado de máquina local ===\n"
+                    + PersonalUsageML.summary(prefs, UiLanguage.english(prefs))
+                    + "\nPrivacidade: modelo, horários e tendências gravados somente no dispositivo"
+                    + "\n\n=== Evidência de economia ===\n"
+                    + ConservativeTuningController.evidenceSummary(prefs)
+                    + "\n\n=== Previsão térmica / diagnóstico temporário ===\n"
+                    + prefs.getString("native_thermal_forecast", "indisponível")
+                    + "\n" + prefs.getString("incident_diagnostic_status", "inativo")
+                    + "\n\n=== Continuidade HyperOS ===\n"
+                    + ServiceContinuityMonitor.summary(prefs, false);
             String name = "AdaptivePerformance-diagnostico-" +
                     new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
                             .format(new Date()) + ".txt";
@@ -1712,9 +1922,9 @@ public class MainActivity extends Activity {
                 out.write(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 out.flush();
             }
-            Toast.makeText(this, "Diagnóstico salvo em Downloads: " + name, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Diagnóstico salvo em Downloads: ") + name, Toast.LENGTH_LONG).show();
         } catch (Throwable t) {
-            Toast.makeText(this, "Falha ao exportar: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Falha ao exportar: ") + t.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -1740,12 +1950,14 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (uiFrameSampler != null) uiFrameSampler.start();
         handler.removeCallbacks(refreshLoop);
         lastShizukuUiCheckElapsed = 0L;
         handler.post(refreshLoop);
     }
 
     @Override protected void onPause() {
+        if (uiFrameSampler != null) uiFrameSampler.stop();
         handler.removeCallbacks(refreshLoop);
         unloadActionsSection();
         super.onPause();
@@ -1786,6 +1998,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (uiFrameSampler != null) uiFrameSampler.stop();
         handler.removeCallbacksAndMessages(null);
         Shizuku.removeRequestPermissionResultListener(permissionListener);
         super.onDestroy();

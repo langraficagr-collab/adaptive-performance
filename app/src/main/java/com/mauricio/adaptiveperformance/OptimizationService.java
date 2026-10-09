@@ -27,6 +27,7 @@ public class OptimizationService extends Service {
     public static final String CHANNEL_ID = "adaptive_performance";
     public static final String ACTION_SET_THERMAL_MODE = "com.mauricio.adaptiveperformance.SET_THERMAL_MODE";
     public static final String ACTION_APPLY_CAUSE_FIX = "com.mauricio.adaptiveperformance.APPLY_CAUSE_FIX";
+    public static final String ACTION_MEMORY_TRIM_NOW = "com.mauricio.adaptiveperformance.MEMORY_TRIM_NOW";
     public static final String ACTION_START_OPTIMIZATION = "com.mauricio.adaptiveperformance.START_OPTIMIZATION";
     public static final String ACTION_STOP_OPTIMIZATION = "com.mauricio.adaptiveperformance.STOP_OPTIMIZATION";
     public static final String ACTION_STORAGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_SCAN";
@@ -52,6 +53,9 @@ public class OptimizationService extends Service {
     private final ExecutorService cleanupExecutor = idleSingleExecutor("cleanup");
     private final AtomicBoolean sampleBusy = new AtomicBoolean(false);
     private volatile boolean serviceDestroyed = false;
+    private volatile long lastMemoryTrimAttemptMs = 0L;
+    private volatile int automaticTrimPressureStreak = 0;
+    private final AtomicBoolean memoryTrimBusy = new AtomicBoolean(false);
     private SharedPreferences prefs;
     private IPrivilegedService privileged;
     private Shizuku.UserServiceArgs userServiceArgs;
@@ -79,6 +83,12 @@ public class OptimizationService extends Service {
     private AdaptivePreloadController adaptivePreloadController;
     private StorageHealthController storageHealthController;
     private volatile long nextLoopDelayMs = 60000L;
+    private NativeThermalForecast nativeForecast;
+    private IncidentProbe incidentProbe;
+    private PersonalUsageML personalUsageML;
+    private AdaptiveBrainV2 adaptiveBrainV2;
+    private long lastEventPollMs = 0L;
+    private final AppCostGuard appCostGuard = new AppCostGuard();
     private final ExecutorService maintenanceExecutor = idleSingleExecutor("maintenance");
     private final AtomicBoolean maintenanceBusy = new AtomicBoolean(false);
     private final ExecutorService cpuPressureExecutor = idleSingleExecutor("cpu");
@@ -117,10 +127,18 @@ public class OptimizationService extends Service {
                 lastShizukuBindAttemptElapsed = 0L;
                 bindShizukuIfPossible();
             }
-            handler.removeCallbacks(loop);
-            handler.post(loop);
+            requestEventSample();
         }
     };
+
+    private void requestEventSample() {
+        long now = SystemClock.elapsedRealtime();
+        if (serviceDestroyed || prefs == null || !prefs.getBoolean("master", false)
+                || now - lastEventPollMs < 12000L) return;
+        lastEventPollMs = now;
+        handler.removeCallbacks(loop);
+        handler.post(loop);
+    }
 
     private volatile boolean recoveryReady = false;
 
@@ -209,12 +227,20 @@ public class OptimizationService extends Service {
         super.onCreate();
         serviceDestroyed = false;
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        ServiceContinuityMonitor.onServiceStart(prefs);
+        incidentProbe = new IncidentProbe(prefs);
+        personalUsageML = new PersonalUsageML(prefs);
+        adaptiveBrainV2 = new AdaptiveBrainV2(this,prefs);
         if (!BuildConfig.LEAN_MODE && "auto".equals(prefs.getString("user_mode", "auto"))) ConservativeTuningController.recoverAfterRestart(prefs);
         if (!prefs.contains("user_mode")) {
             // Atualizações mantêm o comportamento atual; instalações novas começam simplificadas.
             String initialMode = prefs.contains("master") ? "advanced" : "auto";
             prefs.edit().putString("user_mode", initialMode).apply();
         }
+        // Global Automatic mode must not inherit a manual simulated thermal status.
+        if (AutoUserModeController.enabled(prefs)
+                && !"auto".equals(prefs.getString("thermal_mode","auto")))
+            prefs.edit().putString("thermal_mode","auto").apply();
         thermalLevelApplied = prefs.getInt("thermal_level", prefs.getBoolean("thermal_stage1", false) ? 1 : 0);
         createChannel();
         ChangeNotifier.ensureChannel(this);
@@ -226,9 +252,13 @@ public class OptimizationService extends Service {
         stateFilter.addAction(Intent.ACTION_USER_PRESENT);
         stateFilter.addAction(Intent.ACTION_POWER_CONNECTED);
         stateFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
+        stateFilter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+        stateFilter.addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(powerStateReceiver, stateFilter, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(powerStateReceiver, stateFilter);
         startForeground(7014, buildNotification("Iniciando monitor adaptativo"));
+        nativeForecast = new NativeThermalForecast(prefs);
+        nativeForecast.attach((PowerManager)getSystemService(POWER_SERVICE), this::requestEventSample);
         bindShizukuIfPossible();
         handler.post(loop);
     }
@@ -297,6 +327,7 @@ public class OptimizationService extends Service {
         thermals.battery = tempC;
         PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
         boolean interactive = pm != null && pm.isInteractive();
+        boolean nativeThermalRisk = nativeForecast != null && nativeForecast.sample(interactive);
         boolean batteryChargingNow = isChargingNow();
         int smartBatteryPct = batteryPercent();
         if (deepSleepController != null && prefs.getBoolean("deep_sleep_monitor", true)) {
@@ -315,10 +346,12 @@ public class OptimizationService extends Service {
         if (privileged != null) {
             try {
                 long now = SystemClock.elapsedRealtime();
-                boolean cachedHot = thermalLevelApplied > 0
-                        || tempC >= 38f;
-                long thermalInterval = cachedHot ? 10_000L
-                        : (batteryChargingNow ? 20_000L : (interactive ? 45_000L : 60_000L));
+                // Native BatteryManager and thermal callbacks stay available; avoid
+                // repeated heavy dumpsys thermalservice calls when the phone is hot.
+                boolean cachedHot = tempC >= 38f
+                        || (cachedThermals != null && cachedThermals.skin >= 43f);
+                long thermalInterval = cachedHot || batteryChargingNow
+                        ? 90_000L : (interactive ? 60_000L : 120_000L);
                 boolean readThermal = lastThermalReadElapsed <= 0L
                         || now - lastThermalReadElapsed >= thermalInterval;
 
@@ -379,18 +412,50 @@ public class OptimizationService extends Service {
                 prefs.edit().putString("advanced_error", t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
             }
         }
-        final boolean chargingNow = advanced != null ? advanced.charging : batteryChargingNow;
+        // The OS battery broadcast is authoritative for limiting our own work.
+        // An estimator returning false must never cancel an actual charger signal.
+        final boolean chargingNow = batteryChargingNow || (advanced != null && advanced.charging);
+        // Protect against accumulated heat after unplugging, not just while charging.
+        final boolean hotHardware = tempC >= 39f
+                || (thermals.skin > 0f && thermals.skin >= 44f)
+                || (thermals.soc > 0f && thermals.soc >= 60f);
         boolean automaticMode = AutoUserModeController.enabled(prefs);
         boolean lowBatteryAutomatic = automaticMode && !chargingNow && smartBatteryPct >= 0
                 && smartBatteryPct <= 50;
         boolean thermalSavingAutomatic = automaticMode
-                && (controlTemp >= 56.0f
+                && (nativeThermalRisk || controlTemp >= 56.0f
                 || tempC >= 38.0f
                 || (thermals.skin > 0f && thermals.skin >= 42.0f)
                 || (advanced != null && advanced.thermalTarget > 0));
         boolean automaticConservation = lowBatteryAutomatic || thermalSavingAutomatic;
-        boolean deferHeavyDiagnostics = automaticConservation;
-        boolean deferNonCriticalMaintenance = lowBatteryAutomatic && !thermalSavingAutomatic;
+        // Fast charging already creates heat; do not add shell scans, package scans,
+        // diagnostics or APK warmups until unplugged. Native thermal readings remain.
+        boolean lowImpactMode = chargingNow || hotHardware;
+        // Supervised lightweight on-device ML; no network, root or new timers.
+        // It learns patterns, but cannot bypass existing battery/thermal guards.
+        if (personalUsageML != null &&
+                !prefs.getBoolean("v2_self_budget",false)) {
+            try {
+                personalUsageML.sample(interactive, chargingNow, smartBatteryPct,
+                        tempC, cpuLoad, availPct, fg);
+            } catch (RuntimeException error) {
+                prefs.edit().putString("ml_error", error.getClass().getSimpleName()).apply();
+            }
+        }
+        if (adaptiveBrainV2!=null) {
+            try {
+                adaptiveBrainV2.observe(interactive,chargingNow,smartBatteryPct,tempC,
+                        thermals.skin,thermals.soc,cpuLoad,availPct,fg,nativeThermalRisk);
+            } catch (RuntimeException error) {
+                prefs.edit().putString("v2_error",error.getClass().getSimpleName()).apply();
+            }
+        }
+        if (prefs.getBoolean("v2_enabled",true)
+                && prefs.getBoolean("v2_thermal_warning",false)
+                && System.currentTimeMillis()-prefs.getLong("v2_last_observation",0L)<600000L)
+            lowImpactMode=true;
+        boolean deferHeavyDiagnostics = automaticConservation || lowImpactMode;
+        boolean deferNonCriticalMaintenance = automaticConservation || lowImpactMode;
         String automaticReason = thermalSavingAutomatic
                 ? "Resfriamento automático ativo"
                 : (lowBatteryAutomatic ? "Economia automática: bateria " + smartBatteryPct + "%" : "");
@@ -517,6 +582,11 @@ public class OptimizationService extends Service {
             });
         }
 
+        if (incidentProbe != null) {
+            incidentProbe.observe(tempC, thermals.soc, cpuLoad, availPct,
+                    health != null ? health.jankPct : prefs.getFloat("jank_pct", -1f),
+                    advanced != null ? advanced.powerW : -1f, interactive, nativeThermalRisk);
+        }
         final float socForPressure = thermals.soc;
         int effectivePressure = advanced == null ? 0 : advanced.pressureScore;
         int basePressure = effectivePressure;
@@ -537,6 +607,8 @@ public class OptimizationService extends Service {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
                     smartBatteryPct, tempC, adaptivePressureScore);
         } catch (Throwable ignored) {}
+        if (!BuildConfig.LEAN_MODE && "auto".equals(prefs.getString("user_mode", "auto")))
+            ExperimentContext.sample(this, prefs, fg, interactive);
         try {
             AutoUserModeController.evaluate(prefs, smartBatteryPct, tempC, cpuLoad, availPct,
                     interactive, chargingNow, advanced != null ? advanced.powerW : -1f);
@@ -552,6 +624,58 @@ public class OptimizationService extends Service {
         } catch (Throwable t) {
             prefs.edit().putString("auto_tune_error",
                     t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+        }
+        // Automatic memory trim is only a pressure response, never a periodic cleanup.
+        float psiMemory = prefs.getFloat("psi_memory", -1f);
+        boolean memoryPressureNow = (availPct >= 0f && availPct <= 10.0f)
+                || (psiMemory >= 0f && psiMemory >= 25.0f);
+        boolean memoryTrimUnsafe = !interactive || chargingNow
+                || (smartBatteryPct >= 0f && smartBatteryPct <= 30.0f)
+                || tempC >= 50.0f || controlTemp >= SOC_LEVEL1_C;
+        if (!memoryPressureNow || memoryTrimUnsafe) {
+            automaticTrimPressureStreak = 0;
+        } else {
+            automaticTrimPressureStreak = Math.min(2, automaticTrimPressureStreak + 1);
+        }
+        if (automaticMode && privileged != null && interactive &&
+                automaticTrimPressureStreak >= 2 &&
+                System.currentTimeMillis() - lastMemoryTrimAttemptMs >= 900_000L &&
+                memoryTrimBusy.compareAndSet(false, true)) {
+            lastMemoryTrimAttemptMs = System.currentTimeMillis();
+            final IPrivilegedService trimService = privileged;
+            final String visiblePackage = fg;
+            final Set<String> preloadedPackages = new HashSet<>(prefs.getStringSet(
+                    "auto_preload_apps", Collections.emptySet()));
+            maintenanceExecutor.execute(() -> {
+                try {
+                    List<String> candidates = TrimCandidateSelector.candidates(
+                            this, prefs, visiblePackage, 5);
+                    if (candidates.isEmpty()) {
+                        prefs.edit().putString("auto_trim_result",
+                                "Sem candidatos seguros com histórico de uso acessível").apply();
+                    }
+                    for (String candidate : candidates) {
+                        if (candidate.equals(visiblePackage) || candidate.equals(getPackageName())
+                                || preloadedPackages.contains(candidate)
+                                || AppSafety.isCritical(this, candidate)
+                                || AppSafety.isAutoProtected(this, candidate)) continue;
+                        String pid = trimService.exec("pidof " + candidate + " 2>/dev/null");
+                        if (pid == null || !pid.trim().matches("[0-9]+(\\s+[0-9]+)*")) continue;
+                        double before = availableMemoryPct();
+                        String result = trimService.exec("am send-trim-memory " + candidate + " RUNNING_MODERATE 2>&1");
+                        if (result != null && (result.contains("Exception") || result.contains("Error"))) continue;
+                        double after = availableMemoryPct();
+                        prefs.edit().putString("last_memory_trim_app", candidate)
+                                .putString("auto_trim_result", "Solicitação automática enviada a " + candidate)
+                                .putFloat("auto_trim_before_ram_pct", (float) before)
+                                .putFloat("auto_trim_after_ram_pct", (float) after)
+                                .putFloat("auto_trim_delta_ram_pct", (float) (after - before))
+                                .putLong("last_memory_trim_time", System.currentTimeMillis()).apply();
+                        break;
+                    }
+                } catch (Throwable ignored) { }
+                finally { memoryTrimBusy.set(false); }
+            });
         }
         if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
@@ -621,7 +745,7 @@ public class OptimizationService extends Service {
             });
         }
 
-        if (startupReady && storageHealthController != null && !automaticConservation
+        if (startupReady && storageHealthController != null && !lowImpactMode && !automaticConservation
                 && storageHealthBusy.compareAndSet(false, true)) {
             final StorageHealthController shc = storageHealthController;
             final boolean shInteractive = interactive;
@@ -637,7 +761,9 @@ public class OptimizationService extends Service {
         }
 
         String thermalMode = prefs.getString("thermal_mode", "auto");
-        int manualThermalLevel = thermalLevelFromMode(thermalMode);
+        int manualThermalLevel = automaticMode ? 0 : thermalLevelFromMode(thermalMode);
+        if (automaticMode && !"auto".equals(thermalMode))
+            prefs.edit().putString("thermal_mode","auto").apply();
         // A janela pós-correção bloqueia novas ações, mas não deve manter um override térmico
         // antigo quando a leitura real já voltou para uma faixa segura.
         if (!mutationsAllowed && privileged != null && manualThermalLevel == 0 && thermalLevelApplied > 0) {
@@ -646,28 +772,14 @@ public class OptimizationService extends Service {
             float release = hasSoc ? SOC_LEVEL1_RELEASE_C : 37.5f;
             if (observed > 0 && observed <= release) resetThermalOverride();
         }
-        if (mutationsAllowed && privileged != null) {
-            if (manualThermalLevel > 0) {
-                setThermalLevel(manualThermalLevel);
-            } else if (advanced != null) {
-                int target = advanced.thermalTarget;
-                if (extended != null && !extended.safeMode &&
-                        prefs.getBoolean("thermal_prediction", true)) {
-                    target = Math.max(target, extended.predictedThermalLevel);
-                }
-                if (target > 0) setThermalLevel(target);
-                else resetThermalOverride();
-            } else {
-                boolean hasSoc = thermals.hasSoc();
-                float hot = hasSoc ? thermals.soc : tempC;
-                float l1On = hasSoc ? SOC_LEVEL1_C : 38.0f;
-                float maxOn = hasSoc ? SOC_MAX_C : 40.0f;
-                float l1Off = hasSoc ? SOC_LEVEL1_RELEASE_C : 37.5f;
-                if (hot >= maxOn) setThermalLevel(5);
-                else if (hot >= l1On) setThermalLevel(1);
-                else if (thermalLevelApplied > 0 && hot <= l1Off) resetThermalOverride();
-            }
-        }
+        // thermalservice override-status is a debugging/testing command. It DOES
+        // NOT cool the hardware and can falsify Android's genuine thermal state.
+        // Auto mode delegates thermal throttling to the OEM HAL. Explicit manual
+        // thermal level is kept as-is for users who selected it themselves.
+        if (manualThermalLevel == 0 && thermalLevelApplied > 0 && privileged != null)
+            resetThermalOverride();
+        if (mutationsAllowed && privileged != null && manualThermalLevel > 0)
+            setThermalLevel(manualThermalLevel);
 
         if (mutationsAllowed && thermalBrightnessController != null && brightnessBusy.compareAndSet(false, true)) {
             final ThermalBrightnessController bc = thermalBrightnessController;
@@ -684,6 +796,7 @@ public class OptimizationService extends Service {
         }
 
         if (manualThermalLevel > 0) profile = "Térmico nível " + manualThermalLevel + " travado";
+        else if (hotHardware) profile = "Resfriamento leve: manutenção pausada";
         else if (thermalLevelApplied >= 5) profile = "Térmico máximo";
         else if (thermalLevelApplied >= 1) profile = "Térmico nível " + thermalLevelApplied;
         else if (cpuPressureController != null && cpuPressureController.isActive()) profile = "Pressão do sistema — segundo plano limitado";
@@ -692,11 +805,13 @@ public class OptimizationService extends Service {
 
         boolean adaptiveRefresh = prefs.getBoolean("adaptive_refresh", true);
         if (mutationsAllowed && adaptiveRefresh && privileged != null) {
-            boolean refreshHot = thermalLevelApplied >= 5 ||
+            boolean refreshHot = (nativeThermalRisk && automaticMode)
+                    || thermalLevelApplied >= 5 ||
                     (thermals.hasSoc() && thermals.soc >= SOC_MAX_C) ||
                     (health != null && health.antiStallLevel >= 2) ||
                     (extended != null && !extended.safeMode && extended.predictedThermalLevel >= 4);
-            boolean refreshCool = thermals.hasSoc() ? thermals.soc <= 56.0f : tempC <= 38.5f;
+            boolean refreshCool = !nativeThermalRisk
+                    && (thermals.hasSoc() ? thermals.soc <= 56.0f : tempC <= 38.5f);
             if (refreshHot && !lowRefreshApplied) {
                 apply60Hz();
             } else if (refreshCool && lowRefreshApplied && System.currentTimeMillis()-lastRefreshChange > 180000) {
@@ -740,6 +855,7 @@ public class OptimizationService extends Service {
                 .putLong("cpu_freq_khz", avgFreq)
                 .putLong("last_sample", System.currentTimeMillis())
                 .apply();
+        ServiceContinuityMonitor.heartbeat(prefs);
 
         if (!BuildConfig.CONSERVATIVE_MODE || prefs.getBoolean("time_usage_learning", false)
                 || prefs.getBoolean("update_regression_detector", false)
@@ -752,7 +868,8 @@ public class OptimizationService extends Service {
             } catch (Throwable t) {
                 prefs.edit().putString("adaptive_intelligence_error", t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
             }
-            AppProfilePolicy.batch(this, prefs, fg, 4);
+            // UsageStats/package enumeration is nonessential while the device is hot.
+            if (!lowImpactMode) AppProfilePolicy.batch(this, prefs, fg, 4);
             AutoRepairController.evaluate(prefs, cpuPressureController);
         }
         NotificationManager nm = getSystemService(NotificationManager.class);
@@ -778,11 +895,49 @@ public class OptimizationService extends Service {
                 nextLoopDelayMs = Math.max(nextLoopDelayMs, interactive ? 60_000L : 300_000L);
             }
         }
-        if (!BuildConfig.LEAN_MODE && "auto".equals(prefs.getString("user_mode", "auto"))
+        if (!BuildConfig.LEAN_MODE && !lowImpactMode
+                && "auto".equals(prefs.getString("user_mode", "auto"))
+                && !"probation".equals(prefs.getString("conservative_tune_stage", "baseline"))
                 && prefs.getInt("conservative_tune_phase", 0) < 26
                 && prefs.getLong("conservative_tune_completed_at", 0L) == 0L) {
             // Baseline AND candidate need comparable samples, including while display is off.
             nextLoopDelayMs = Math.min(nextLoopDelayMs, 30_000L);
+        }
+        boolean emergency = tempC >= 42f
+                || (thermals.skin > 0 && thermals.skin >= 47f)
+                || (thermals.soc > 0 && thermals.soc >= 69f);
+        // CPU budget always applies, including hot conditions: a frequent
+        // profiler loop adds heat rather than taking heat away.
+        long budgetDelay = appCostGuard.record(prefs, interactive, emergency);
+        if (budgetDelay > 0L) nextLoopDelayMs = Math.max(nextLoopDelayMs, budgetDelay);
+        if (lowImpactMode) {
+            nextLoopDelayMs = Math.max(nextLoopDelayMs,
+                    emergency ? 60000L : (interactive ? 120000L : 300000L));
+            // Genuine thermal API and low-overhead battery broadcast remain active.
+            String reason = chargingNow
+                    ? "Carregando: manutenção, diagnósticos e pré-carga pausados"
+                    : "Aparelho quente mesmo fora da carga: varreduras e pré-carga pausadas";
+            prefs.edit().putBoolean("charging_low_impact_monitor", true)
+                    .putBoolean("hot_hardware_guard", hotHardware)
+                    .putString("charging_low_impact_note", reason)
+                    .putLong("charging_low_impact_interval_ms", nextLoopDelayMs).apply();
+        } else if (prefs.getBoolean("charging_low_impact_monitor", false)) {
+            prefs.edit().putBoolean("charging_low_impact_monitor", false)
+                    .putBoolean("hot_hardware_guard", false)
+                    .putString("charging_low_impact_note", "Temperatura normal; modo normal")
+                    .apply();
+        }
+    }
+
+    private double availableMemoryPct() {
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            if (am == null) return -1.0;
+            ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
+            am.getMemoryInfo(info);
+            return info.totalMem > 0L ? (100.0 * info.availMem / info.totalMem) : -1.0;
+        } catch (Throwable ignored) {
+            return -1.0;
         }
     }
 
@@ -1482,6 +1637,43 @@ public class OptimizationService extends Service {
             return START_NOT_STICKY;
         }
 
+        if (ACTION_MEMORY_TRIM_NOW.equals(action)) {
+            maintenanceExecutor.execute(() -> {
+                int tried = 0;
+                try {
+                    if (privileged == null) {
+                        prefs.edit().putString("manual_ram_trim_result", "Shizuku indisponível; nenhuma alteração realizada").apply();
+                        return;
+                    }
+                    String foreground = "";
+                    try { foreground = privileged.exec("dumpsys activity activities | grep mResumedActivity"); } catch (Throwable ignored) {}
+                    List<String> apps = TrimCandidateSelector.candidates(
+                            this, prefs, prefs.getString("foreground", ""), 5);
+                    for (String pkg : apps) {
+                        if ((foreground != null && foreground.contains(pkg))
+                                || AppSafety.isCritical(this, pkg)
+                                || AppSafety.isAutoProtected(this, pkg)) continue;
+                        String pid = privileged.exec("pidof " + pkg + " 2>/dev/null");
+                        if (pid == null || !pid.trim().matches("[0-9]+(\\s+[0-9]+)*")) continue;
+                        double before = availableMemoryPct();
+                        String output = privileged.exec("am send-trim-memory " + pkg + " RUNNING_MODERATE 2>&1");
+                        if (output == null || (!output.contains("Exception") && !output.contains("Error"))) {
+                            tried++;
+                            double after = availableMemoryPct();
+                            prefs.edit().putFloat("manual_trim_before_ram_pct", (float) before)
+                                    .putFloat("manual_trim_after_ram_pct", (float) after)
+                                    .putFloat("manual_trim_delta_ram_pct", (float) (after - before)).apply();
+                        }
+                    }
+                    prefs.edit().putString("manual_ram_trim_result", tried > 0
+                        ? "Trim solicitado para " + tried + " apps em segundo plano; RAM não garantida"
+                        : "Nenhum app elegível ou acesso ao histórico de uso indisponível").apply();
+                } catch (Throwable t) {
+                    prefs.edit().putString("manual_ram_trim_result", "Falha: " + t.getClass().getSimpleName()).apply();
+                }
+            });
+            return START_STICKY;
+        }
         if (ACTION_PRIVATE_DNS_ENABLE.equals(action)) {
             configurePrivateDns(true, 0);
             return START_STICKY;
@@ -1557,7 +1749,8 @@ public class OptimizationService extends Service {
 
         if (intent != null && ACTION_SET_THERMAL_MODE.equals(intent.getAction())) {
             String mode = intent.getStringExtra("mode");
-            int requestedLevel = thermalLevelFromMode(mode);
+            int requestedLevel = AutoUserModeController.enabled(prefs)
+                    ? 0 : thermalLevelFromMode(mode);
             if (requestedLevel == 0) mode = "auto";
             prefs.edit().putString("thermal_mode", mode).apply();
             if (privileged != null) {
@@ -1752,17 +1945,21 @@ public class OptimizationService extends Service {
             maintenanceExecutor.execute(() -> {
                 boolean ok = false;
                 try {
-                    int desired = "heat_charge".equals(causeId) ? 4 : 3;
-                    if (thermalLevelApplied > desired) desired = thermalLevelApplied;
-                    setThermalLevel(desired);
+                    // Never use thermalservice override-status for automatic fixes.
+                    // Only reversible screen changes are ours; the HyperOS thermal
+                    // HAL remains responsible for hardware frequency throttling.
+                    if (privileged != null && thermalLevelFromMode(
+                            prefs.getString("thermal_mode", "auto")) == 0
+                            && thermalLevelApplied > 0) resetThermalOverride();
                     apply60Hz();
-                    ok = thermalLevelApplied >= ("heat_charge".equals(causeId) ? 4 : 3);
+                    ok = lowRefreshApplied;
                 } catch (Throwable ignored) {}
                 reportCauseResult(causeId, ok,
-                        ok ? "Proteção térmica temporária no nível " + thermalLevelApplied +
-                                (lowRefreshApplied ? "; tela em 60 Hz. " : "; 60 Hz não confirmado. ") +
-                                "As medidas serão aliviadas automaticamente quando a temperatura cair."
-                           : "Não foi possível reforçar a proteção automaticamente. Nenhuma proteção térmica existente foi reduzida.",
+                        ok ? "Tela ajustada para 60 Hz temporariamente. " +
+                                "Controle térmico real mantido com HyperOS; " +
+                                "varreduras pesadas pausadas enquanto estiver quente."
+                           : "Controle térmico do HyperOS preservado. " +
+                                "Não foi possível confirmar a redução temporária a 60 Hz.",
                         !ok);
             });
             return;
@@ -1946,10 +2143,12 @@ public class OptimizationService extends Service {
     }
 
     @Override public void onDestroy() {
+        ServiceContinuityMonitor.onServiceStop(prefs);
         if (prefs != null) ConservativeTuningController.stopIfNeeded(prefs);
         serviceDestroyed = true;
         handler.removeCallbacksAndMessages(null);
         sampleExecutor.shutdownNow();
+        if (nativeForecast != null) nativeForecast.close();
         try { unregisterReceiver(powerStateReceiver); } catch (Throwable ignored) {}
 
         // Privileged restore operations can take several seconds on HyperOS.

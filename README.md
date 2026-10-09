@@ -12,7 +12,49 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
-## Novidades da versão 1.9.3 — português / English
+## Novidades da versão 1.11.0 — Adaptive Brain 2.0
+
+**Versão Android:** `1.11.0-adaptive-brain2` (versionCode **82**). [Baixar APK completo v1.11.0](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.0/Adaptive-Performance-v1.11.0.apk) · [Release e código-fonte](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0).
+
+A versão **1.11.0** inclui dez extensões que reutilizam o mesmo serviço do aplicativo. O objetivo é aprender hábitos, prever problemas e suspender apenas trabalho opcional em condições desfavoráveis. **Não são dez processos adicionais executados continuamente.**
+
+| Recurso | Funcionamento e limites |
+|---|---|
+| **1. Machine Learning 2.0 contextual** | Dois modelos locais incrementais estimam atividade e risco de aquecimento usando tela, CPU, RAM, bateria, carregamento e horário. Necessita **48 amostras**, espaçadas em pelo menos **3 minutos**, antes de decisões por ML. |
+| **2. Previsão do próximo aplicativo** | Aprendizado de até **32 transições**; prioriza o app previsto somente se estiver entre os aplicativos recentes e elegíveis. Não inicia apps automaticamente nem os prende à RAM. |
+| **3. Thermal AI Pro** | Combina temperatura da bateria, superfície, SoC e o ThermalHeadroom oficial quando disponível; exibe projeção indicativa de **5 minutos**. Não injeta estados térmicos artificiais no modo Automático. |
+| **4. Carregamento inteligente (observação)** | Lê corrente relatada por BatteryManager quando disponível e identifica carga quente. Não controla a potência física do carregador. |
+| **5. RAM preditiva** | Projeta tendência de RAM livre para **10 minutos** e evita pré-carregamento opcional quando há previsão de pressão. |
+| **6. Medição de fluidez** | Coleta de até **150 frames/10 segundos** da **própria interface**, com intervalo mínimo de **10 minutos**. Não mede toda a fluidez de apps externos. |
+| **7. Autolimitação do otimizador** | Usa orçamento estimado de CPU e espaça monitoramento ou suspende trabalho opcional quando o próprio aplicativo exige recursos demais. |
+| **8. Autorrecuperação contextual** | Após regressão forte observada em cenário semelhante, pode pausar reversivelmente a pré-carga opcional por **6 horas**; preserva ajustes e rollback anteriores. |
+| **9. Perfis de rotina** | Reconhece repouso, jogos, navegação GPS, mensagens, redes sociais e uso geral; evita pré-carga extra em situações sensíveis. |
+| **10. Laboratório de resultados** | Exibe amostras, previsões, testes, decisões provisórias, reversões e exportação de diagnósticos; não confunde comparação observacional com economia comprovada. |
+
+### Recursos anteriores preservados
+
+- **Modos Automático e Avançado**, interface **Português/English** e preferências persistentes.
+- **Testes automáticos reversíveis:** referência de **2 min** e teste de **2 min** por configuração, com reavaliação em **6–24 horas** quando existem amostras comparáveis; rollback diante de piora ou incerteza.
+- **Pré-carregamento inteligente** de até quatro apps recentes por ciclo de **15 minutos**, com limitação de RAM, carga, temperatura e bateria.
+- **Monitoramento** de bateria/autonomia, CPU/frequência, RAM, swap/zRAM, PSI, sensores, atividades em segundo plano, wakeups, pressão de memória e histórico de saúde.
+- **Gerenciamento de RAM e CPU**, anti-travamento, proteção contra thrashing, detecção de possíveis vazamentos de memória, perfis de zRAM e restrições graduais.
+- **Congelamento manual**, seleção de apps, preservação das exceções e proteção dos componentes essenciais do Android.
+- **Economia de bateria e repouso**, proteção térmica real pelo sistema, brilho adaptativo, Doze e controle de tarefas em segundo plano quando permitido.
+- **Armazenamento:** análise de arquivos grandes/duplicados, apps antigos, F2FS, solicitações seguras de manutenção/TRIM e monitoramento de espaço.
+- **Rede:** firewall DNS por VPN local, otimizador de sinal móvel e economia GPS opcional, conforme ROM, operadora e permissões.
+- **Auditoria de compatibilidade**, relatórios exportáveis, análise de incidentes e restauração de ajustes reversíveis.
+
+### Instalar
+
+Baixe o [APK oficial completo](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.0/Adaptive-Performance-v1.11.0.apk) e instale no **Android 8.0+**. Para atualizar preservando os dados, o APK precisa ter a mesma assinatura da versão instalada. Para funções avançadas, inicie o **Shizuku** e conceda autorização.
+
+O aprendizado ocorre **no próprio dispositivo** sem conexão com servidores de IA; as preferências locais podem integrar o backup padrão do Android se ele estiver habilitado. É possível desativar ou apagar o aprendizado na interface. O aplicativo não promete ganho fixo de autonomia, redução garantida de temperatura, root real nem acesso ao firmware de carga. As variantes completa, conservadora e Lite compilaram; **o APK desta Release é a variante completa**.
+
+As seções abaixo detalham os recursos existentes e registram versões anteriores.
+
+---
+
+## Histórico: novidades da versão 1.9.3 — português / English
 
 O Adaptive Performance agora permite trocar entre **Português** e **English** diretamente na tela inicial, sem alterar o idioma do Android. A preferência fica salva.
 
@@ -22,7 +64,7 @@ No **modo Automático**, ele mede uma referência por **2 minutos** e ativa **um
 
 **English:** Adaptive Performance 1.9.3 adds an in-app **English / Português** language selector. In **Automatic** mode, it measures a **2-minute baseline**, enables **one reversible setting**, and observes it for **another 2 minutes**. It compares estimated power draw, CPU load, available RAM, temperature, and responsiveness. Only measurable improvements are kept; regressions and inconclusive trials are rolled back. Unsafe or irreversible changes are excluded. See the [complete English guide](README.en.md).
 
-**APK:** [Baixar versão 1.9.3 / Download 1.9.3](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.9.3).
+**APK histórico:** [Baixar versão 1.9.3 / Download 1.9.3](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.9.3).
 
 ## Visão geral
 
@@ -295,6 +337,8 @@ Sem Shizuku, o app continua abrindo, mas algumas restrições, manutenção avan
 
 ## Versão atual
 
+**1.11.0 — Adaptive Brain 2.0**, código 82. Confira a tabela de melhorias no início e [baixe o APK oficial](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0). As versões abaixo são históricas.
+
 **1.9.2 — pré-carregamento inteligente e economia automática**
 
 Reconhece os quatro apps usados mais recentemente a cada 15 minutos, calcula o orçamento de memória conforme RAM e temperatura, informa os apps mantidos no ciclo e reduz automaticamente o trabalho pesado quando a bateria está baixa ou o telefone aquece.
@@ -324,13 +368,13 @@ A versão 1.8.3 incluiu economia GPS opcional em segundo plano com restauração
 ## Compilação
 
 ~~~bash
-gradle :app:assembleDebug --no-daemon
+gradle :app:assembleFullDebug --console=plain
 ~~~
 
 APK de debug:
 
 ~~~text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/full/debug/app-full-debug.apk
 ~~~
 
 ## Estrutura principal
@@ -364,3 +408,73 @@ O vídeo usa gravação real do aplicativo, narração em português e algumas c
 O repositório não inclui caminhos locais do Android SDK, credenciais, backups de desenvolvimento ou arquivos temporários de build.
 
 O comportamento de funções privilegiadas pode mudar entre fabricantes e versões do Android. Resultados devem ser interpretados de acordo com hardware, kernel e ROM utilizados.
+
+### Histórico de desenvolvimento 1.9.4 — economia verificável
+- Orçamento do próprio monitor: CPU do processo, contagem de coletas (proxy de wakeups) e estimativa CPU-only de mWh; quando o CPU do monitor excede 3% numa janela de 10 min, a cadência de verificações diminui automaticamente, exceto em alerta térmico.
+- Teste reversível de 2 min: aprovação provisória, revisão após 6 h e confirmação após 24 h com no mínimo 8 leituras comparáveis. Piora ou evidência insuficiente reverte.
+- Auditoria de compatibilidade somente leitura: Shizuku, PSI, zRAM, CPU e rede; presença não garante permissão de escrita da ROM.
+- Limpeza de RAM: seleção dinâmica de aplicativos em segundo plano pelo histórico de uso, sem lista fixa; TRIM automático apenas com duas leituras consecutivas de pressão de RAM/PSI.
+- Relatório exportável: sinais vitais, histórico de decisões, resultados de TRIM, estimativa de custo do próprio app e auditoria.
+- `nativeapp` e `pythonapp` não participam do build Gradle principal; fontes preservadas localmente.
+Observação: medições curtas ou prolongadas não isolam completamente a influência do padrão de uso. A energia estimada não representa o consumo real total de bateria do aplicativo.
+
+### Histórico de desenvolvimento 1.9.5 — inteligência térmica e continuidade
+- Previsão térmica com PowerManager.getThermalHeadroom(30), limiar da ROM quando disponível e listener nativo de status; leituras espaçadas 20s com fallback se a ROM não oferecer o dado. Apenas proteção reversível inicial após confirmação.
+- Eventos de tela, carregamento, economia de energia, Doze e mudança de status térmico disparam amostras com limitação de frequência; monitoramento periódico permanece como fallback.
+- Comparações A/B separadas por rede, brilho aproximado, tela, perfil de uso e economia de energia, sem alterar os recursos anteriores. Dados não comparáveis são descartados.
+- Painel de economia com parâmetros confirmados após 24h, reversões e estimativa de redução de potência por função (não equivale a aumento comprovado de autonomia).
+- Diagnóstico leve de incidentes por 3min, limitado a 1 evento a cada 23min, registrando dados sem shell. O diagnóstico profundo existente também passa a ser limitado a 3min com cooldown.
+- Detector de lacunas de serviço de 15min ou mais sinaliza possível interferência do Android/HyperOS; não consegue impedir o sistema de encerrar o serviço.
+
+### Correção local 1.9.6 — congelamento manual
+- Lista de apps elegíveis carregada em worker para evitar ANR ao abrir a tela.
+- Renderização em páginas de 36 apps, com pesquisa sem perda dos selecionados ocultos.
+- Seleção preservada quando a lista não pode ser carregada; salvar só é habilitado após leitura válida.
+- Não altera os apps congelados ou as preferências existentes durante a atualização.
+
+### Correção local 1.9.7 — aquecimento durante a carga
+- Corrigida a versão completa para não pré-aquecer APKs durante a carga (antes só a conservadora evitava).
+- Durante a carga, pausa varreduras de manutenção, diagnóstico pesado e varreduras de armazenamento, com coleta leve periódica e limite de frequência; mantém sensores e medidas de tela.
+- Em modo térmico automático, libera o override sintético do thermalservice durante a carga para preservar o controle nativo do HyperOS. Níveis térmicos definidos manualmente permanecem sob controle do usuário.
+- Android emite leituras do carregador e do status de carga; monitoramento de baixo impacto fica visível no painel e diagnóstico.
+
+### Versão local 1.9.8 — proteção térmica real
+- Removido 'cmd thermalservice override-status' do modo automático: era status sintético de depuração, não comando de resfriamento. Níveis definidos manualmente permanecem disponíveis.
+- Reduzida a frequência de dumpsys térmico (90s quente/em carga); mantém as leituras de bateria e o callback térmico nativo.
+- Proteção de baixo impacto agora continua enquanto bateria ≥39 °C, pele ≥44 °C ou SoC ≥60 °C, mesmo depois de retirar o carregador.
+- Pausa varreduras de manutenção, diagnósticos e pré-carregamento quando quente, além de tarefas de aprendizado por lote.
+- Círculo automático de testes de 30s não acelera verificações quando quente/em carga; amostragens urgentes ficam a pelo menos 60s.
+- Temperatura alta não confirma causalidade do app: uso de CPU de outros programas, carregamento rápido e calor ambiente precisam ser avaliados separadamente.
+
+### Hotfix local 1.9.9 — OEM Thermal
+- Correções automáticas heat_charge/battery_soc_heat não forçam override-status; apenas aplicam 60 Hz reversível e preservam controle térmico nativo.
+
+### Versão local 1.10.0 — aprendizado de máquina no aparelho
+- Dois modelos pequenos de regressão logística online (Java puro): estimam atividade do próximo intervalo e risco de temperatura elevada usando **somente** tela, CPU, RAM, bateria, status de carga e horário/dia da semana. Sem nuvem, TensorFlow ou permissões novas.
+- Treino supervisionado com a observação seguinte, no máximo uma vez a cada 3 minutos; pesos compactos salvos nas preferências locais e recuperados após reiniciar.
+- Nas primeiras 48 amostras o modelo **apenas observa**. Depois, no modo automático, pode **somente adiar pré-carregamento opcional** quando prever calor alto ou uso muito baixo. Nunca mata/congela apps, ajusta configurações térmicas do Android ou faz mudanças irreversíveis por previsão.
+- Controles de ativar/desativar e apagar o modelo no painel; o botão geral de reiniciar aprendizado também apaga o modelo. O módulo não envia os dados para servidores; preferências do aplicativo podem participar do backup do Android se esse recurso estiver ativado.
+- As previsões são probabilísticas e não comprovam ganhos de bateria; podem falhar antes de acumularem uso suficiente.
+- Testes isolados: `tests/local-ml/LocalMlHarness.java`.
+
+### Hotfix local 1.10.1 — aprendizado mesmo sem CPU privilegiada
+- Se a leitura privilegiada da CPU não estiver disponível, os modelos seguem aprendendo apenas com sinais nativos do Android (tela, carga, bateria, RAM e temperatura).
+- Treino permanece limitado a uma amostra a cada 3 minutos, sem efeitos até 48 amostras; previsão térmica continua apenas bloqueando pré-carga opcional.
+
+### Hotfix local 1.10.2 — consistência térmica durante aprendizado
+- Em modo global Automático, limpa uma antiga seleção térmica manual, retirando o status artificial do Android para não contaminar as leituras do modelo.
+- Opções manuais de nível térmico continuam disponíveis exclusivamente no modo Avançado.
+
+### Detalhes técnicos publicados na versão 1.11.0 — Adaptive Brain 2.0
+1. **ML 2.0 contextual:** reaproveita a regressão logística local e compara observações de pré-carga com contexto equivalente. Só restringe pré-carga opcional após evidência negativa; não afirma economia comprovada.
+2. **Próximo aplicativo:** contador de transições limitado a 32 pares; apenas prioriza um app que já apareça entre os recentemente usados e elegíveis; requer 48 amostras ML para ter efeito.
+3. **Thermal AI Pro:** tendência da temperatura da bateria e projeção linear indicativa para 5 min; combina sensores reais e ThermalHeadroom quando suportado. Nunca altera status térmico sintético.
+4. **Carregamento inteligente (observação):** lê corrente via BatteryManager quando disponível (o sinal varia conforme o fabricante), observa aquecimento e recomenda ventilação; não controla potência/firmware do carregador.
+5. **RAM preditiva:** tendência de memória disponível com previsão indicativa em 10 min, bloqueando aquecimento de cache opcional se faltar RAM.
+6. **Detector de fluidez:** amostragem limitada de FrameMetrics da própria interface do Adaptive Performance (até 150 quadros e no máximo 10 s por abertura; intervalo entre sessões ≥10 min).
+7. **Orçamento do próprio otimizador:** se a estimativa anterior de CPU do app superar 4% e o guardião já estiver reduzindo a cadência, suspende pré-carga opcional e novo aprendizado.
+8. **Autorrecuperação contextual:** forte piora pós-pré-carga leva a pausa reversível de 6 horas, sem mudar a preferência do usuário; preserva os rollback existentes.
+9. **Perfis de rotina:** repouso, jogos, navegação, mensagens, redes sociais e uso geral; jogos, navegação e repouso não recebem pré-carga extra.
+10. **Laboratório:** tela de amostras, previsões, observações estáveis provisórias, reversões, histórico e exportação de diagnóstico. Não considera testes curtos como prova de economia.
+
+O sistema não inicia novos cronômetros ou serviços contínuos. Usa o ciclo de monitoramento existente, modelagem local e controles reversíveis. Dados de apps e pesos ficam nas preferências; se backup do Android estiver habilitado, poderão participar dele. Todas as funcionalidades ficam desativáveis pelo usuário.

@@ -37,3 +37,12 @@ local.properties
 
 # Reports generated locally
 build/reports/
+
+# Local source snapshots and independent experimental apps
+.backup-*/
+*.before-*
+*.pre-*
+**/*.before-*
+**/*.pre-*
+nativeapp/
+pythonapp/

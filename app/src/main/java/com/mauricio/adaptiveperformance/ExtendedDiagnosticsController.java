@@ -24,7 +24,8 @@ public final class ExtendedDiagnosticsController {
     private static final long NORMAL_SCAN_MS = 8L * 60L * 1000L;
     private static final long BURST_SCAN_MS = 60_000L;
     private static final long BINDER_SCAN_MS = 10L * 60L * 1000L;
-    private static final long DIAGNOSTIC_BURST_MS = 10L * 60L * 1000L;
+    private static final long DIAGNOSTIC_BURST_MS = 3L * 60L * 1000L;
+    private static final long BURST_COOLDOWN_MS = 20L * 60L * 1000L;
     private static final long SAFE_MODE_MS = 30L * 60L * 1000L;
     private static final long AB_WINDOW_MS = 6L * 60L * 60L * 1000L;
     private static final long MEMORY_LEAK_SAMPLE_MS = 4L * 60L * 1000L;
@@ -159,11 +160,27 @@ public final class ExtendedDiagnosticsController {
         boolean abnormalHeat = r.predicted3m >= 62f || healthThermal >= 85 ||
                 (batteryTemp >= 40f && socTemp >= 58f);
         boolean severeStall = healthUi >= 85 || healthMemory >= 85 || healthCpu >= 90;
-        if (prefs.getBoolean("diagnostic_burst", true) && (abnormalHeat || severeStall)) {
-            diagnosticBurstUntil = Math.max(diagnosticBurstUntil, now + DIAGNOSTIC_BURST_MS);
-            prefs.edit().putLong("diagnostic_burst_until_elapsed", diagnosticBurstUntil).apply();
-            r.diagnosticMode = true;
+        // A bounded burst, never extended by a persistent problem on each sample.
+        if (diagnosticBurstUntil > now + DIAGNOSTIC_BURST_MS) {
+            diagnosticBurstUntil = now; // migrate old 10-minute bursts conservatively
         }
+        long cooldownUntil = prefs.getLong("incident_burst_cooldown_until_elapsed", 0L);
+        if (prefs.getBoolean("diagnostic_burst", true)
+                && (abnormalHeat || severeStall) && now >= diagnosticBurstUntil
+                && now >= cooldownUntil && interactive) {
+            diagnosticBurstUntil = now + DIAGNOSTIC_BURST_MS;
+            prefs.edit().putLong("diagnostic_burst_until_elapsed", diagnosticBurstUntil)
+                    .putLong("incident_burst_cooldown_until_elapsed",
+                            now + DIAGNOSTIC_BURST_MS + BURST_COOLDOWN_MS)
+                    .putString("incident_diagnostic_status",
+                            "3 minutos de diagnóstico • "
+                            + (abnormalHeat ? "anomalia térmica" : "travamento/pressão"))
+                    .apply();
+        }
+        r.diagnosticMode = now < diagnosticBurstUntil;
+        if (!r.diagnosticMode && prefs.getString("incident_diagnostic_status", "").startsWith("3 minutos"))
+            prefs.edit().putString("incident_diagnostic_status",
+                    "Diagnóstico encerrado; aguardando novo incidente").apply();
 
         if (ownAnrRecent > 0 || prefs.getLong("health_scan_cost_ms", 0L) >= 12_000L) {
             safeModeUntil = Math.max(safeModeUntil, now + SAFE_MODE_MS);

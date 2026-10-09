@@ -16,6 +16,10 @@ public class FreezeSelectionActivity extends Activity {
     private SharedPreferences prefs;
     private final Map<String, CheckBox> boxes = new LinkedHashMap<>();
     private final List<Item> items = new ArrayList<>();
+    private final Set<String> selectedPackages = new HashSet<>();
+    private static final int PAGE_SIZE = 36;
+    private int visibleLimit = PAGE_SIZE;
+    private boolean listReady = false;
     private LinearLayout list;
     private TextView countText;
 
@@ -119,25 +123,60 @@ public class FreezeSelectionActivity extends Activity {
 
         setContentView(page);
 
-        Set<String> selected=new HashSet<>(prefs.getStringSet("manual_freeze_selected",Collections.emptySet()));
-        PackageManager pm=getPackageManager();
-        for(ApplicationInfo ai:pm.getInstalledApplications(0)) {
-            String pkg=ai.packageName;
-            if(!AppSafety.isEligibleForManualFreeze(this,pkg)) continue;
-            items.add(new Item(pkg,AppSafety.label(this,pkg),AppSafety.isSystemApp(this,pkg)));
-        }
-        items.sort((a,b)->a.label.compareToIgnoreCase(b.label));
-        rebuildList("",selected);
+        // PackageManager labels/eligibility may perform Binder calls for hundreds of apps.
+        // Never enumerate them on the main (input dispatch) thread.
+        selectedPackages.addAll(prefs.getStringSet("manual_freeze_selected",Collections.emptySet()));
+        countText.setText(UiLanguage.tr(prefs, "Carregando aplicativos em segundo plano…"));
+        save.setEnabled(false);
+
+        new Thread(() -> {
+            List<Item> loaded = new ArrayList<>();
+            String error = null;
+            try {
+                PackageManager pm=getPackageManager();
+                for(ApplicationInfo ai:pm.getInstalledApplications(0)) {
+                    try {
+                        String pkg=ai.packageName;
+                        if(!AppSafety.isEligibleForManualFreeze(this,pkg)) continue;
+                        loaded.add(new Item(pkg,AppSafety.label(this,pkg),AppSafety.isSystemApp(this,pkg)));
+                    } catch (RuntimeException ignored) {
+                        // A corrupted/unavailable app entry must not abort the full list.
+                    }
+                }
+                loaded.sort((a,b)->a.label.compareToIgnoreCase(b.label));
+            } catch(Throwable ex) {
+                error = ex.getClass().getSimpleName();
+            }
+            final String failure = error;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                items.clear();
+                items.addAll(loaded);
+                listReady = failure == null && !items.isEmpty();
+                save.setEnabled(listReady);
+                if (!listReady) {
+                    countText.setText(failure != null
+                            ? UiLanguage.tr(prefs, "Falha ao carregar aplicativos: ") + failure
+                            : UiLanguage.tr(prefs, "Nenhum aplicativo elegível. Seleção preservada."));
+                    return;
+                }
+                visibleLimit = PAGE_SIZE;
+                rebuildList(search.getText().toString(), null);
+            });
+        }, "AP-freeze-package-loader").start();
 
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int b,int c){ rebuildList(s.toString(),null); }
+            public void onTextChanged(CharSequence s,int st,int b,int c) {
+                visibleLimit = PAGE_SIZE;
+                if (listReady) rebuildList(s.toString(),null);
+            }
             public void afterTextChanged(Editable e){}
         });
 
         save.setOnClickListener(v->{
-            Set<String> newSet=new HashSet<>();
-            for(Map.Entry<String,CheckBox> e:boxes.entrySet()) if(e.getValue().isChecked()) newSet.add(e.getKey());
+            if (!listReady) return;
+            Set<String> newSet=new HashSet<>(selectedPackages);
             prefs.edit().putStringSet("manual_freeze_selected",newSet).apply();
             ChangeNotifier.notifyChange(this,"Seleção de congelamento atualizada",
                     newSet.size()+" app(s) selecionado(s) para congelamento em segundo plano.",6);
@@ -146,35 +185,54 @@ public class FreezeSelectionActivity extends Activity {
     }
 
     private void rebuildList(String filter, Set<String> initialSelected) {
-        Set<String> current=new HashSet<>();
-        if(initialSelected!=null) current.addAll(initialSelected);
-        else {
-            for(Map.Entry<String,CheckBox> e:boxes.entrySet()) if(e.getValue().isChecked()) current.add(e.getKey());
+        if (!listReady) return;
+        if (initialSelected != null) {
+            selectedPackages.clear();
+            selectedPackages.addAll(initialSelected);
         }
-
         boxes.clear();
         list.removeAllViews();
         String f=filter==null?"":filter.trim().toLowerCase(Locale.ROOT);
+        int matches=0;
         int shown=0;
         for(Item item:items) {
             String hay=(item.label+" "+item.pkg).toLowerCase(Locale.ROOT);
             if(!f.isEmpty() && !hay.contains(f)) continue;
+            matches++;
+            if(shown >= visibleLimit) continue;
 
             CheckBox cb=new CheckBox(this);
             cb.setText((item.system?"[Sistema] ":"")+item.label+"\n"+item.pkg);
             cb.setTextColor(TEXT);
             cb.setTextSize(14);
             cb.setPadding(dp(14),dp(10),dp(10),dp(10));
-            cb.setChecked(current.contains(item.pkg));
+            cb.setChecked(selectedPackages.contains(item.pkg));
             cb.setBackground(bg(CARD,BORDER,14));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
             lp.setMargins(0,0,0,dp(8));
             cb.setLayoutParams(lp);
+            cb.setOnCheckedChangeListener((button, checked) -> {
+                if (checked) selectedPackages.add(item.pkg);
+                else selectedPackages.remove(item.pkg);
+                countText.setText(selectedPackages.size()
+                        + " selecionado(s) • seleções mantidas ao pesquisar");
+            });
             boxes.put(item.pkg,cb);
             list.addView(cb);
             shown++;
         }
-        int selected=current.size();
-        countText.setText(shown+" apps exibidos • "+selected+" selecionado(s)");
+        if (matches > shown) {
+            Button more = new Button(this);
+            more.setAllCaps(false);
+            more.setText(UiLanguage.tr(prefs, "Mostrar mais aplicativos")
+                    + " (" + (matches - shown) + ")");
+            more.setOnClickListener(v -> {
+                visibleLimit += PAGE_SIZE;
+                rebuildList(filter, null);
+            });
+            list.addView(more);
+        }
+        countText.setText(shown+" de "+matches+" apps exibidos • "
+                +selectedPackages.size()+" selecionado(s)");
     }
 }

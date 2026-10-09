@@ -33,6 +33,17 @@ final class AdaptivePreloadController {
                   float batteryTemperatureC, boolean interactive, boolean charging,
                   int batteryPct, boolean automaticMode, float powerW) {
         long now = System.currentTimeMillis();
+        // Full edition also must not warm APKs during fast charging.
+        boolean unsafeTemperature = batteryTemperatureC >= 38.0f
+                || (temperatureC > 0f && temperatureC >= 55f);
+        if (charging || unsafeTemperature) {
+            String status = charging ? "Pré-carga pausada durante a carga"
+                    : "Pré-carga pausada: aparelho aquecido";
+            if (!prefs.getString("auto_preload_status", "").equals(status))
+                prefs.edit().putString("auto_preload_status", status)
+                        .putBoolean("auto_preload_monitor_pending", false).apply();
+            return;
+        }
         if (BuildConfig.CONSERVATIVE_MODE
                 && prefs.getBoolean("auto_preload_monitor_pending", false)) {
             boolean sameScreenState = prefs.getBoolean("auto_preload_monitor_interactive", interactive)
@@ -61,6 +72,22 @@ final class AdaptivePreloadController {
                         .apply();
                 return;
             }
+        }
+        if (AdaptiveBrainV2.avoidOptionalPreload(prefs)) {
+            String reason=prefs.getString("v2_preload_skip_reason","");
+            String status="Pré-carga adiada pelo Adaptive Brain 2"
+                    + (reason.isEmpty()?"":": "+reason);
+            if(!status.equals(prefs.getString("auto_preload_status","")))
+                prefs.edit().putString("auto_preload_status",status).apply();
+            return;
+        }
+        if (PersonalUsageML.avoidPreload(prefs)
+                && System.currentTimeMillis() - prefs.getLong("ml_last_training_at",0L) <= 20L * 60L * 1000L) {
+            if (!"Pré-carga pausada: previsão de uso/temperatura".equals(
+                    prefs.getString("auto_preload_status", "")))
+                prefs.edit().putString("auto_preload_status",
+                        "Pré-carga pausada: previsão de uso/temperatura").apply();
+            return;
         }
         if (!prefs.getBoolean("auto_preload_enabled", true)) {
             if (!prefs.getString("auto_preload_status", "").startsWith("Pré-carga desativada")) {
@@ -92,6 +119,15 @@ final class AdaptivePreloadController {
         }
 
         List<String> apps = mostUsedApps(now);
+        // Do not warm a new or unknown package: merely prioritize a transition
+        // prediction IF the candidate is already in the 15-minute safe shortlist.
+        if (automaticMode && prefs.getBoolean("v2_next_app_enabled",true)
+                && !RoutineProfileClassifier.neverWarm(prefs.getString("v2_routine",""))
+                && prefs.getInt("ml_training_samples",0)>=48) {
+            String predicted=prefs.getString("v2_next_app","");
+            if(!predicted.isEmpty() && apps.remove(predicted))
+                apps.add(0,predicted);
+        }
         if (apps.isEmpty()) {
             setStatus("Nenhum app elegível usado nos últimos 15 minutos", 0, now);
             return;

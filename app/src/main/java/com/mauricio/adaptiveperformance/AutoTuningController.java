@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 /** Tests reversible options sequentially using the 2-minute A/B safety engine. */
 final class AutoTuningController {
     private final SharedPreferences prefs;
-    AutoTuningController(Context context, SharedPreferences prefs) { this.prefs = prefs; }
+    AutoTuningController(SharedPreferences prefs) { this.prefs = prefs; }
 
     void evaluate(int batteryPct, float tempC, double cpuLoad, double freeRamPct,
                   boolean interactive, boolean charging, float powerW) {

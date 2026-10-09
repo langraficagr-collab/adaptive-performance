@@ -40,9 +40,9 @@ final class AdaptiveBrainV2 {
     }
 
     /** At most once per 60 seconds, on the existing OptimizationService worker. */
-    void observe(boolean screen, boolean charging, int level,
+    void observe(boolean screen, boolean charging,
                  float batteryTemp, float skin, float soc,
-                 double cpu, double freeRam, String fg, boolean nativeRisk) {
+                 double freeRam, String fg, boolean nativeRisk) {
         if (!prefs.getBoolean("v2_enabled",true)) return;
         int resetNow=prefs.getInt("v2_reset_token",0);
         if(resetNow!=resetSeen) {

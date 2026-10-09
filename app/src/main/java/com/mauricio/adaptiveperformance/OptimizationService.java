@@ -165,7 +165,7 @@ public class OptimizationService extends Service {
             extendedController = new ExtendedDiagnosticsController(OptimizationService.this, prefs, privileged);
             thermalBrightnessController = new ThermalBrightnessController(OptimizationService.this, prefs, privileged);
             systemBatteryController = new SystemBatteryController(OptimizationService.this, prefs, privileged);
-            autoTuningController = new AutoTuningController(OptimizationService.this, prefs);
+            autoTuningController = new AutoTuningController(prefs);
             adaptivePreloadController = new AdaptivePreloadController(OptimizationService.this, prefs);
             storageHealthController = new StorageHealthController(OptimizationService.this, prefs, privileged);
             final SystemBatteryController initBattery = systemBatteryController;
@@ -444,8 +444,8 @@ public class OptimizationService extends Service {
         }
         if (adaptiveBrainV2!=null) {
             try {
-                adaptiveBrainV2.observe(interactive,chargingNow,smartBatteryPct,tempC,
-                        thermals.skin,thermals.soc,cpuLoad,availPct,fg,nativeThermalRisk);
+                adaptiveBrainV2.observe(interactive,chargingNow,tempC,
+                        thermals.skin,thermals.soc,availPct,fg,nativeThermalRisk);
             } catch (RuntimeException error) {
                 prefs.edit().putString("v2_error",error.getClass().getSimpleName()).apply();
             }
@@ -473,7 +473,7 @@ public class OptimizationService extends Service {
         if (systemBatteryController != null) {
             try {
                 systemBattery = systemBatteryController.evaluate(
-                        interactive, chargingNow, thermals.soc, tempC, cpuLoad, fg);
+                        interactive, chargingNow, thermals.soc, tempC, cpuLoad);
                 if (!interactive && systemBattery.suggestedLoopMs > 0L) {
                     nextLoopDelayMs = Math.max(nextLoopDelayMs, systemBattery.suggestedLoopMs);
                 }
@@ -555,10 +555,9 @@ public class OptimizationService extends Service {
                 extended = extendedController.update(
                         fg, controlTemp, tempC,
                         advanced != null ? advanced.tempTrendCPerMin : 0f,
-                        cpuLoad, availPct,
+                        cpuLoad,
                         advanced != null ? advanced.powerW : -1f,
                         thermalLevelApplied,
-                        advanced != null ? advanced.pressureScore : 0,
                         ht, hm, hc, hi, hb, hu, lmk, jank, interactive);
                 if (!extended.safeMode && health != null && health.antiStallLevel == 0 &&
                         extended.activityProfile != null && !"Uso leve".equals(extended.activityProfile)) {
@@ -574,9 +573,8 @@ public class OptimizationService extends Service {
                 && extendedBusy.compareAndSet(false, true)) {
             final ExtendedDiagnosticsController ec = extendedController;
             final String extendedFg = fg;
-            final boolean extendedInteractive = interactive;
-            extendedExecutor.execute(() -> {
-                try { ec.maybeRunDiagnostics(extendedFg, extendedInteractive); }
+                        extendedExecutor.execute(() -> {
+                try { ec.maybeRunDiagnostics(extendedFg); }
                 catch (Throwable ignored) {}
                 finally { extendedBusy.set(false); }
             });
@@ -610,8 +608,8 @@ public class OptimizationService extends Service {
         if (!BuildConfig.LEAN_MODE && "auto".equals(prefs.getString("user_mode", "auto")))
             ExperimentContext.sample(this, prefs, fg, interactive);
         try {
-            AutoUserModeController.evaluate(prefs, smartBatteryPct, tempC, cpuLoad, availPct,
-                    interactive, chargingNow, advanced != null ? advanced.powerW : -1f);
+            AutoUserModeController.evaluate(prefs, smartBatteryPct, tempC, cpuLoad,
+                    chargingNow, advanced != null ? advanced.powerW : -1f);
         } catch (Throwable t) {
             prefs.edit().putString("auto_user_error",
                     t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
@@ -695,7 +693,7 @@ public class OptimizationService extends Service {
                 && prefs.getBoolean("signal_optimizer_changed", false);
         if (!automaticConservation || signalTestActive || signalDisabledNeedsRestore) {
             try {
-                CellularSignalOptimizer.evaluate(this, prefs, privileged);
+                CellularSignalOptimizer.evaluate(prefs, privileged);
             } catch (Throwable ignored) {}
         }
         try {

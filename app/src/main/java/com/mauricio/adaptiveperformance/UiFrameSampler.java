@@ -32,7 +32,8 @@ final class UiFrameSampler {
         frames=slow=dropped=0;duration=0L;stopPosted=false;
         startElapsed=SystemClock.elapsedRealtime();
         listener=(window, metrics, droppedFrames)-> {
-            if(!listening)return;
+            // Ignore callbacks from a window other than the sampled activity.
+            if(!listening || window != activity.getWindow()) return;
             long ns=metrics.getMetric(FrameMetrics.TOTAL_DURATION);
             if(ns>0 && ns<2_000_000_000L) {
                 frames++;

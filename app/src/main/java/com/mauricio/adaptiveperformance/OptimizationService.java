@@ -118,12 +118,20 @@ public class OptimizationService extends Service {
             } else if (Intent.ACTION_SCREEN_ON.equals(action) || Intent.ACTION_USER_PRESENT.equals(action)) {
                 prefs.edit().putLong("storage_idle_since", 0L).apply();
             }
+            if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                // Let Android enter deep sleep.  Do not immediately run a shell
+                // polling cycle just because the display went dark.
+                handler.removeCallbacks(loop);
+                nextLoopDelayMs = 600_000L;
+                handler.postDelayed(loop, 600_000L);
+                return;
+            }
             if (wake) {
                 prefs.edit()
                         .putBoolean("system_deep_idle_active", false)
                         .putBoolean("shizuku_suspended_deep_idle", false)
                         .apply();
-                nextLoopDelayMs = 5_000L;
+                nextLoopDelayMs = 60_000L;
                 lastShizukuBindAttemptElapsed = 0L;
                 bindShizukuIfPossible();
             }
@@ -306,8 +314,15 @@ public class OptimizationService extends Service {
                         long fallback = (pm != null && pm.isInteractive()) ? 60_000L : 300_000L;
                         long delay = nextLoopDelayMs >= 3_000L && nextLoopDelayMs <= 900_000L
                                 ? nextLoopDelayMs : fallback;
-                        if ("testing".equals(prefs.getString("signal_optimizer_phase", "idle")))
+                        if ("testing".equals(prefs.getString("signal_optimizer_phase", "idle"))
+                                && pm != null && pm.isInteractive())
                             delay = Math.min(delay, 10_000L);
+                        // No periodic 10/30-second probes during screen-off.
+                        // Genuine Android battery/thermal protection continues
+                        // independently of this application's shell polling.
+                        if (pm != null && !pm.isInteractive()) {
+                            delay = Math.max(delay, 600_000L);
+                        }
                         handler.postDelayed(loop, delay);
                     }
                 }
@@ -430,7 +445,9 @@ public class OptimizationService extends Service {
         boolean automaticConservation = lowBatteryAutomatic || thermalSavingAutomatic;
         // Fast charging already creates heat; do not add shell scans, package scans,
         // diagnostics or APK warmups until unplugged. Native thermal readings remain.
-        boolean lowImpactMode = chargingNow || hotHardware;
+        // Pausing nonessential work when the display is off is more effective
+        // than repeatedly waking up to try to save power.
+        boolean lowImpactMode = !interactive || chargingNow || hotHardware;
         // Supervised lightweight on-device ML; no network, root or new timers.
         // It learns patterns, but cannot bypass existing battery/thermal guards.
         if (personalUsageML != null &&
@@ -893,7 +910,7 @@ public class OptimizationService extends Service {
                 nextLoopDelayMs = Math.max(nextLoopDelayMs, interactive ? 60_000L : 300_000L);
             }
         }
-        if (!BuildConfig.LEAN_MODE && !lowImpactMode
+        if (interactive && !BuildConfig.LEAN_MODE && !lowImpactMode
                 && "auto".equals(prefs.getString("user_mode", "auto"))
                 && !"probation".equals(prefs.getString("conservative_tune_stage", "baseline"))
                 && prefs.getInt("conservative_tune_phase", 0) < 26
@@ -910,11 +927,13 @@ public class OptimizationService extends Service {
         if (budgetDelay > 0L) nextLoopDelayMs = Math.max(nextLoopDelayMs, budgetDelay);
         if (lowImpactMode) {
             nextLoopDelayMs = Math.max(nextLoopDelayMs,
-                    emergency ? 60000L : (interactive ? 120000L : 300000L));
+                    !interactive ? 600_000L : (emergency ? 60_000L : 120_000L));
             // Genuine thermal API and low-overhead battery broadcast remain active.
-            String reason = chargingNow
+            String reason = !interactive
+                    ? "Tela apagada: tarefas pesadas pausadas até desbloquear"
+                    : (chargingNow
                     ? "Carregando: manutenção, diagnósticos e pré-carga pausados"
-                    : "Aparelho quente mesmo fora da carga: varreduras e pré-carga pausadas";
+                    : "Aparelho quente: varreduras e pré-carga pausadas");
             prefs.edit().putBoolean("charging_low_impact_monitor", true)
                     .putBoolean("hot_hardware_guard", hotHardware)
                     .putString("charging_low_impact_note", reason)

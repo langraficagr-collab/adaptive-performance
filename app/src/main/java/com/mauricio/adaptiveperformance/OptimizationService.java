@@ -88,6 +88,8 @@ public class OptimizationService extends Service {
     private PersonalUsageML personalUsageML;
     private AdaptiveBrainV2 adaptiveBrainV2;
     private long lastEventPollMs = 0L;
+    // A screen-on event must survive a currently running sampling cycle.
+    private final AtomicBoolean screenWakeSamplePending = new AtomicBoolean(false);
     private final AppCostGuard appCostGuard = new AppCostGuard();
     private final ExecutorService maintenanceExecutor = idleSingleExecutor("maintenance");
     private final AtomicBoolean maintenanceBusy = new AtomicBoolean(false);
@@ -118,14 +120,31 @@ public class OptimizationService extends Service {
             } else if (Intent.ACTION_SCREEN_ON.equals(action) || Intent.ACTION_USER_PRESENT.equals(action)) {
                 prefs.edit().putLong("storage_idle_since", 0L).apply();
             }
+            if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                // Let Android enter deep sleep.  Do not immediately run a shell
+                // polling cycle just because the display went dark.
+                screenWakeSamplePending.set(false);
+                handler.removeCallbacks(loop);
+                nextLoopDelayMs = 600_000L;
+                handler.postDelayed(loop, 600_000L);
+                return;
+            }
             if (wake) {
                 prefs.edit()
                         .putBoolean("system_deep_idle_active", false)
                         .putBoolean("shizuku_suspended_deep_idle", false)
                         .apply();
-                nextLoopDelayMs = 5_000L;
+                nextLoopDelayMs = 60_000L;
                 lastShizukuBindAttemptElapsed = 0L;
                 bindShizukuIfPossible();
+                if (Intent.ACTION_SCREEN_ON.equals(action)
+                        || Intent.ACTION_USER_PRESENT.equals(action)) {
+                    // Do not let the event debounce hold a stale 10-minute timer.
+                    screenWakeSamplePending.set(true);
+                    handler.removeCallbacks(loop);
+                    handler.post(loop);
+                    return;
+                }
             }
             requestEventSample();
         }
@@ -292,6 +311,7 @@ public class OptimizationService extends Service {
 
             // Never overlap cycles. The active worker will schedule the next one.
             if (!sampleBusy.compareAndSet(false, true)) return;
+            screenWakeSamplePending.set(false);
 
             sampleExecutor.execute(() -> {
                 try {
@@ -301,15 +321,34 @@ public class OptimizationService extends Service {
                             t.getClass().getSimpleName()+": "+t.getMessage()).apply();
                 } finally {
                     sampleBusy.set(false);
-                    if (!serviceDestroyed && prefs.getBoolean("master", true)) {
+                    // All scheduling is serialized on the handler thread, alongside
+                    // SCREEN_ON/OFF broadcasts, so stale callbacks cannot multiply.
+                    handler.post(() -> {
+                    if (serviceDestroyed || !prefs.getBoolean("master", true)
+                            || sampleBusy.get()) return;
+                    if (screenWakeSamplePending.getAndSet(false)) {
+                        handler.removeCallbacks(loop);
+                        handler.post(loop);
+                        return;
+                    }
+                    {
                         PowerManager pm = (PowerManager)getSystemService(POWER_SERVICE);
                         long fallback = (pm != null && pm.isInteractive()) ? 60_000L : 300_000L;
                         long delay = nextLoopDelayMs >= 3_000L && nextLoopDelayMs <= 900_000L
                                 ? nextLoopDelayMs : fallback;
-                        if ("testing".equals(prefs.getString("signal_optimizer_phase", "idle")))
+                        if ("testing".equals(prefs.getString("signal_optimizer_phase", "idle"))
+                                && pm != null && pm.isInteractive())
                             delay = Math.min(delay, 10_000L);
+                        // No periodic 10/30-second probes during screen-off.
+                        // Genuine Android battery/thermal protection continues
+                        // independently of this application's shell polling.
+                        if (pm != null && !pm.isInteractive()) {
+                            delay = Math.max(delay, 600_000L);
+                        }
+                        handler.removeCallbacks(loop);
                         handler.postDelayed(loop, delay);
                     }
+                    });
                 }
             });
         }
@@ -430,7 +469,9 @@ public class OptimizationService extends Service {
         boolean automaticConservation = lowBatteryAutomatic || thermalSavingAutomatic;
         // Fast charging already creates heat; do not add shell scans, package scans,
         // diagnostics or APK warmups until unplugged. Native thermal readings remain.
-        boolean lowImpactMode = chargingNow || hotHardware;
+        // Pausing nonessential work when the display is off is more effective
+        // than repeatedly waking up to try to save power.
+        boolean lowImpactMode = !interactive || chargingNow || hotHardware;
         // Supervised lightweight on-device ML; no network, root or new timers.
         // It learns patterns, but cannot bypass existing battery/thermal guards.
         if (personalUsageML != null &&
@@ -893,7 +934,7 @@ public class OptimizationService extends Service {
                 nextLoopDelayMs = Math.max(nextLoopDelayMs, interactive ? 60_000L : 300_000L);
             }
         }
-        if (!BuildConfig.LEAN_MODE && !lowImpactMode
+        if (interactive && !BuildConfig.LEAN_MODE && !lowImpactMode
                 && "auto".equals(prefs.getString("user_mode", "auto"))
                 && !"probation".equals(prefs.getString("conservative_tune_stage", "baseline"))
                 && prefs.getInt("conservative_tune_phase", 0) < 26
@@ -910,11 +951,13 @@ public class OptimizationService extends Service {
         if (budgetDelay > 0L) nextLoopDelayMs = Math.max(nextLoopDelayMs, budgetDelay);
         if (lowImpactMode) {
             nextLoopDelayMs = Math.max(nextLoopDelayMs,
-                    emergency ? 60000L : (interactive ? 120000L : 300000L));
+                    !interactive ? 600_000L : (emergency ? 60_000L : 120_000L));
             // Genuine thermal API and low-overhead battery broadcast remain active.
-            String reason = chargingNow
+            String reason = !interactive
+                    ? "Tela apagada: tarefas pesadas pausadas até desbloquear"
+                    : (chargingNow
                     ? "Carregando: manutenção, diagnósticos e pré-carga pausados"
-                    : "Aparelho quente mesmo fora da carga: varreduras e pré-carga pausadas";
+                    : "Aparelho quente: varreduras e pré-carga pausadas");
             prefs.edit().putBoolean("charging_low_impact_monitor", true)
                     .putBoolean("hot_hardware_guard", hotHardware)
                     .putString("charging_low_impact_note", reason)

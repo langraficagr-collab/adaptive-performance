@@ -20,6 +20,20 @@ public final class BrainV2Harness {
         check(bounded.length() <= 6500, "serialized model must be bounded");
         check(UsageTransitionModel.parse(bounded).edgeCount()>0,
                 "bounded serialized model must remain readable");
+        // Oversized early entries must not hide small, more recent transitions.
+        // The model holds at most 32 edges, so this builds 27 very long edges,
+        // followed by a small, valid transition that must survive serialization.
+        UsageTransitionModel mixed = new UsageTransitionModel();
+        String largePrefix = "com.app." + "x".repeat(132);
+        for(int i=0;i<27;i++) mixed.observe(largePrefix + (char)('A'+i));
+        mixed.observe("com.short.left");
+        mixed.observe("com.short.right");
+        String mixedEncoded=mixed.serialize();
+        check(mixedEncoded.length()<=6500,"mixed model must remain bounded");
+        check(mixedEncoded.contains("com.short.left>com.short.right:1;"),
+                "late short edge must not be lost behind an oversized entry");
+        check(UsageTransitionModel.parse(mixedEncoded).edgeCount()>0,
+                "mixed model must deserialize correctly");
         check(RoutineProfileClassifier.neverWarm(
                 RoutineProfileClassifier.classify(true,"com.google.android.apps.maps",false)),
                 "navigation must be preserved");

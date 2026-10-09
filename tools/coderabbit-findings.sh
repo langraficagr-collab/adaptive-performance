@@ -9,8 +9,8 @@ if [[ ! "$pr" =~ ^[1-9][0-9]*$ ]]; then
 fi
 echo "CodeRabbit | ${repo} | PR #${pr}"
 echo "--- Revisões ---"
-gh api --paginate "repos/${repo}/pulls/${pr}/reviews?per_page=100" --jq '.[] | select(.user.login | ascii_downcase | contains("coderabbit")) | "[\(.state)] \(.user.login): \(.body // "")"'
+gh api --paginate "repos/${repo}/pulls/${pr}/reviews?per_page=100" --jq '.[] | select(.user.login == "coderabbitai[bot]") | "[\(.state)] \(.user.login): \(.body // "")"'
 echo "--- Anotações em linhas de código ---"
-gh api --paginate "repos/${repo}/pulls/${pr}/comments?per_page=100" --jq '.[] | select(.user.login | ascii_downcase | contains("coderabbit")) | "\(.path):\(.line // .original_line // 0) [\(.user.login)] \(.body // "")"'
+gh api --paginate "repos/${repo}/pulls/${pr}/comments?per_page=100" --jq '.[] | select(.user.login == "coderabbitai[bot]") | "\(.path):\(.line // .original_line // 0) [\(.user.login)] \(.body // "")"'
 echo "--- Comentários gerais ---"
-gh api --paginate "repos/${repo}/issues/${pr}/comments?per_page=100" --jq '.[] | select(.user.login | ascii_downcase | contains("coderabbit")) | "[\(.user.login)] \(.body // "")"'
+gh api --paginate "repos/${repo}/issues/${pr}/comments?per_page=100" --jq '.[] | select(.user.login == "coderabbitai[bot]") | "[\(.user.login)] \(.body // "")"'

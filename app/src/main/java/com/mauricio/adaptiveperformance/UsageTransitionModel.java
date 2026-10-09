@@ -56,9 +56,9 @@ final class UsageTransitionModel {
         b.append('|');
         for (Map.Entry<String,Integer> e:edges.entrySet()) {
             // Never serialize a model larger than parse() can restore.
-            // Truncate at a complete edge boundary, not in the middle of an entry.
+            // Skip an oversized edge so smaller subsequent edges can still persist.
             String next = e.getKey() + ':' + e.getValue() + ';';
-            if (b.length() + next.length() > 6500) break;
+            if (b.length() + next.length() > 6500) continue;
             b.append(next);
         }
         return b.toString();

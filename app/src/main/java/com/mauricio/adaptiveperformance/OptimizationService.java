@@ -641,6 +641,7 @@ public class OptimizationService extends Service {
         }
         final int adaptivePressureScore = effectivePressure;
         prefs.edit().putFloat("thermal_soc_c", thermals.soc).apply();
+        CapabilityPolicy.reconcile(prefs, privileged);
         if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
@@ -716,6 +717,7 @@ public class OptimizationService extends Service {
                 finally { memoryTrimBusy.set(false); }
             });
         }
+        CapabilityPolicy.reconcile(prefs, privileged);
         if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             if (adaptivePreloadController != null) {
@@ -1148,33 +1150,20 @@ public class OptimizationService extends Service {
     }
 
     private void setThermalLevel(int level) {
-        try {
-            if (level < 1 || level > 5) return;
-            if (thermalLevelApplied == level) return;
-            privileged.exec("cmd thermalservice override-status " + level);
-            thermalLevelApplied = level;
-            prefs.edit()
-                    .putInt("thermal_level", level)
-                    .putBoolean("thermal_stage1", level == 1)
-                    .apply();
-            String msg = level == 5 ? "Thermal nível 5 (emergência) ativado." :
-                    "Thermal nível " + level + " ativado.";
-            ChangeNotifier.notifyChange(this, "Proteção térmica alterada", msg, 1);
-        } catch (Throwable ignored) {}
+        // ThermalService override-status only spoofs Android's thermal status.
+        // It does not tune OEM power/clock limits and can interfere with safety.
+        thermalLevelApplied = 0;
+        prefs.edit().putInt("thermal_level", 0)
+                .putBoolean("thermal_stage1", false)
+                .putString("thermal_action_status",
+                        "Monitor térmico ativo; override inseguro desabilitado").apply();
     }
 
     private void resetThermalOverride() {
-        try {
-            if (thermalLevelApplied == 0) return;
-            privileged.exec("cmd thermalservice reset");
-            thermalLevelApplied = 0;
-            prefs.edit()
-                    .putInt("thermal_level", 0)
-                    .putBoolean("thermal_stage1", false)
-                    .apply();
-            ChangeNotifier.notifyChange(this, "Temperatura normalizada",
-                    "Override térmico removido; controle normal restaurado.", 1);
-        } catch (Throwable ignored) {}
+        // A pre-existing override is cleared once in the startup migration.
+        thermalLevelApplied = 0;
+        prefs.edit().putInt("thermal_level", 0)
+                .putBoolean("thermal_stage1", false).apply();
     }
 
     private void apply60Hz() {
@@ -1489,7 +1478,7 @@ public class OptimizationService extends Service {
         long before = dataFreeKb();
         ArrayList<String> done = new ArrayList<>();
         if (cache) {
-            privileged.exec("pm trim-caches 256G 2>/dev/null; true");
+            CachePolicy.manualTrim(privileged);
             done.add("cache de apps");
         }
         if (thumbs) {
@@ -1528,7 +1517,7 @@ public class OptimizationService extends Service {
         }
         if (dexCache) {
             // Solicita apenas a limpeza suportada pelo Package Manager; não remove APK/dados do usuário.
-            privileged.exec("pm trim-caches 512G 2>/dev/null; true");
+            CachePolicy.manualTrim(privileged);
             done.add("caches temporários do Android");
         }
         try { Thread.sleep(700L); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }

@@ -482,105 +482,29 @@ public final class AdvancedAdaptiveController {
     }
 
     private void maybeCompactMemory(double ramFreePct, float controlTemp, float batteryTemp, long now) {
-        if (!prefs.getBoolean("memory_compaction_enabled", true)) return;
-        if (prefs.getBoolean("diagnostic_only", false)) return;
-        if (ramFreePct <= 0) return;
-
-        int threshold = prefs.getInt("memory_compaction_threshold_pct", 50);
-        threshold = Math.max(50, Math.min(95, threshold));
-
-        String zramProfile = prefs.getString("zram_profile", "normal");
-        String effectiveProfile = zramProfile;
-        long compactionCooldown;
-
-        if ("auto".equals(zramProfile)) {
-            // No automático o ciclo é fixo em 30→50% e protegido pela temperatura.
-            threshold = 50;
-            float hottest = Math.max(controlTemp, batteryTemp);
-
-            if (autoMemoryThermalPaused) {
-                if (hottest <= 36.0f) {
-                    autoMemoryThermalPaused = false;
-                } else {
-                    prefs.edit()
-                            .putBoolean("auto_memory_thermal_paused", true)
-                            .putString("auto_memory_effective_profile", "pausado")
-                            .putFloat("auto_memory_temperature_c", hottest)
-                            .apply();
-                    return;
-                }
-            }
-            if (hottest >= 40.0f) {
-                autoMemoryThermalPaused = true;
-                prefs.edit()
-                        .putBoolean("auto_memory_thermal_paused", true)
-                        .putString("auto_memory_effective_profile", "pausado")
-                        .putFloat("auto_memory_temperature_c", hottest)
-                        .apply();
-                return;
-            }
-
-            // RAM muito baixa = máxima compactação; conforme recupera RAM, reduz a agressividade.
-            if (ramFreePct <= 30.0) effectiveProfile = "extreme";
-            else if (ramFreePct <= 40.0) effectiveProfile = "maximum";
-            else if (ramFreePct <= 50.0) effectiveProfile = "normal";
-            else return;
-
-            // Ao esquentar, desce um nível antes de precisar pausar completamente.
-            if (hottest >= 38.0f) {
-                if ("extreme".equals(effectiveProfile)) effectiveProfile = "maximum";
-                else if ("maximum".equals(effectiveProfile)) effectiveProfile = "normal";
-                else return;
-            }
-            compactionCooldown = "extreme".equals(effectiveProfile) ? 30_000L
-                    : ("maximum".equals(effectiveProfile) ? 45_000L : MEMORY_COMPACTION_COOLDOWN_MS);
-            prefs.edit()
-                    .putBoolean("auto_memory_thermal_paused", false)
-                    .putString("auto_memory_effective_profile", effectiveProfile)
-                    .putFloat("auto_memory_temperature_c", hottest)
-                    .apply();
-        } else {
-            compactionCooldown = "extreme".equals(zramProfile) ? 30_000L
-                    : ("maximum".equals(zramProfile) ? 45_000L : MEMORY_COMPACTION_COOLDOWN_MS);
-        }
-
-        if (ramFreePct > threshold) return;
-        if (now - lastMemoryCompactionElapsed < compactionCooldown) return;
-
+        // Android's process compaction is NOT zRAM compression. Never mutate kernel zRAM.
+        if (!prefs.getBoolean("memory_compaction_enabled", false)
+                || prefs.getBoolean("diagnostic_only", false) || privileged == null) return;
+        int threshold = Math.max(5, Math.min(35, prefs.getInt("memory_compaction_threshold_pct", 15)));
+        if (ramFreePct <= 0 || ramFreePct > threshold || controlTemp >= 38f
+                || batteryTemp >= 38f || prefs.getBoolean("zram_thrashing", false)) return;
+        // Avoid repeated compaction/re-fault loops that cost battery.
+        if (now - lastMemoryCompactionElapsed < 30L * 60L * 1000L) return;
         lastMemoryCompactionElapsed = now;
         try {
             String output = privileged.exec("cmd activity compact system 2>&1");
-            String normalized = output == null ? "" : output.replaceAll("\s+", " ").trim();
-            if (normalized.length() > 240) normalized = normalized.substring(0, 240);
-            boolean ok = normalized.contains("Finished system compaction")
-                    && !normalized.toLowerCase(Locale.US).contains("error");
-            String result = ok ? "ok" : (normalized.isEmpty() ? "sem retorno" : normalized);
-
-            prefs.edit()
-                    .putInt("memory_compaction_threshold_pct", threshold)
-                    .putFloat("memory_compaction_last_free_pct", (float) ramFreePct)
+            boolean ok = output != null && output.contains("Finished system compaction")
+                    && !output.toLowerCase(Locale.US).contains("error");
+            prefs.edit().putInt("memory_compaction_threshold_pct", threshold)
                     .putLong("memory_compaction_last_at", System.currentTimeMillis())
+                    .putFloat("memory_compaction_last_free_pct", (float)ramFreePct)
+                    .putString("memory_compaction_last_result", ok ? "ok" : "rejected")
                     .putInt("memory_compaction_count",
-                            prefs.getInt("memory_compaction_count", 0) + (ok ? 1 : 0))
-                    .putString("memory_compaction_last_result", result)
-                    .apply();
-
-            String msg = String.format(Locale.US,
-                    "Compactação de RAM [%s] em %d%%: %s (RAM livre %.1f%%)",
-                    effectiveProfile, threshold, ok ? "concluída" : "falhou", ramFreePct);
-            log(msg);
-            if (ok) {
-                ChangeNotifier.notifyChange(context, "Compactação de RAM", msg, 4);
-            } else {
-                ChangeNotifier.notifyUnresolved(context, "Compactação de RAM", msg, 4);
-            }
-        } catch (Throwable t) {
-            prefs.edit()
-                    .putLong("memory_compaction_last_at", System.currentTimeMillis())
-                    .putString("memory_compaction_last_result",
-                            t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()))
-                    .apply();
-            log("Compactação de RAM falhou: " + t.getClass().getSimpleName());
+                        prefs.getInt("memory_compaction_count", 0) + (ok ? 1 : 0)).apply();
+            if (!ok) prefs.edit().putBoolean("memory_compaction_enabled", false).apply();
+        } catch (Throwable ignored) {
+            prefs.edit().putBoolean("memory_compaction_enabled", false)
+                    .putString("memory_compaction_last_result", "not_supported").apply();
         }
     }
 

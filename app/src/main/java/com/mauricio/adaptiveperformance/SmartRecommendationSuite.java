@@ -99,18 +99,12 @@ public final class SmartRecommendationSuite {
         }
         if(n>0)p.edit().putInt("adaptive_freeze_last_count",n).putLong("adaptive_freeze_last_at",System.currentTimeMillis()).apply();
     }
-    private static void autoCleanup(SharedPreferences p,IPrivilegedService s,boolean interactive)throws Exception{
-        if(!p.getBoolean("smart_auto_cleanup",false)||interactive)return;
-        long now=System.currentTimeMillis(),last=p.getLong("smart_auto_cleanup_last",0);
-        if(now-last<6*3600000L)return;
-        String df=s.exec("df -k /data 2>/dev/null | tail -1");
-        Matcher m=Pattern.compile("\\s(\\d+)%\\s").matcher(df==null?"":df);
-        int used=m.find()?Integer.parseInt(m.group(1)):0;
-        int free=100-used, threshold=Math.max(5,Math.min(30,p.getInt("smart_cleanup_free_pct",15)));
-        if(free>0&&free<=threshold){
-            s.exec("pm trim-caches 256G 2>/dev/null; true");
-            p.edit().putLong("smart_auto_cleanup_last",now).putInt("smart_auto_cleanup_free_pct_last",free).apply();
-        }
+    private static void autoCleanup(SharedPreferences p,IPrivilegedService s,boolean interactive) {
+        // Automatic trim-caches with 256G caused repeated cache regeneration and I/O.
+        // Keep cache under Android's ownership; manual capped cleanup only.
+        if (p.getBoolean("smart_auto_cleanup", false))
+            p.edit().putBoolean("smart_auto_cleanup", false)
+                .putString("smart_cleanup_status", "Limpeza automática de cache removida: custo energético").apply();
     }
     private static void economyDashboard(SharedPreferences p,int battery,float temp,int pressure){
         String level=p.getBoolean("zram_thrashing",false)?"Proteção ZRAM":

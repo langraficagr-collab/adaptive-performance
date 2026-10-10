@@ -103,8 +103,7 @@ final class StorageHealthController {
 
             if (veryLowFree) {
                 int targetGb = (int)Math.max(4L, (totalKb * 12L / 100L + 1048575L) / 1048576L);
-                exec("pm trim-caches " + targetGb + "G 2>/dev/null; true");
-                action += " • cache temporário reduzido por pouco espaço";
+                action += " • cache preservado; limpeza somente manual";
             }
         } else if (maintenanceNeeded && interactive) {
             action = "Manutenção pendente; aguardando tela desligada";

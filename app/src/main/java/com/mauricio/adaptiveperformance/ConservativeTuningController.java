@@ -42,7 +42,7 @@ final class ConservativeTuningController {
     private static final long WINDOW_MS = 2L * 60L * 1000L;
     private static final long MAX_WINDOW_MS = 8L * 60L * 1000L;
     private static final long CYCLE_COOLDOWN_MS = 24L * 60L * 60L * 1000L;
-    private static final int MIN_SAMPLES = 3;
+    private static final int MIN_SAMPLES = 4;
     private static final long REVIEW_6H = 21600000L, CONFIRM_24H = 86400000L;
     private static final long PROBATION_INTERVAL = 1800000L;
 
@@ -100,6 +100,18 @@ final class ConservativeTuningController {
         }
 
         String stage = prefs.getString(P + "stage", "baseline");
+        String option = OPTIONS[phase][0];
+        if (!CapabilityPolicy.optionSupported(prefs, option)) {
+            if ("trial".equals(stage) || "probation".equals(stage)) restoreSnapshot(prefs);
+            advance(prefs, phase, now, "Ignorado " + phaseName(phase)
+                    + ": sem permissão efetiva ou sem ganho energético verificável");
+            return;
+        }
+        // Previous failures raise the minimum evidence before trying this feature again.
+        if ("baseline".equals(stage) && now < prefs.getLong(P + "retry_after_" + option, 0L)) {
+            advance(prefs, phase, now, "Ignorado " + phaseName(phase) + ": regressão anterior");
+            return;
+        }
         String environment = prefs.getString("experiment_context", "");
         String windowEnv = prefs.getString(P + "window_environment", "");
         if ("trial".equals(stage) && !environment.isEmpty()
@@ -318,7 +330,7 @@ final class ConservativeTuningController {
                 return;
             }
             boolean confirmed = n >= 8 && basePower > 0f
-                    && p.getFloat(P + "probation_power", 0) / n <= basePower * .98f
+                    && p.getFloat(P + "probation_power", 0) / n <= basePower * .93f
                     && p.getBoolean(P + "probation_6h_ok", false);
             if (confirmed) {
                 float savingPct = Math.max(0f, 100f * (basePower
@@ -398,9 +410,8 @@ final class ConservativeTuningController {
         }
         if (base.avgPower > 0f && test.avgPower > 0f) {
             if (test.avgPower > base.avgPower * 1.02f) return "CONSUMO";
-            if (test.avgPower <= base.avgPower * 0.95f) return "MELHORA";
-            if (test.avgCpu <= base.avgCpu * 0.90f && test.avgCpu <= base.avgCpu - 3f) return "MELHORA";
-            if (test.avgRam >= base.avgRam + 4f) return "MELHORA";
+            // CPU/RAM changes are safety signals, never evidence of battery saving.
+            if (test.avgPower <= base.avgPower * 0.93f) return "MELHORA";
             return "SEM_MELHORA";
         }
         if (baseDrain >= 0d && testDrain >= 0d) {
@@ -536,6 +547,23 @@ final class ConservativeTuningController {
     }
 
     private static void advance(SharedPreferences p, int phase, long now, String priorResult) {
+        String key = OPTIONS[phase][0];
+        if (priorResult != null) {
+            int n = p.getInt("ml_trials_" + key, 0);
+            SharedPreferences.Editor learning = p.edit()
+                    .putInt("ml_trials_" + key, Math.min(10000, n + 1))
+                    .putString("ml_last_verdict_" + key, priorResult);
+            if (priorResult.startsWith("Revertido")) {
+                learning.putInt("ml_reverted_" + key,
+                        Math.min(10000, p.getInt("ml_reverted_" + key, 0) + 1))
+                        .putLong(P + "retry_after_" + key, now + 24L*60L*60L*1000L);
+            }
+            if (priorResult.startsWith("Confirmado")) {
+                learning.putInt("ml_confirmed_" + key,
+                        Math.min(10000, p.getInt("ml_confirmed_" + key, 0) + 1));
+            }
+            learning.apply();
+        }
         String entry = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
                 .format(new java.util.Date(now)) + " | " + priorResult;
         String history = entry + "\n" + p.getString("auto_tune_decision_history", "");
@@ -613,7 +641,7 @@ final class ConservativeTuningController {
     }
 
     static void initialize(SharedPreferences p) {
-        if (p.getInt(P + "schema", 0) == 4) return;
+        if (p.getInt(P + "schema", 0) == 5) return;
         // Old version snapshots use numeric phases; migrate before replacing their meaning.
         if (trialActive(p) && p.getString(P + "snapshot_key", "").isEmpty()) {
             int old = p.getInt(P + "phase", 0);
@@ -626,6 +654,8 @@ final class ConservativeTuningController {
         resetSession(p);
         SharedPreferences.Editor e = p.edit();
         for (String[] option : OPTIONS) e.putBoolean(option[0], false);
+        // Keep core measurements active: removing the observer biases the A/B test.
+        e.putBoolean("advanced_adaptive", true);
         // Health/thermal/rollback protections are never experimentally disabled.
         e.putBoolean("health_guard", true).putBoolean("rollback_guard", true)
                 .putBoolean("over_optimization_guard", true).putBoolean("cause_confidence_guard", true)
@@ -642,7 +672,7 @@ final class ConservativeTuningController {
                 .putBoolean("ab_testing", false).putBoolean("crash_loop_guard", false)
                 .putBoolean("startup_diagnostics", false)
                 .putBoolean("conservative_profile_initialized", true)
-                .putString("user_mode", "auto").putInt(P + "schema", 4)
+                .putString("user_mode", "auto").putInt(P + "schema", 5)
                 .putInt(P + "option_count", PHASES)
                 .putString(P + "exclusions", "Proteções permanecem ativas. Limpeza de dados/cache, "
                     + "encerramento de processos, congelamento, compactação/ZRAM e ações sem restauração "

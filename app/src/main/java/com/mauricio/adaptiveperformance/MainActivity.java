@@ -751,40 +751,10 @@ public class MainActivity extends Activity {
 
     private void buildThermal() {
         LinearLayout c = card();
-        addSectionTitle(c,"◆","Proteção térmica","Escolha um nível travado de 1 a 5 ou use o modo automático");
-
-        HorizontalScrollView hs = new HorizontalScrollView(this);
-        hs.setHorizontalScrollBarEnabled(false);
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0,dp(14),0,dp(2));
-
-        thermalLevel1 = thermalChip("Nível 1\nTravado");
-        thermalLevel2 = thermalChip("Nível 2\nTravado");
-        thermalLevel3 = thermalChip("Nível 3\nTravado");
-        thermalLevel4 = thermalChip("Nível 4\nTravado");
-        thermalLevel5 = thermalChip("Nível 5\nEmergência");
-        thermalAuto = thermalChip("Automático\nInteligente");
-
-        thermalLevel1.setOnClickListener(v -> selectThermalMode("level1"));
-        thermalLevel2.setOnClickListener(v -> selectThermalMode("level2"));
-        thermalLevel3.setOnClickListener(v -> selectThermalMode("level3"));
-        thermalLevel4.setOnClickListener(v -> selectThermalMode("level4"));
-        thermalLevel5.setOnClickListener(v -> selectThermalMode("level5"));
-        thermalAuto.setOnClickListener(v -> selectThermalMode("auto"));
-
-        TextView[] chips = {thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto};
-        for (int i=0; i<chips.length; i++) {
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(i==5 ? 150 : 112), dp(70));
-            lp.setMargins(0,0,dp(8),0);
-            row.addView(chips[i], lp);
-        }
-        hs.addView(row);
-        c.addView(hs);
-
-        TextView warn = text("Níveis 4 e 5 são fortes; o nível 5 corresponde ao estado térmico de emergência do Android.", 12, MUTED, false);
-        warn.setPadding(dp(2),dp(10),dp(2),0);
-        c.addView(warn);
+        addSectionTitle(c, "◆", "Proteção térmica",
+                "Monitoramento real de temperatura e economia reversível de tela.");
+        c.addView(text("Controle de estados térmicos simulados removido. " +
+                "A proteção nativa do HyperOS permanece ativa.", 12, MUTED, false));
         content.addView(c);
     }
 
@@ -913,45 +883,20 @@ public class MainActivity extends Activity {
 
         refreshSwitch = actionSwitch("Reduzir a tela para 60 Hz somente com aquecimento","adaptive_refresh",true);
         cleanupSwitch = actionSwitch("Liberar processos em cache quando RAM livre < 7%","critical_cleanup",true);
-        memoryCompactionSwitch = actionSwitch("Compactação automática de RAM", "memory_compaction_enabled", true);
+        memoryCompactionSwitch = actionSwitch("Compactação do Android (somente com pressão de RAM)", "memory_compaction_enabled", false);
         memoryCompactionLabel = text("", 12, MUTED, false);
         memoryCompactionLabel.setPadding(dp(12), dp(4), dp(8), 0);
         memoryCompactionSeekBar = new SeekBar(this);
-        memoryCompactionSeekBar.setMax(45);
-        int compactionThreshold = Math.max(50, Math.min(95,
-                prefs.getInt("memory_compaction_threshold_pct", 50)));
-        memoryCompactionSeekBar.setProgress(compactionThreshold - 50);
-        setTextIfChanged(memoryCompactionLabel, "Compactar quando RAM livre ≤ " + compactionThreshold + "%");
-
-        TextView zramProfileTitle = text("Perfil de ZRAM", 13, TEXT, true);
-        zramProfileTitle.setPadding(dp(12), dp(12), dp(8), dp(2));
-        zramProfileSpinner = new Spinner(this);
-        String[] zramProfiles = {"Normal", "Máxima", "Extrema", "Automático"};
-        ArrayAdapter<String> zramAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, zramProfiles);
-        zramAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        zramProfileSpinner.setAdapter(zramAdapter);
-        String savedZramProfile = prefs.getString("zram_profile", "normal");
-        // Migração das opções antigas para os três perfis simplificados.
-        if ("aggressive".equals(savedZramProfile) || "zstd1".equals(savedZramProfile)
-                || "zstd3".equals(savedZramProfile) || "zstd6".equals(savedZramProfile)) {
-            savedZramProfile = "maximum";
-        } else if ("extreme".equals(savedZramProfile)
-                || "zstd19".equals(savedZramProfile) || "zstd22".equals(savedZramProfile)) {
-            savedZramProfile = "extreme";
-        }
-        int zramSelection = "auto".equals(savedZramProfile) ? 3
-                : ("extreme".equals(savedZramProfile) ? 2
-                : ("maximum".equals(savedZramProfile) ? 1 : 0));
-        zramProfileSpinner.setSelection(zramSelection, false);
-        zramProfileHint = text(zramProfileDescription(savedZramProfile), 12, MUTED, false);
-        zramProfileHint.setPadding(dp(12), dp(2), dp(8), dp(6));
+        memoryCompactionSeekBar.setMax(30);
+        int compactionThreshold = Math.max(5, Math.min(35,
+                prefs.getInt("memory_compaction_threshold_pct", 15)));
+        memoryCompactionSeekBar.setProgress(compactionThreshold - 5);
+        setTextIfChanged(memoryCompactionLabel, "Compactar processos se RAM livre ≤ " + compactionThreshold + "%");
 
         TextView smartTitle = text("Automação inteligente recomendada", 16, TEXT, true);
         smartTitle.setPadding(dp(12), dp(16), dp(8), dp(4));
         c.addView(smartTitle);
         Switch smartSuiteSwitch = actionSwitch("Modo automático geral: RAM + PSI + temperatura + bateria", "smart_suite_enabled", true);
-        Switch smartCleanupSwitch = actionSwitch("Limpeza automática com pouco armazenamento e tela apagada", "smart_auto_cleanup", false);
         Switch adaptiveFreezeSwitch = actionSwitch("Congelamento adaptativo de apps ociosos/restritos", "adaptive_freeze_enabled", false);
         TextView freezeDelayTitle = text("Aguardar após sair do app antes de congelar", 13, TEXT, true);
         freezeDelayTitle.setPadding(dp(12), dp(12), dp(8), dp(2));
@@ -985,7 +930,7 @@ public class MainActivity extends Activity {
         Switch perAppProfileSwitch = actionSwitch("Perfis automáticos Econômico/Balanceado/Desempenho por app", "app_profiles", true);
         Switch leak2Switch = actionSwitch("Detector de vazamento de RAM por tendência", "memory_leak_detector", true);
         Switch thermalSmartSwitch = actionSwitch("Controle térmico adaptativo gradual", "thermal_prediction", true);
-        for (Switch x : new Switch[]{smartSuiteSwitch,smartCleanupSwitch,adaptiveFreezeSwitch,recurrenceSwitch,lowBatterySwitch,
+        for (Switch x : new Switch[]{smartSuiteSwitch,adaptiveFreezeSwitch,recurrenceSwitch,lowBatterySwitch,
                 thrashSwitch,psiSmartSwitch,perAppProfileSwitch,leak2Switch,thermalSmartSwitch}) c.addView(x);
         Button economyDashboard = actionButton("Painel de economia e automação");
         economyDashboard.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(tr("Economia e automação"))
@@ -1047,30 +992,14 @@ public class MainActivity extends Activity {
                 prefs.edit().putBoolean("memory_compaction_enabled", v).apply());
         memoryCompactionSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                int pct = 50 + progress;
-                setTextIfChanged(memoryCompactionLabel, "Compactar quando RAM livre ≤ " + pct + "%");
+                int pct = 5 + progress;
+                setTextIfChanged(memoryCompactionLabel, "Compactar processos se RAM livre ≤ " + pct + "%");
                 if (fromUser) prefs.edit()
                         .putInt("memory_compaction_threshold_pct", pct)
                         .apply();
             }
             @Override public void onStartTrackingTouch(SeekBar bar) {}
             @Override public void onStopTrackingTouch(SeekBar bar) {}
-        });
-        zramProfileSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String profile = position == 3 ? "auto" : (position == 2 ? "extreme" : (position == 1 ? "maximum" : "normal"));
-                prefs.edit()
-                        .putString("zram_profile", profile)
-                        .putInt("zstd_requested_level",
-                                "extreme".equals(profile) ? 19 : ("maximum".equals(profile) ? 1 : ("auto".equals(profile) ? 19 : 0)))
-                        .apply();
-                setTextIfChanged(zramProfileHint, zramProfileDescription(profile));
-                boolean aggressiveMode = !"normal".equals(profile);
-                if (aggressiveMemorySwitch != null && aggressiveMemorySwitch.isChecked() != aggressiveMode) {
-                    aggressiveMemorySwitch.setChecked(aggressiveMode);
-                }
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
         appRamLimiterSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("app_ram_limiter_enabled",v).apply());
         appRamLimitSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1124,7 +1053,7 @@ public class MainActivity extends Activity {
         });
 
         c.addView(refreshSwitch); c.addView(cleanupSwitch); c.addView(memoryCompactionSwitch); c.addView(memoryCompactionLabel); c.addView(memoryCompactionSeekBar);
-        c.addView(zramProfileTitle); c.addView(zramProfileSpinner); c.addView(zramProfileHint);
+
         c.addView(appRamLimiterSwitch); c.addView(appRamLimitLabel); c.addView(appRamLimitSeekBar);
         c.addView(aggressiveMemorySwitch); c.addView(bugCleanupSwitch);
         c.addView(freezeDelayTitle); c.addView(freezeDelaySpinner); c.addView(freezeDelayHint);
@@ -1400,6 +1329,7 @@ public class MainActivity extends Activity {
     }
 
     private void selectThermalMode(String mode) {
+        mode = "auto";
         int level = manualThermalLevel(mode);
         if (level == 0) mode = "auto";
         prefs.edit().putString("thermal_mode", mode).apply();
@@ -1929,6 +1859,7 @@ public class MainActivity extends Activity {
     }
 
     private void styleThermal(TextView v, boolean active, int accent) {
+        if (v == null) return;
         if(v==null) return;
         v.setTextColor(active ? TEXT : MUTED);
         v.setBackground(active

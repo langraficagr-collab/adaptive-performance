@@ -491,3 +491,6 @@ Observação: medições curtas ou prolongadas não isolam completamente a influ
 10. **Laboratório:** tela de amostras, previsões, observações estáveis provisórias, reversões, histórico e exportação de diagnóstico. Não considera testes curtos como prova de economia.
 
 O sistema não inicia novos cronômetros ou serviços contínuos. Usa o ciclo de monitoramento existente, modelagem local e controles reversíveis. Dados de apps e pesos ficam nas preferências; se backup do Android estiver habilitado, poderão participar dele. Todas as funcionalidades ficam desativáveis pelo usuário.
+
+### 1.11.6 — Shizuku sem root e aprendizado por função
+A auditoria agora testa as permissões disponíveis. Controles inacessíveis de CPU/GPU/ZRAM e troca de rádio não comprovada ficam indisponíveis. A compactação de processos só ocorre com pressão real e intervalo mínimo de 30 minutos; não altera diretamente a ZRAM. A limpeza automática agressiva de caches e a simulação do estado térmico foram removidas. O aprendizado A/B mede separadamente mudanças reversíveis, impede experimentos no próprio monitor e exige redução de potência medida de pelo menos 7%, com validação prolongada antes de confirmar ganhos. Regressões são revertidas e registradas por função.

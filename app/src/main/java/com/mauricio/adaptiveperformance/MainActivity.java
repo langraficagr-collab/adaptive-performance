@@ -1860,7 +1860,6 @@ public class MainActivity extends Activity {
 
     private void styleThermal(TextView v, boolean active, int accent) {
         if (v == null) return;
-        if(v==null) return;
         v.setTextColor(active ? TEXT : MUTED);
         v.setBackground(active
                 ? bordered(Color.rgb(12,48,64),accent,15)

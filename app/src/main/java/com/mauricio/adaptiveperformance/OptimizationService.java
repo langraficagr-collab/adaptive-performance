@@ -717,7 +717,6 @@ public class OptimizationService extends Service {
                 finally { memoryTrimBusy.set(false); }
             });
         }
-        CapabilityPolicy.reconcile(prefs, privileged);
         if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             if (adaptivePreloadController != null) {
@@ -1160,7 +1159,17 @@ public class OptimizationService extends Service {
     }
 
     private void resetThermalOverride() {
-        // A pre-existing override is cleared once in the startup migration.
+        // Clear a legacy Android thermal status override, never set a new one.
+        if (thermalLevelApplied > 0 && privileged != null) {
+            try {
+                String result = privileged.exec("cmd thermalservice reset 2>&1");
+                if (result != null && (result.contains("Error") || result.contains("Exception")
+                        || result.contains("Permission denied"))) return;
+            } catch (Throwable ignored) {
+                // Keep the prior state so another cleanup attempt is possible.
+                return;
+            }
+        }
         thermalLevelApplied = 0;
         prefs.edit().putInt("thermal_level", 0)
                 .putBoolean("thermal_stage1", false).apply();
@@ -1477,9 +1486,11 @@ public class OptimizationService extends Service {
         prefs.edit().putString("storage_cleanup_status", "Limpando categorias selecionadas…").apply();
         long before = dataFreeKb();
         ArrayList<String> done = new ArrayList<>();
+        ArrayList<String> notes = new ArrayList<>();
         if (cache) {
-            CachePolicy.manualTrim(privileged);
-            done.add("cache de apps");
+            String trim = CachePolicy.manualTrim(privileged);
+            if (trim.startsWith("Solicitação de limpeza")) done.add("cache de apps (solicitação enviada)");
+            else notes.add("cache de apps: " + trim);
         }
         if (thumbs) {
             privileged.exec("find /sdcard/DCIM/.thumbnails /sdcard/Pictures/.thumbnails -mindepth 1 -type f -delete 2>/dev/null; true");
@@ -1517,16 +1528,21 @@ public class OptimizationService extends Service {
         }
         if (dexCache) {
             // Solicita apenas a limpeza suportada pelo Package Manager; não remove APK/dados do usuário.
-            CachePolicy.manualTrim(privileged);
-            done.add("caches temporários do Android");
+            String trim = CachePolicy.manualTrim(privileged);
+            if (trim.startsWith("Solicitação de limpeza")) done.add("caches do Android (solicitação enviada)");
+            else notes.add("caches do Android: " + trim);
         }
         try { Thread.sleep(700L); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
         long after = dataFreeKb();
         long freed = Math.max(0L, after - before);
         prefs.edit().putLong("storage_last_freed_kb", freed)
                 .putLong("storage_last_clean_at", System.currentTimeMillis())
-                .putString("storage_cleanup_status", "Limpeza concluída • " + (done.isEmpty() ? "nenhuma categoria selecionada" : String.join(", ", done))).apply();
-        IncidentHistory.add(prefs, "storage_cleanup", "Limpeza de espaço", "Liberado aprox. " + freed + " KB; " + String.join(", ", done), -1);
+                .putString("storage_cleanup_status", "Limpeza concluída • "
+                        + (done.isEmpty() ? "nenhuma ação confirmada" : String.join(", ", done))
+                        + (notes.isEmpty() ? "" : " • " + String.join("; ", notes))).apply();
+        IncidentHistory.add(prefs, "storage_cleanup", "Limpeza de espaço",
+                "Liberado aprox. " + freed + " KB; " + String.join(", ", done)
+                        + (notes.isEmpty() ? "" : "; " + String.join("; ", notes)), -1);
         storageScan();
     }
 

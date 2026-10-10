@@ -14,8 +14,8 @@ final class CapabilityPolicy {
                 p.edit().putBoolean("cap_shell_ready", false).apply();
             return;
         }
-        if (p.getBoolean("cap_shell_ready", false)
-                && now - p.getLong("cap_checked_at", 0L) < INTERVAL_MS) return;
+        long checkedAt = p.getLong("cap_checked_at", 0L);
+        if (checkedAt > 0L && now - checkedAt < INTERVAL_MS) return;
         try {
             // A single short call avoids shell-spawning overhead on every sample.
             String out = s.exec("echo UID:$(id -u); " +

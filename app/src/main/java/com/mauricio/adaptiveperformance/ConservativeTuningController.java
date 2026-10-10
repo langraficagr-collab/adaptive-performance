@@ -77,6 +77,17 @@ final class ConservativeTuningController {
         }
 
         if ("probation".equals(prefs.getString(P + "stage", "baseline"))) {
+            int probationPhase = prefs.getInt(P + "phase", 0);
+            if (probationPhase < 0 || probationPhase >= PHASES) {
+                resetSession(prefs);
+                return;
+            }
+            if (!CapabilityPolicy.optionSupported(prefs, OPTIONS[probationPhase][0])) {
+                restoreSnapshot(prefs);
+                advance(prefs, probationPhase, now,
+                        "Revertido " + phaseName(probationPhase) + ": permissão perdida durante validação");
+                return;
+            }
             reviewProbation(prefs, now, batteryPct, tempC, cpuLoad, freeRamPct, interactive, charging, powerW);
             return;
         }
@@ -553,7 +564,7 @@ final class ConservativeTuningController {
             SharedPreferences.Editor learning = p.edit()
                     .putInt("ml_trials_" + key, Math.min(10000, n + 1))
                     .putString("ml_last_verdict_" + key, priorResult);
-            if (priorResult.startsWith("Revertido")) {
+            if (priorResult.startsWith("Revertido") || priorResult.startsWith("teste revertido")) {
                 learning.putInt("ml_reverted_" + key,
                         Math.min(10000, p.getInt("ml_reverted_" + key, 0) + 1))
                         .putLong(P + "retry_after_" + key, now + 24L*60L*60L*1000L);

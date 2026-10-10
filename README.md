@@ -12,9 +12,9 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
-## Versão atual: 1.11.1 — revisão de estabilidade
+## Pré-lançamento: 1.11.6 — Shizuku e ML de economia
 
-**Versão Android:** `1.11.1-review-fixes` (versionCode **83**). [Baixar APK completo v1.11.1](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release v1.11.1](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).
+**Versão Android:** `1.11.6-shizuku-ml` (versionCode **88**, pré-lançamento). [Baixar APK completo v1.11.6](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.6-shizuku-ml/Adaptive-Performance-v1.11.6-shizuku-ml.apk) · [Detalhes da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml).
 
 Esta atualização mantém os dez recursos do **Adaptive Brain 2.0** e todas as funções anteriores. Corrige:
 
@@ -493,4 +493,5 @@ Observação: medições curtas ou prolongadas não isolam completamente a influ
 O sistema não inicia novos cronômetros ou serviços contínuos. Usa o ciclo de monitoramento existente, modelagem local e controles reversíveis. Dados de apps e pesos ficam nas preferências; se backup do Android estiver habilitado, poderão participar dele. Todas as funcionalidades ficam desativáveis pelo usuário.
 
 ### 1.11.6 — Shizuku sem root e aprendizado por função
+
 A auditoria agora testa as permissões disponíveis. Controles inacessíveis de CPU/GPU/ZRAM e troca de rádio não comprovada ficam indisponíveis. A compactação de processos só ocorre com pressão real e intervalo mínimo de 30 minutos; não altera diretamente a ZRAM. A limpeza automática agressiva de caches e a simulação do estado térmico foram removidas. O aprendizado A/B mede separadamente mudanças reversíveis, impede experimentos no próprio monitor e exige redução de potência medida de pelo menos 7%, com validação prolongada antes de confirmar ganhos. Regressões são revertidas e registradas por função.

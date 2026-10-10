@@ -4,9 +4,9 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
-## Current release: 1.11.1 — stability review
+## Preview release: 1.11.6 — Shizuku safeguards and energy ML
 
-**Android build:** `1.11.1-review-fixes` (**versionCode 83**). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).
+**Android build:** `1.11.6-shizuku-ml` (**versionCode 88**, preview). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.6-shizuku-ml/Adaptive-Performance-v1.11.6-shizuku-ml.apk) · [Preview notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml).
 
 This update retains all ten Adaptive Brain 2.0 extensions and existing features, with targeted fixes:
 
@@ -42,7 +42,7 @@ Automatic and Advanced modes, **English and Portuguese**, reversible automatic t
 
 ### Install and privacy
 
-Download [Adaptive-Performance-v1.11.0.apk](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.0/Adaptive-Performance-v1.11.0.apk) on **Android 8.0+**. An update preserves app data if signatures match. Authorize Shizuku for advanced operations. ML runs entirely on the device without a remote AI service. Android's device backup may include app preferences if enabled. Clear or disable learning at any time.
+Download [Adaptive-Performance-v1.11.6-shizuku-ml.apk](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.6-shizuku-ml/Adaptive-Performance-v1.11.6-shizuku-ml.apk) on **Android 8.0+** (preview build). An update preserves app data if signatures match. Authorize Shizuku for advanced operations. ML runs entirely on the device without a remote AI service. Android's device backup may include app preferences if enabled. Clear or disable learning at any time.
 
 No fixed battery gain, reduced temperature, root privileges or charger firmware control is guaranteed. Full, conservative and Lite build variants compile, but the downloadable release asset is the **full edition**.
 
@@ -71,7 +71,7 @@ Thermal protection, CPU and memory metrics, PSI monitoring, zRAM/swap protection
 
 ## Installation
 
-1. Download **Adaptive-Performance-v1.11.0.apk** from the [v1.11.0 release](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0).
+1. Download **Adaptive-Performance-v1.11.6-shizuku-ml.apk** from the [v1.11.6 preview](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml).
 2. Install on Android 8.0 or later. An in-place update preserves existing data when APK signatures match.
 3. For privileged controls, run Shizuku and authorize Adaptive Performance.
 

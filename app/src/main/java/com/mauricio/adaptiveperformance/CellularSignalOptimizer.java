@@ -33,6 +33,14 @@ public final class CellularSignalOptimizer {
 
     public static void evaluate(SharedPreferences p, IPrivilegedService s) {
         if (s == null) return;
+        // Automatic SIM switching requires a verified write capability.
+        if (!p.getBoolean("cap_radio_switch", false)) {
+            p.edit().putBoolean("signal_optimizer_enabled", false)
+                    .putString("signal_optimizer_status",
+                        "Troca automática de rede desativada: comando de gravação não validado").apply();
+            restoreIfNeeded(p, s);
+            return;
+        }
         boolean enabled = p.getBoolean("signal_optimizer_enabled", false);
         if (!enabled) {
             restoreIfNeeded(p, s);

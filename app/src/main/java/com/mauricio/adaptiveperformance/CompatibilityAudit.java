@@ -18,9 +18,9 @@ final class CompatibilityAudit {
         try { shizuku = Shizuku.pingBinder()
                 && Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED; }
         catch (Throwable ignored) {}
-        boolean psi = new File("/proc/pressure/memory").canRead();
-        boolean zram = new File("/sys/block/zram0").exists();
-        boolean freq = new File("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").canRead();
+        boolean psi = p.getBoolean("cap_psi", false);
+        boolean zram = p.getBoolean("cap_zram_write", false);
+        boolean freq = p.getBoolean("cap_cpu_write", false);
         boolean stats = false;
         try {
             UsageStatsManager manager = (UsageStatsManager)c.getSystemService(Context.USAGE_STATS_SERVICE);
@@ -33,9 +33,11 @@ final class CompatibilityAudit {
                 + "\n" + "RAM: " + works
                 + "\nPSI: " + (psi ? works : unavailable)
                 + "\nShizuku shell: " + (shizuku ? works : unavailable)
-                + "\nCPU frequency / controle: " + (freq ? limited : unavailable)
-                + "\nzRAM: " + (zram ? limited : unavailable)
-                + "\n" + (en ? "Radio/network control: " : "Controle de rede/rádio: ") + (shizuku ? limited : unavailable)
+                + "\nControle de frequência CPU: " + (freq ? works : unavailable)
+                + "\nzRAM (gravação): " + (zram ? works : unavailable)
+                + "\n" + (en ? "Radio switching: " : "Troca de rede: ")
+                    + (p.getBoolean("cap_radio_switch", false) ? works : unavailable)
+                + "\nGPU (gravação): " + (p.getBoolean("cap_gpu_write", false) ? works : unavailable)
                 + "\n" + (en ? "App usage history: " : "Histórico de uso dos apps: ")
                     + (stats ? works : unavailable)
                 + "\n" + (en ? "Feature presence does not guarantee kernel/ROM write access."

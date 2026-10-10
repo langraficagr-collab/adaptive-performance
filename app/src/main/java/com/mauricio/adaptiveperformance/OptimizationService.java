@@ -641,6 +641,7 @@ public class OptimizationService extends Service {
         }
         final int adaptivePressureScore = effectivePressure;
         prefs.edit().putFloat("thermal_soc_c", thermals.soc).apply();
+        CapabilityPolicy.reconcile(prefs, privileged);
         if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
@@ -1148,33 +1149,30 @@ public class OptimizationService extends Service {
     }
 
     private void setThermalLevel(int level) {
-        try {
-            if (level < 1 || level > 5) return;
-            if (thermalLevelApplied == level) return;
-            privileged.exec("cmd thermalservice override-status " + level);
-            thermalLevelApplied = level;
-            prefs.edit()
-                    .putInt("thermal_level", level)
-                    .putBoolean("thermal_stage1", level == 1)
-                    .apply();
-            String msg = level == 5 ? "Thermal nível 5 (emergência) ativado." :
-                    "Thermal nível " + level + " ativado.";
-            ChangeNotifier.notifyChange(this, "Proteção térmica alterada", msg, 1);
-        } catch (Throwable ignored) {}
+        // ThermalService override-status only spoofs Android's thermal status.
+        // It does not tune OEM power/clock limits and can interfere with safety.
+        thermalLevelApplied = 0;
+        prefs.edit().putInt("thermal_level", 0)
+                .putBoolean("thermal_stage1", false)
+                .putString("thermal_action_status",
+                        "Monitor térmico ativo; override inseguro desabilitado").apply();
     }
 
     private void resetThermalOverride() {
-        try {
-            if (thermalLevelApplied == 0) return;
-            privileged.exec("cmd thermalservice reset");
-            thermalLevelApplied = 0;
-            prefs.edit()
-                    .putInt("thermal_level", 0)
-                    .putBoolean("thermal_stage1", false)
-                    .apply();
-            ChangeNotifier.notifyChange(this, "Temperatura normalizada",
-                    "Override térmico removido; controle normal restaurado.", 1);
-        } catch (Throwable ignored) {}
+        // Clear a legacy Android thermal status override, never set a new one.
+        if (thermalLevelApplied > 0 && privileged != null) {
+            try {
+                String result = privileged.exec("cmd thermalservice reset 2>&1");
+                if (result != null && (result.contains("Error") || result.contains("Exception")
+                        || result.contains("Permission denied"))) return;
+            } catch (Throwable ignored) {
+                // Keep the prior state so another cleanup attempt is possible.
+                return;
+            }
+        }
+        thermalLevelApplied = 0;
+        prefs.edit().putInt("thermal_level", 0)
+                .putBoolean("thermal_stage1", false).apply();
     }
 
     private void apply60Hz() {
@@ -1488,9 +1486,11 @@ public class OptimizationService extends Service {
         prefs.edit().putString("storage_cleanup_status", "Limpando categorias selecionadas…").apply();
         long before = dataFreeKb();
         ArrayList<String> done = new ArrayList<>();
+        ArrayList<String> notes = new ArrayList<>();
         if (cache) {
-            privileged.exec("pm trim-caches 256G 2>/dev/null; true");
-            done.add("cache de apps");
+            String trim = CachePolicy.manualTrim(privileged);
+            if (trim.startsWith("Solicitação de limpeza")) done.add("cache de apps (solicitação enviada)");
+            else notes.add("cache de apps: " + trim);
         }
         if (thumbs) {
             privileged.exec("find /sdcard/DCIM/.thumbnails /sdcard/Pictures/.thumbnails -mindepth 1 -type f -delete 2>/dev/null; true");
@@ -1528,16 +1528,21 @@ public class OptimizationService extends Service {
         }
         if (dexCache) {
             // Solicita apenas a limpeza suportada pelo Package Manager; não remove APK/dados do usuário.
-            privileged.exec("pm trim-caches 512G 2>/dev/null; true");
-            done.add("caches temporários do Android");
+            String trim = CachePolicy.manualTrim(privileged);
+            if (trim.startsWith("Solicitação de limpeza")) done.add("caches do Android (solicitação enviada)");
+            else notes.add("caches do Android: " + trim);
         }
         try { Thread.sleep(700L); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
         long after = dataFreeKb();
         long freed = Math.max(0L, after - before);
         prefs.edit().putLong("storage_last_freed_kb", freed)
                 .putLong("storage_last_clean_at", System.currentTimeMillis())
-                .putString("storage_cleanup_status", "Limpeza concluída • " + (done.isEmpty() ? "nenhuma categoria selecionada" : String.join(", ", done))).apply();
-        IncidentHistory.add(prefs, "storage_cleanup", "Limpeza de espaço", "Liberado aprox. " + freed + " KB; " + String.join(", ", done), -1);
+                .putString("storage_cleanup_status", "Limpeza concluída • "
+                        + (done.isEmpty() ? "nenhuma ação confirmada" : String.join(", ", done))
+                        + (notes.isEmpty() ? "" : " • " + String.join("; ", notes))).apply();
+        IncidentHistory.add(prefs, "storage_cleanup", "Limpeza de espaço",
+                "Liberado aprox. " + freed + " KB; " + String.join(", ", done)
+                        + (notes.isEmpty() ? "" : "; " + String.join("; ", notes)), -1);
         storageScan();
     }
 

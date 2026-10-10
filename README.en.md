@@ -4,9 +4,9 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
-## Current release: 1.11.1 — stability review
+## Preview release: 1.11.6 — Shizuku safeguards and energy ML
 
-**Android build:** `1.11.1-review-fixes` (**versionCode 83**). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).
+**Android build:** `1.11.6-shizuku-ml` (**versionCode 88**, preview). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.6-shizuku-ml/Adaptive-Performance-v1.11.6-shizuku-ml.apk) · [Preview notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml).
 
 This update retains all ten Adaptive Brain 2.0 extensions and existing features, with targeted fixes:
 
@@ -42,7 +42,7 @@ Automatic and Advanced modes, **English and Portuguese**, reversible automatic t
 
 ### Install and privacy
 
-Download [Adaptive-Performance-v1.11.0.apk](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.0/Adaptive-Performance-v1.11.0.apk) on **Android 8.0+**. An update preserves app data if signatures match. Authorize Shizuku for advanced operations. ML runs entirely on the device without a remote AI service. Android's device backup may include app preferences if enabled. Clear or disable learning at any time.
+Download [Adaptive-Performance-v1.11.6-shizuku-ml.apk](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.6-shizuku-ml/Adaptive-Performance-v1.11.6-shizuku-ml.apk) on **Android 8.0+** (preview build). An update preserves app data if signatures match. Authorize Shizuku for advanced operations. ML runs entirely on the device without a remote AI service. Android's device backup may include app preferences if enabled. Clear or disable learning at any time.
 
 No fixed battery gain, reduced temperature, root privileges or charger firmware control is guaranteed. Full, conservative and Lite build variants compile, but the downloadable release asset is the **full edition**.
 
@@ -71,7 +71,7 @@ Thermal protection, CPU and memory metrics, PSI monitoring, zRAM/swap protection
 
 ## Installation
 
-1. Download **Adaptive-Performance-v1.11.0.apk** from the [v1.11.0 release](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.0).
+1. Download **Adaptive-Performance-v1.11.6-shizuku-ml.apk** from the [v1.11.6 preview](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml).
 2. Install on Android 8.0 or later. An in-place update preserves existing data when APK signatures match.
 3. For privileged controls, run Shizuku and authorize Adaptive Performance.
 
@@ -124,3 +124,6 @@ CPU energy estimates are not actual per-app battery measurements; usage variatio
 
 ### Technical details of the published 1.11.0 — Adaptive Brain 2.0
 Ten incremental extensions, preserving prior behavior: contextual online ML with guarded observational feedback; bounded 32-edge next-app transition model; real battery/skin/SoC temperature trends and native ThermalHeadroom, with illustrative 5-minute projection; charging current and temperature observation (does not change charging power); 10-minute free-RAM trend; bounded 150-frame self-app frame sampling; self-CPU budget; reversible 6-hour optional preloading cooldown following strong, context-matched regressions; game/navigation/social/idle routines; local experiment results and diagnostic export. All automatic ML actions only inhibit optional preloading or reprioritize a recently-used eligible app. No synthetic OEM thermal status, app killing, cloud ML, new polling service, or guaranteed battery savings. Local package history may be included in Android backup if enabled.
+
+### 1.11.6 — Rootless Shizuku and per-feature learning
+Runtime capability probes disable inaccessible CPU/GPU/zRAM sysfs writes and unverified radio switching. Process compaction runs only under genuine memory pressure with at least a 30-minute cooldown and never changes zRAM configuration. Aggressive automatic cache cleaning and thermal status overrides were removed. Sequential reversible A/B trials keep core monitoring on, require at least 7% measured power reduction, and perform longer-term validation before claiming savings. Each feature tracks reverts and confirmed outcomes.

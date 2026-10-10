@@ -165,12 +165,11 @@ final class AdaptivePreloadController {
             result = "erro: " + error.getClass().getSimpleName();
         }
         String normalizedResult = result == null ? "" : result.trim();
-        boolean preloadFailed = normalizedResult.toLowerCase(java.util.Locale.US).matches(
-                "(?s).*(^erro:|permission denied|not found|exception|failed|error).*");
-        if (BuildConfig.CONSERVATIVE_MODE
-                && !normalizedResult.matches("(?s).*WARMED_BYTES=[1-9][0-9]*.*")) {
-            preloadFailed = true;
-        }
+        // Both editions must confirm that at least one byte was warmed.
+        // A shell command that exits without output must not count as success.
+        boolean preloadFailed = !normalizedResult.matches("(?s).*WARMED_BYTES=[1-9][0-9]*.*")
+                || normalizedResult.toLowerCase(java.util.Locale.US).matches(
+                        "(?s).*(^erro:|permission denied|not found|exception|failed|error).*");
         int warmedAppCount = preloadFailed ? 0 : apps.size();
         String preloadStatus = preloadFailed
                 ? "Falha/nenhum APK aquecido • " + normalizedResult
@@ -304,8 +303,11 @@ final class AdaptivePreloadController {
             command.append("for root in /sdcard/Android/data/").append(pkg)
                     .append("/files /sdcard/Android/obb/").append(pkg)
                     .append(" /sdcard/Android/media/").append(pkg).append("; do ");
+            command.append("[ \"$used\" -ge \"$MAX_BYTES\" ] && break; ");
             command.append("[ -d \"$root\" ] || continue; ");
-            command.append("for f in $(find \"$root\" -type f -size -512M -print 2>/dev/null); do read_one \"$f\"; done; done; ");
+            // Limit directory traversal and stop warming once the I/O budget is consumed.
+            command.append("for f in $(find \"$root\" -maxdepth 2 -type f -size -64M -print 2>/dev/null | head -n 4); do ");
+            command.append("[ \"$used\" -ge \"$MAX_BYTES\" ] && break; read_one \"$f\"; done; done; ");
         }
         command.append("echo WARMED_BYTES=$warmed; echo LIMIT_BYTES=$MAX_BYTES");
         return command.toString();

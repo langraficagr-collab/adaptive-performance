@@ -34,12 +34,15 @@ public class SignalOptimizerActivity extends Activity {
         ScrollView sv=new ScrollView(this);
         LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(16),dp(18),dp(16),dp(30)); root.setBackgroundColor(bg); sv.addView(root);
 
-        root.addView(t("Otimizador automático de sinal móvel",24,text,true));
-        TextView sub=t("Quando o sinal ficar muito baixo, o Adaptive Performance compara as tecnologias permitidas no SIM e mantém a que entregar o melhor sinal.",13,muted,false);
+        root.addView(t("Monitor de sinal móvel",24,text,true));
+        TextView sub=t("A leitura do sinal está disponível. A troca automática de 2G/3G/4G/5G foi removida porque sua gravação não foi confirmada sem root.",13,muted,false);
         sub.setPadding(0,dp(5),0,dp(14)); root.addView(sub);
 
         LinearLayout c=card(card);
         enabled=sw("Ativar otimização automática de sinal","signal_optimizer_enabled",false,text);
+        enabled.setChecked(false);
+        enabled.setEnabled(false);
+        enabled.setVisibility(View.GONE);
         c.addView(enabled);
         status=t("",13,muted,false); status.setPadding(0,dp(8),0,dp(3)); c.addView(status);
         signal=t("",13,muted,false); c.addView(signal);
@@ -60,6 +63,7 @@ public class SignalOptimizerActivity extends Activity {
         test3g=sw("3G / WCDMA / HSPA","signal_optimizer_test_3g",true,text);
         test2g=sw("2G / GSM / EDGE","signal_optimizer_test_2g",true,text);
         tech.addView(test5g); tech.addView(test4g); tech.addView(test3g); tech.addView(test2g);
+        tech.setVisibility(View.GONE);
         root.addView(tech);
 
         LinearLayout cfg=card(card);
@@ -76,6 +80,7 @@ public class SignalOptimizerActivity extends Activity {
         cooldownLabel=t("",13,muted,false); cooldownLabel.setPadding(0,dp(10),0,0); cfg.addView(cooldownLabel);
         SeekBar cool=new SeekBar(this); cool.setMax(115); cool.setProgress(Math.max(0,prefs.getInt("signal_optimizer_cooldown_min",5)-5)); cfg.addView(cool);
         cool.setOnSeekBarChangeListener(listener(v->{ int min=v+5; prefs.edit().putInt("signal_optimizer_cooldown_min",min).commit(); updateLabels(); }));
+        cfg.setVisibility(View.GONE);
         root.addView(cfg);
 
         Button check=btn("Verificar sinal agora");

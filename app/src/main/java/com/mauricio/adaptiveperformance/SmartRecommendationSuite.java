@@ -22,7 +22,7 @@ public final class SmartRecommendationSuite {
         try { lowBatteryMode(p,batteryPct); } catch(Throwable ignored){}
         try { recurrence(p,s,fg); } catch(Throwable ignored){}
         try { adaptiveFreeze(c,p,s,fg); } catch(Throwable ignored){}
-        try { autoCleanup(p,s,interactive); } catch(Throwable ignored){}
+        try { autoCleanup(p); } catch(Throwable ignored){}
         try { economyDashboard(p,batteryPct,tempC,pressureScore); } catch(Throwable ignored){}
     }
 
@@ -99,7 +99,7 @@ public final class SmartRecommendationSuite {
         }
         if(n>0)p.edit().putInt("adaptive_freeze_last_count",n).putLong("adaptive_freeze_last_at",System.currentTimeMillis()).apply();
     }
-    private static void autoCleanup(SharedPreferences p,IPrivilegedService s,boolean interactive) {
+    private static void autoCleanup(SharedPreferences p) {
         // Automatic trim-caches with 256G caused repeated cache regeneration and I/O.
         // Keep cache under Android's ownership; manual capped cleanup only.
         if (p.getBoolean("smart_auto_cleanup", false))

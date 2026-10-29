@@ -144,6 +144,9 @@ public final class AutoUserModeController {
                     .putString("thermal_mode", "auto")
                     .putString("zram_profile", "normal");
             ConservativeTuningController.applySafeDefaults(e);
+            // The safe-default profile must not undo a user's explicit opt-in.
+            if (prefs.getBoolean("auto_preload_enabled", false))
+                e.putBoolean("auto_preload_enabled", true);
             e.apply();
         }
         ConservativeTuningController.initialize(prefs);

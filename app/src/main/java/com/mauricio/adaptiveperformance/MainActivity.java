@@ -1498,11 +1498,14 @@ public class MainActivity extends Activity {
         float cpu = prefs.getFloat("app_cost_cpu_pct", -1f);
         if (cpu < 0f) return tr("Aguardando medição do consumo do próprio aplicativo");
         boolean en = UiLanguage.english(prefs);
+        float energyMwh = prefs.getFloat("app_cost_estimated_mwh", -1f);
+        String energyPart = energyMwh < 0f ? "" : String.format(Locale.US,
+                en ? " • estimated CPU energy %.3f mWh" : " • energia CPU estimada %.3f mWh",
+                energyMwh);
         String cost = String.format(Locale.US, en
-                ? "App CPU %.2f%% • estimated CPU energy %.3f mWh • %d monitor polls • %s"
-                : "CPU do app %.2f%% • energia CPU estimada %.3f mWh • %d coletas • %s",
-                cpu, prefs.getFloat("app_cost_estimated_mwh", 0f),
-                prefs.getInt("app_cost_poll_count", 0),
+                ? "App CPU %.2f%%%s • %d monitor polls • %s"
+                : "CPU do app %.2f%%%s • %d coletas • %s",
+                cpu, energyPart, prefs.getInt("app_cost_poll_count", 0),
                 prefs.getBoolean("app_cost_throttled", false)
                 ? (en ? "slower monitoring" : "monitoramento reduzido")
                 : (en ? "normal" : "normal"));
@@ -1801,8 +1804,10 @@ public class MainActivity extends Activity {
                     + "\nAmostragens (proxy, não wakeups reais): "
                     + prefs.getInt("app_cost_poll_count", 0)
                     + "\nCPU do processo: " + prefs.getFloat("app_cost_cpu_pct", -1f) + "%"
-                    + "\nEstimativa CPU mWh (não mede bateria do app): "
-                    + prefs.getFloat("app_cost_estimated_mwh", -1f)
+                    + (prefs.getFloat("app_cost_estimated_mwh", -1f) < 0f
+                            ? ""
+                            : "\nEstimativa CPU mWh (não mede bateria do app): "
+                            + prefs.getFloat("app_cost_estimated_mwh", -1f))
                     + "\n\n=== Leituras atuais ==="
                     + "\nTemperatura bateria °C: " + prefs.getFloat("temp_c", -1f)
                     + "\nTemperatura SoC °C: " + prefs.getFloat("thermal_soc_c", -1f)

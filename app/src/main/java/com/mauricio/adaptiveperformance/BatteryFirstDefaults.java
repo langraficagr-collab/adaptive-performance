@@ -13,6 +13,7 @@ final class BatteryFirstDefaults {
                 .putBoolean("auto_preload_enabled", false)
                 .putBoolean("auto_preload_monitor_pending", false)
                 .putInt("auto_preload_count", 0)
+                .putStringSet("auto_preload_apps", new java.util.LinkedHashSet<String>())
                 .putString("auto_preload_status", "Pré-carregamento opcional desativado para economizar bateria")
                 .putBoolean(MIGRATED, true).commit();
     }

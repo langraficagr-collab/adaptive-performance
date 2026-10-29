@@ -35,9 +35,28 @@ public final class CellularSignalOptimizer {
         if (s == null) return;
         // Automatic SIM switching requires a verified write capability.
         if (!p.getBoolean("cap_radio_switch", false)) {
-            p.edit().putBoolean("signal_optimizer_enabled", false)
-                    .putString("signal_optimizer_status",
-                        "Troca automática de rede desativada: comando de gravação não validado").apply();
+            // Explicit user request is read-only; never bypass the write guard.
+            boolean checked = p.getBoolean("signal_optimizer_force_check", false);
+            if (checked) {
+                try {
+                    Signal sample = readSignal(s);
+                    saveSignal(p, sample);
+                    p.edit().putBoolean("signal_optimizer_force_check", false)
+                            .putString("signal_optimizer_status", sample.registered
+                                    ? "Sinal atual: " + sample.tech + " • nível "
+                                        + sample.level + "/4 • " + sample.dbm + " dBm"
+                                    : "Leitura de sinal indisponível; aguardando amostra válida")
+                            .apply();
+                } catch (Exception ex) {
+                    p.edit().putBoolean("signal_optimizer_force_check", false)
+                            .putString("signal_optimizer_status", "Falha na leitura do sinal")
+                            .apply();
+                }
+            }
+            SharedPreferences.Editor off = p.edit().putBoolean("signal_optimizer_enabled", false);
+            if (!checked) off.putString("signal_optimizer_status",
+                    "Troca automática de rede desativada: comando de gravação não validado");
+            off.apply();
             restoreIfNeeded(p, s);
             return;
         }

@@ -91,7 +91,7 @@ public class SignalOptimizerActivity extends Activity {
             } else {
                 Intent i=new Intent(this,OptimizationService.class);
                 if(Build.VERSION.SDK_INT>=26) startForegroundService(i); else startService(i);
-                Toast.makeText(this,"Verificação solicitada",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,"Leitura de sinal solicitada (sem trocar a rede)",Toast.LENGTH_SHORT).show();
                 new Handler(Looper.getMainLooper()).postDelayed(this::refresh,1800L);
             }
         });

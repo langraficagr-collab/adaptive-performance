@@ -113,6 +113,15 @@ final class ConservativeTuningController {
         String stage = prefs.getString(P + "stage", "baseline");
         String option = OPTIONS[phase][0];
         if (!CapabilityPolicy.optionSupported(prefs, option)) {
+            if (CapabilityPolicy.requiresShell(option)
+                    && !prefs.getBoolean("cap_shell_ready", false)) {
+                // Suspend a shell-dependent trial without consuming the phase.
+                // It will be reconsidered after Shizuku reconnects.
+                if ("trial".equals(stage)) restoreSnapshot(prefs);
+                startWindow(prefs, "baseline", now);
+                setStatus(prefs, "Aguardando Shizuku para " + phaseName(phase));
+                return;
+            }
             if ("trial".equals(stage) || "probation".equals(stage)) restoreSnapshot(prefs);
             advance(prefs, phase, now, "Ignorado " + phaseName(phase)
                     + ": sem permissão efetiva ou sem ganho energético verificável");
@@ -575,7 +584,12 @@ final class ConservativeTuningController {
             SharedPreferences.Editor learning = p.edit()
                     .putInt("ml_trials_" + key, Math.min(10000, n + 1))
                     .putString("ml_last_verdict_" + key, priorResult);
-            if (priorResult.startsWith("Revertido") || priorResult.startsWith("teste revertido")) {
+            boolean measuredRegression = (priorResult.startsWith("Revertido")
+                    || priorResult.startsWith("teste revertido"))
+                    && !priorResult.contains("dados suficientes")
+                    && !priorResult.contains("não comprovou")
+                    && !priorResult.contains("condições de uso mudou");
+            if (measuredRegression) {
                 learning.putInt("ml_reverted_" + key,
                         Math.min(10000, p.getInt("ml_reverted_" + key, 0) + 1))
                         .putLong(P + "retry_after_" + key, now + 24L*60L*60L*1000L);

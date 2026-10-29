@@ -18,7 +18,7 @@ final class CompatibilityAudit {
         try { shizuku = Shizuku.pingBinder()
                 && Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED; }
         catch (Throwable ignored) {}
-        boolean psi = p.getBoolean("cap_psi", false);
+        boolean psi = new File("/proc/pressure/memory").canRead() || p.getBoolean("cap_psi", false);
         boolean zram = p.getBoolean("cap_zram_write", false);
         boolean freq = p.getBoolean("cap_cpu_write", false);
         boolean stats = false;

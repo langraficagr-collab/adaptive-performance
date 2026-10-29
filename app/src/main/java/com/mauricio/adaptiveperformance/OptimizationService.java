@@ -388,9 +388,9 @@ public class OptimizationService extends Service {
                 long now = SystemClock.elapsedRealtime();
                 // Native BatteryManager and thermal callbacks stay available; avoid
                 // repeated heavy dumpsys thermalservice calls when the phone is hot.
-                boolean cachedHot = tempC >= 38f
-                        || (cachedThermals != null && cachedThermals.skin >= 43f);
-                long thermalInterval = interactive ? 180_000L : 600_000L;
+                // Keep hardware thermal samples bounded; never make decisions using
+                // ancient SoC/skin values after a failed or throttled shell read.
+                long thermalInterval = interactive ? 90_000L : 300_000L;
                 // Battery and native ThermalHeadroom callbacks provide prompt safety signals.
                 boolean readThermal = lastThermalReadElapsed <= 0L
                         || now - lastThermalReadElapsed >= thermalInterval;
@@ -416,9 +416,16 @@ public class OptimizationService extends Service {
                     thermals = parseThermals(thermSplit[1], tempC);
                     cachedThermals = thermals;
                     lastThermalReadElapsed = now;
-                } else {
+                } else if (lastThermalReadElapsed > 0L
+                        && now - lastThermalReadElapsed < thermalInterval) {
                     thermals = cachedThermals;
                     thermals.battery = tempC;
+                } else {
+                    // BatteryManager and native ThermalHeadroom remain available.
+                    thermals = new ThermalSnapshot();
+                    thermals.battery = tempC;
+                    cachedThermals = thermals;
+                    lastThermalReadElapsed = 0L;
                 }
             } catch (Throwable ignored) {}
         }
@@ -461,6 +468,10 @@ public class OptimizationService extends Service {
         final boolean hotHardware = tempC >= 39f
                 || (thermals.skin > 0f && thermals.skin >= 44f)
                 || (thermals.soc > 0f && thermals.soc >= 60f);
+        final boolean thermalGuardActive = tempC >= 38f || nativeThermalRisk
+                || thermalLevelApplied > 0
+                || (thermals.skin > 0f && thermals.skin >= 43f)
+                || (thermals.soc > 0f && thermals.soc >= 54f);
         boolean automaticMode = AutoUserModeController.enabled(prefs);
         boolean lowBatteryAutomatic = automaticMode && !chargingNow && smartBatteryPct >= 0
                 && smartBatteryPct <= 50;
@@ -951,17 +962,23 @@ public class OptimizationService extends Service {
                 || (thermals.soc > 0 && thermals.soc >= 69f);
         // CPU budget always applies, including hot conditions: a frequent
         // profiler loop adds heat rather than taking heat away.
-        long budgetDelay = appCostGuard.record(prefs, interactive, emergency);
+        long budgetDelay = appCostGuard.record(prefs, interactive,
+                emergency || thermalGuardActive);
         if (budgetDelay > 0L) nextLoopDelayMs = Math.max(nextLoopDelayMs, budgetDelay);
+        // Do not let optimizer CPU throttling postpone active thermal protection.
+        if (interactive && thermalGuardActive)
+            nextLoopDelayMs = Math.min(nextLoopDelayMs, 60_000L);
         if (lowImpactMode) {
             nextLoopDelayMs = Math.max(nextLoopDelayMs,
-                    !interactive ? 600_000L : (emergency ? 60_000L : 120_000L));
+                    !interactive ? 600_000L : (thermalGuardActive ? 60_000L : 120_000L));
             // Genuine thermal API and low-overhead battery broadcast remain active.
             String reason = !interactive
                     ? "Tela apagada: tarefas pesadas pausadas até desbloquear"
                     : (chargingNow
                     ? "Carregando: manutenção, diagnósticos e pré-carga pausados"
                     : "Aparelho quente: varreduras e pré-carga pausadas");
+            if (interactive && thermalGuardActive)
+                nextLoopDelayMs = Math.min(nextLoopDelayMs, 60_000L);
             prefs.edit().putBoolean("charging_low_impact_monitor", true)
                     .putBoolean("hot_hardware_guard", hotHardware)
                     .putString("charging_low_impact_note", reason)

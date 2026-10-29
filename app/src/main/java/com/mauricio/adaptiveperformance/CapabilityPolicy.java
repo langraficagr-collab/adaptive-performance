@@ -10,8 +10,15 @@ final class CapabilityPolicy {
     static void reconcile(SharedPreferences p, IPrivilegedService s) {
         long now = System.currentTimeMillis();
         if (s == null) {
-            if (p.getBoolean("cap_shell_ready", false))
-                p.edit().putBoolean("cap_shell_ready", false).apply();
+            // Invalidate only when a formerly available shell disconnects.
+            // Clearing the timestamp forces a fresh probe on reconnect.
+            if (p.getBoolean("cap_shell_ready", false)
+                    || p.getLong("cap_checked_at", 0L) != 0L
+                    || p.getBoolean("cap_psi", false)
+                    || p.getBoolean("cap_cpu_write", false)
+                    || p.getBoolean("cap_gpu_write", false)
+                    || p.getBoolean("cap_zram_write", false))
+                clearUnavailable(p);
             return;
         }
         long checkedAt = p.getLong("cap_checked_at", 0L);
@@ -47,8 +54,23 @@ final class CapabilityPolicy {
             e.putBoolean("smart_auto_cleanup", false);
             e.apply();
         } catch (Exception ignored) {
-            p.edit().putBoolean("cap_shell_ready", false).apply();
+            clearUnavailable(p);
         }
+    }
+
+    private static void clearUnavailable(SharedPreferences p) {
+        p.edit().putBoolean("cap_shell_ready", false)
+                .putBoolean("cap_psi", false)
+                .putBoolean("cap_cpu_write", false)
+                .putBoolean("cap_gpu_write", false)
+                .putBoolean("cap_zram_write", false)
+                .remove("cap_checked_at").apply();
+    }
+
+    static boolean requiresShell(String key) {
+        return key.equals("cpu_pressure_control") || key.equals("system_battery_guard")
+                || key.equals("dynamic_doze_whitelist") || key.equals("system_radio_savings")
+                || key.equals("adaptive_screen_timeout") || key.equals("maximum_battery_mode");
     }
 
     /** Only sample features that can actually take effect in the current privilege mode. */
@@ -57,10 +79,7 @@ final class CapabilityPolicy {
                 || key.equals("sensor_modem_guard") || key.equals("duplicate_detection")
                 || key.equals("storage_guard") || key.equals("history_24h")) return false;
         boolean shell = p.getBoolean("cap_shell_ready", false);
-        if (key.equals("cpu_pressure_control") || key.equals("system_battery_guard")
-                || key.equals("dynamic_doze_whitelist") || key.equals("system_radio_savings")
-                || key.equals("adaptive_screen_timeout") || key.equals("maximum_battery_mode"))
-            return shell;
+        if (requiresShell(key)) return shell;
         return true;
     }
 }

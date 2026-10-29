@@ -20,13 +20,17 @@ public final class AutoUserModeController {
         long now = System.currentTimeMillis();
         if (BuildConfig.CONSERVATIVE_MODE) {
             if (!prefs.getBoolean("conservative_preload_configured_v2", false)) {
-                prefs.edit().putBoolean("auto_preload_enabled", false)
-                        .putBoolean("conservative_preload_configured_v2", true)
+                SharedPreferences.Editor preload = prefs.edit();
+                if (!prefs.contains("auto_preload_enabled"))
+                    preload.putBoolean("auto_preload_enabled", false);
+                preload.putBoolean("conservative_preload_configured_v2", true)
                         .putInt("auto_preload_max_apps", 2)
                         .putInt("auto_preload_budget_cap_mb", 32)
                         .putLong("auto_preload_cycle_at", 0L)
                         .putString("auto_preload_status",
-                                "Pré-carga opcional: desligada para economizar bateria")
+                                prefs.getBoolean("auto_preload_enabled", false)
+                                        ? "Pré-carga autorizada pelo usuário"
+                                        : "Pré-carga opcional: desligada para economizar bateria")
                         .apply();
             }
             long lastApply = prefs.getLong("auto_user_last_apply", 0L);
@@ -136,7 +140,7 @@ public final class AutoUserModeController {
                     .putBoolean("smart_auto_cleanup", false)
                     .putBoolean("app_ram_limiter_enabled", false)
                     .putBoolean("adaptive_freeze_enabled", false)
-                    .putBoolean("auto_preload_enabled", false)
+                    // Preserve the explicit preloading choice initialized above.
                     .putString("thermal_mode", "auto")
                     .putString("zram_profile", "normal");
             ConservativeTuningController.applySafeDefaults(e);

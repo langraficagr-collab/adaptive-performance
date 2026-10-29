@@ -57,7 +57,8 @@ public final class CellularSignalOptimizer {
             if (!checked) off.putString("signal_optimizer_status",
                     "Troca automática de rede desativada: comando de gravação não validado");
             off.apply();
-            restoreIfNeeded(p, s);
+            // A read-only permission does not authorize restoring a radio mask.
+            // Keep any pending restoration recorded until write access is verified.
             return;
         }
         boolean enabled = p.getBoolean("signal_optimizer_enabled", false);

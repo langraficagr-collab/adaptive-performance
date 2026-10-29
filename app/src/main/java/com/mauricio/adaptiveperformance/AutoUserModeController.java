@@ -20,8 +20,11 @@ public final class AutoUserModeController {
         long now = System.currentTimeMillis();
         if (BuildConfig.CONSERVATIVE_MODE) {
             if (!prefs.getBoolean("conservative_preload_configured_v2", false)) {
-                prefs.edit().putBoolean("auto_preload_enabled", false)
-                        .putBoolean("conservative_preload_configured_v2", true)
+                SharedPreferences.Editor preloadEditor = prefs.edit();
+                if (!prefs.contains("auto_preload_enabled")) {
+                    preloadEditor.putBoolean("auto_preload_enabled", false);
+                }
+                preloadEditor.putBoolean("conservative_preload_configured_v2", true)
                         .putInt("auto_preload_max_apps", 2)
                         .putInt("auto_preload_budget_cap_mb", 32)
                         .putLong("auto_preload_cycle_at", 0L)

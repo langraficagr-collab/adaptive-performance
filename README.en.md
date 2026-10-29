@@ -4,6 +4,18 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
+## Development updates — 1.11.8 (PR #12, not yet released)
+
+**Release status (October 29, 2026):** [1.11.1 is the latest published stable release](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1). [1.11.6 is a preview](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml). **1.11.8-i18n-settings** (versionCode **90**) was built and installed on a POCO X7 5G but is available only as code in [PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12), **not as a stable APK release**.
+
+- **1.11.7 — battery and responsiveness:** optional preloading **off by default**, less frequent optional diagnostics/polling and lower app monitoring overhead. Sustained battery savings remain unverified.
+- **1.11.8 — PT/EN coverage:** improved translations for battery, RAM, GPU, frequency, Advanced Cleanup and dynamic storage summaries.
+- **1.11.8 — Settings behavior:** Automatic mode shows an explanation and direct link to its options; Advanced mode keeps manual controls without resetting automatic trials just to view Settings.
+- **Test results:** FullDebug build, language harness, and POCO X7 5G / Android 16 UI checks passed without observed crash. The Galaxy S24 Ultra reporter's issue and untested diagnostics are not fully verified.
+- **Pending review:** CodeRabbit reported **13 technical findings** on PR #12 that the UI-only fix did not resolve. CodeQL also produced a new static-analysis alert although the workflow completed successfully. Do not interpret green CI as a clean review.
+
+[View changes in PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12) · [English website](https://langraficagr-collab.github.io/adaptive-performance/en.html#novidades)
+
 ## Current release: 1.11.1 — stability review
 
 **Android build:** `1.11.1-review-fixes` (**versionCode 83**). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).

@@ -12,6 +12,18 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
+## Novidades em desenvolvimento — 1.11.8 (PR #12, ainda não lançada)
+
+**Situação das versões (29/10/2026):** [1.11.1 é a última versão estável publicada](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1). A [1.11.6 é uma prévia](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml). A **1.11.8-i18n-settings** (versionCode **90**) foi compilada e instalada em um POCO X7 5G, mas está somente no [PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12), **sem APK estável publicado**.
+
+- **1.11.7 — bateria e fluidez:** pré-carregamento opcional **desativado por padrão**, menor frequência de diagnósticos/consultas opcionais e redução do custo do monitoramento do próprio app. O ganho de autonomia ainda requer validação em uso prolongado.
+- **1.11.8 — tradução PT/EN:** novos textos traduzidos nos indicadores de bateria, RAM, GPU, frequência, limpeza avançada e resumos dinâmicos de armazenamento.
+- **1.11.8 — botão Ajustes:** no modo Automático, abre explicação e link direto para o painel de opções automáticas, sem trocar o modo. No Avançado, preserva as opções manuais.
+- **Verificação:** compilação FullDebug e teste de traduções passaram; interface testada no POCO X7 5G com Android 16/Shizuku sem travamento identificado. Não há confirmação de correção no Galaxy S24 Ultra nem cobertura de todos os textos dinâmicos.
+- **Revisões pendentes:** o CodeRabbit apontou **13 observações técnicas** no PR #12 (não consideradas resolvidas pela correção de interface). O CodeQL apresentou um alerta de análise estática mesmo com execução do workflow concluída. Consulte o PR antes de mesclar ou publicar outra versão estável.
+
+[Ver alterações da 1.11.8 no GitHub](https://github.com/langraficagr-collab/adaptive-performance/pull/12) · [Página do aplicativo](https://langraficagr-collab.github.io/adaptive-performance/#novidades)
+
 ## Versão atual: 1.11.1 — revisão de estabilidade
 
 **Versão Android:** `1.11.1-review-fixes` (versionCode **83**). [Baixar APK completo v1.11.1](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release v1.11.1](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).

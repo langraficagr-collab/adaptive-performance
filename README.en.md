@@ -4,23 +4,19 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
-## 1.11.9 — review findings addressed (PR #12, not yet released)
+## Latest release: 1.11.9 — published October 29, 2026
 
-Development build **1.11.9-review-fixes** (versionCode **91**) addresses the earlier 13 CodeRabbit comments plus the CodeQL warning in thermal sampling, radio read-only checks, Shizuku reconnects, preload persistence, inconclusive ML trials, ZRAM profiles and tests. Local Android build and lint passed, as did JVM migration/language tests. **Independent CI and code review of this new head are still required**; this is not a stable APK release. [Technical details](docs/review-fixes-1.11.9.md).
+**APK:** [Download Adaptive Performance v1.11.9](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.9/Adaptive-Performance-v1.11.9.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.9) · [Merged PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12).
 
-## Development updates — 1.11.8 (PR #12, not yet released)
+**1.11.9-review-fixes** (versionCode **91**) includes lower optional background polling, preloading off by default while honoring user settings, broader PT/EN translations, clearer Automatic-mode Settings, Shizuku reconnect handling and capability audits, read-only signal checks, and safeguards against stale thermal data. See [1.11.9 details](docs/review-fixes-1.11.9.md), [1.11.8](docs/i18n-settings-1.11.8.md), and [1.11.7](docs/battery-fluidity-1.11.7.md).
 
-**Release status (October 29, 2026):** [1.11.1 is the latest published stable release](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1). [1.11.6 is a preview](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml). **1.11.8-i18n-settings** (versionCode **90**) was built and installed on a POCO X7 5G but is available only as code in [PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12), **not as a stable APK release**.
+**Testing:** Android build and lint passed; local persistence/migration and language harnesses passed. CodeQL reported no new alerts in changed PR code. CodeRabbit skipped the final complete review, and local Android Lint reported 111 nonblocking warnings. **This is a development/debug-signed Full APK, not production-signed.** Battery savings and device compatibility vary. Install over the existing app only if the signing certificates match to preserve app data.
 
-- **1.11.7 — battery and responsiveness:** optional preloading **off by default**, less frequent optional diagnostics/polling and lower app monitoring overhead. Sustained battery savings remain unverified.
-- **1.11.8 — PT/EN coverage:** improved translations for battery, RAM, GPU, frequency, Advanced Cleanup and dynamic storage summaries.
-- **1.11.8 — Settings behavior:** Automatic mode shows an explanation and direct link to its options; Advanced mode keeps manual controls without resetting automatic trials just to view Settings.
-- **Test results:** FullDebug build, language harness, and POCO X7 5G / Android 16 UI checks passed without observed crash. The Galaxy S24 Ultra reporter's issue and untested diagnostics are not fully verified.
-- **Pending review:** CodeRabbit reported **13 technical findings** on PR #12 that the UI-only fix did not resolve. CodeQL also produced a new static-analysis alert although the workflow completed successfully. Do not interpret green CI as a clean review.
+### Version history: 1.11.7 and 1.11.8
 
-[View changes in PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12) · [English website](https://langraficagr-collab.github.io/adaptive-performance/en.html#novidades)
+Battery/fluency changes from 1.11.7 and localization/navigation fixes from 1.11.8 are included in the published **1.11.9** release. See [PR #12 history](https://github.com/langraficagr-collab/adaptive-performance/pull/12). Version 1.11.6 remains an older preview; 1.11.1 is a historical release.
 
-## Current release: 1.11.1 — stability review
+## Previous release: 1.11.1 — stability review
 
 **Android build:** `1.11.1-review-fixes` (**versionCode 83**). [Download full APK](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1).
 

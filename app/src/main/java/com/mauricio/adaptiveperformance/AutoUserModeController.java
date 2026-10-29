@@ -100,6 +100,7 @@ public final class AutoUserModeController {
     private static void applyConservativeProfile(SharedPreferences prefs, long now,
                                                  int batteryPct, float tempC) {
         if (!prefs.getBoolean("conservative_profile_initialized", false)) {
+            boolean manualPreloadEnabled = prefs.getBoolean("auto_preload_enabled", false);
             SharedPreferences.Editor e = prefs.edit()
                     .putBoolean("conservative_profile_initialized", true)
                     .putBoolean("smart_suite_enabled", true)
@@ -143,6 +144,7 @@ public final class AutoUserModeController {
                     .putString("thermal_mode", "auto")
                     .putString("zram_profile", "normal");
             ConservativeTuningController.applySafeDefaults(e);
+            if (manualPreloadEnabled) e.putBoolean("auto_preload_enabled", true);
             e.apply();
         }
         ConservativeTuningController.initialize(prefs);

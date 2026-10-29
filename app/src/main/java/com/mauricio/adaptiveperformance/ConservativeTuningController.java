@@ -76,6 +76,29 @@ final class ConservativeTuningController {
             return;
         }
 
+        // A disconnected shell must pause, not skip or roll back, an option
+        // that depends on Shizuku. Restart comparable sampling on reconnection.
+        int pendingPhase = prefs.getInt(P + "phase", 0);
+        String pendingStage = prefs.getString(P + "stage", "baseline");
+        if (pendingPhase >= 0 && pendingPhase < PHASES
+                && shellRequired(OPTIONS[pendingPhase][0])) {
+            if (!prefs.getBoolean("cap_shell_ready", false)) {
+                if (!prefs.getBoolean(P + "shell_paused", false))
+                    prefs.edit().putBoolean(P + "shell_paused", true).apply();
+                setStatus(prefs, "Aguardando Shizuku para avaliar " + phaseName(pendingPhase));
+                return;
+            }
+            if (prefs.getBoolean(P + "shell_paused", false)) {
+                prefs.edit().putBoolean(P + "shell_paused", false).apply();
+                if ("trial".equals(pendingStage)) {
+                    startWindow(prefs, "trial", now);
+                    prefs.edit().putLong(P + "deadline", now + WINDOW_MS).apply();
+                } else if ("baseline".equals(pendingStage)) {
+                    startWindow(prefs, "baseline", now);
+                }
+            }
+        }
+
         if ("probation".equals(prefs.getString(P + "stage", "baseline"))) {
             int probationPhase = prefs.getInt(P + "phase", 0);
             if (probationPhase < 0 || probationPhase >= PHASES) {
@@ -568,6 +591,15 @@ final class ConservativeTuningController {
                 .putBoolean(key, !p.getBoolean(P + "snapshot_value", false)).commit();
     }
 
+    private static boolean shellRequired(String option) {
+        return "cpu_pressure_control".equals(option)
+                || "system_battery_guard".equals(option)
+                || "dynamic_doze_whitelist".equals(option)
+                || "system_radio_savings".equals(option)
+                || "adaptive_screen_timeout".equals(option)
+                || "maximum_battery_mode".equals(option);
+    }
+
     private static void advance(SharedPreferences p, int phase, long now, String priorResult) {
         String key = OPTIONS[phase][0];
         if (priorResult != null) {
@@ -577,8 +609,18 @@ final class ConservativeTuningController {
                     .putString("ml_last_verdict_" + key, priorResult);
             if (priorResult.startsWith("Revertido") || priorResult.startsWith("teste revertido")) {
                 learning.putInt("ml_reverted_" + key,
-                        Math.min(10000, p.getInt("ml_reverted_" + key, 0) + 1))
-                        .putLong(P + "retry_after_" + key, now + 24L*60L*60L*1000L);
+                        Math.min(10000, p.getInt("ml_reverted_" + key, 0) + 1));
+                // Missing samples, a changed environment, or lost permissions
+                // are inconclusive; only measured regressions get a 24h cooldown.
+                boolean measuredRegression = priorResult.contains("piora de CPU")
+                        || priorResult.contains("piora grave")
+                        || priorResult.contains("temperatura subiu")
+                        || priorResult.contains("consumo disparou")
+                        || priorResult.contains("regressão");
+                if (measuredRegression) {
+                    learning.putLong(P + "retry_after_" + key,
+                            now + 24L * 60L * 60L * 1000L);
+                }
             }
             if (priorResult.startsWith("Confirmado")) {
                 learning.putInt("ml_confirmed_" + key,

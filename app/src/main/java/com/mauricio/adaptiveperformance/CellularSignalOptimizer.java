@@ -33,12 +33,28 @@ public final class CellularSignalOptimizer {
 
     public static void evaluate(SharedPreferences p, IPrivilegedService s) {
         if (s == null) return;
-        // Automatic SIM switching requires a verified write capability.
+        // Network measurements are read-only. Never require radio-write permission
+        // just to refresh the displayed signal strength.
         if (!p.getBoolean("cap_radio_switch", false)) {
+            long now = System.currentTimeMillis();
+            boolean force = p.getBoolean("signal_optimizer_force_check", false);
+            long last = p.getLong("signal_optimizer_last_check", 0L);
+            long interval = Math.max(1, Math.min(30, p.getInt("signal_optimizer_interval_min", 1))) * 60_000L;
+            if (force || last <= 0L || now - last >= interval) {
+                try {
+                    saveSignal(p, readSignal(s));
+                    p.edit().putLong("signal_optimizer_last_check", now).apply();
+                } catch (Exception error) {
+                    p.edit().putString("signal_optimizer_status",
+                            "Falha na leitura de sinal: " + error.getClass().getSimpleName()).apply();
+                    return;
+                }
+            }
             p.edit().putBoolean("signal_optimizer_enabled", false)
+                    .putBoolean("signal_optimizer_force_check", false)
                     .putString("signal_optimizer_status",
-                        "Troca automática de rede desativada: comando de gravação não validado").apply();
-            restoreIfNeeded(p, s);
+                            "Leitura de sinal disponível; troca automática não autorizada").apply();
+            // Do not attempt a modem write (including restore) without permission.
             return;
         }
         boolean enabled = p.getBoolean("signal_optimizer_enabled", false);

@@ -16,8 +16,8 @@ android {
         buildConfigField("boolean", "LEAN_MODE", "false")
         buildConfigField("boolean", "CONSERVATIVE_MODE", "false")
         resValue("string", "app_name", "Adaptive Performance")
-        versionCode = 89
-        versionName = "1.11.7-battery-fluidity"
+        versionCode = 90
+        versionName = "1.11.8-i18n-settings"
     }
 
     flavorDimensions += "edition"

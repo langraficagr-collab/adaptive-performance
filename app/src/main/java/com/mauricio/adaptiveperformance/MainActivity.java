@@ -43,7 +43,7 @@ public class MainActivity extends Activity {
     private LinearLayout content;
     private ScrollView mainScroll;
     private SparklineView chart;
-    private View actionsPlaceholder;
+    private View actionsPlaceholder, automaticSettingsCard;
     private boolean actionsBuilt = false;
     private int actionsInsertIndex = -1;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -527,6 +527,7 @@ public class MainActivity extends Activity {
 
     private void buildAutomaticModeCard() {
         LinearLayout c = card();
+        automaticSettingsCard = c;
         addSectionTitle(c, "✦", "Otimização automática", "O aplicativo escolhe e testa as melhores configurações por você");
         String autoStatus = prefs.getString("auto_user_status",
                 "Aprendizado inicial • priorizando economia de bateria");
@@ -537,10 +538,10 @@ public class MainActivity extends Activity {
         c.addView(status);
 
         TextView details = text(UiLanguage.english(prefs) ?
-                "Automatic mode takes a 2-minute baseline, trials one reversible setting for 2 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. App preloading still runs every 15 minutes." :
+                "Automatic mode takes a 2-minute baseline, trials one reversible setting for 2 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. Optional app preloading is off by default to save battery." :
                 BuildConfig.CONSERVATIVE_MODE
                 ? "Testa uma opção por vez e desfaz se houver piora. Pré-aquece no máximo 2 APKs usados nos últimos 15 min, a cada 15 min, com limite total de 32 MB. Pausa em bateria baixa, carregamento, pouca RAM ou calor; desativa ciclos futuros se medir aumento relevante de consumo ou temperatura. O Android pode liberar o cache; os apps não ficam presos na RAM."
-                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível por 2 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. A cada 15 minutos, pré-carrega aplicativos recentes, sem protegê-los contra congelamento.",
+                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível por 2 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. O pré-carregamento de apps é opcional e fica desligado por padrão para economizar bateria.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
@@ -566,9 +567,9 @@ public class MainActivity extends Activity {
 
         TextView recentHint = text(UiLanguage.english(prefs)
                 ? "Recent apps: only apps used during the last " + recentWindow
-                  + " minutes; preloading runs every 15 minutes."
+                  + " minutes; optional preloading checks every 15 minutes when enabled."
                 : "Reconhecimento inteligente: considera somente os aplicativos usados nos últimos "
-                  + recentWindow + " minutos; o ciclo roda a cada 15 minutos.", 12, MUTED, false);
+                  + recentWindow + " minutos; a pré-carga opcional verifica a cada 15 minutos se ativada.", 12, MUTED, false);
         recentHint.setPadding(dp(4), dp(2), dp(4), dp(8));
         c.addView(recentHint);
 
@@ -793,10 +794,14 @@ public class MainActivity extends Activity {
         // Advanced controls are not initialized in automatic mode. Never build
         // them on demand: their view references can be null and crash the UI.
         if (!isAdvancedUserMode()) {
-            mainScroll.post(() -> mainScroll.smoothScrollTo(0, 0));
-            android.widget.Toast.makeText(this,
-                    tr("Configurações automáticas no início da tela. Para opções manuais, selecione Avançado."),
-                    android.widget.Toast.LENGTH_LONG).show();
+            new AlertDialog.Builder(this)
+                    .setTitle(tr("Configurações do modo Automático"))
+                    .setMessage(tr("O modo Automático gerencia os ajustes e testa mudanças reversíveis. Toque em Ver opções automáticas para abrir o painel. Para controles manuais, selecione Avançado na tela inicial."))
+                    .setPositiveButton(tr("Ver opções automáticas"), (dialog, which) -> {
+                        if (automaticSettingsCard != null) mainScroll.post(() ->
+                                mainScroll.smoothScrollTo(0, automaticSettingsCard.getTop()));
+                    })
+                    .setNegativeButton(tr("Fechar"), null).show();
             return;
         }
         if (!actionsBuilt) {

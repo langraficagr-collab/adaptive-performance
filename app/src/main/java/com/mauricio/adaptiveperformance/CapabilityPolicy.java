@@ -59,6 +59,12 @@ final class CapabilityPolicy {
     }
 
     private static void clearUnavailable(SharedPreferences p) {
+        if (!p.getBoolean("cap_shell_ready", false)
+                && !p.getBoolean("cap_psi", false)
+                && !p.getBoolean("cap_cpu_write", false)
+                && !p.getBoolean("cap_gpu_write", false)
+                && !p.getBoolean("cap_zram_write", false)
+                && !p.contains("cap_checked_at")) return;
         p.edit().putBoolean("cap_shell_ready", false)
                 .putBoolean("cap_psi", false)
                 .putBoolean("cap_cpu_write", false)

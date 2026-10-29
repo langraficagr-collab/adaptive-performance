@@ -10,8 +10,7 @@ final class CapabilityPolicy {
     static void reconcile(SharedPreferences p, IPrivilegedService s) {
         long now = System.currentTimeMillis();
         if (s == null) {
-            if (p.getBoolean("cap_shell_ready", false))
-                p.edit().putBoolean("cap_shell_ready", false).apply();
+            invalidateShellCapabilities(p, true);
             return;
         }
         long checkedAt = p.getLong("cap_checked_at", 0L);
@@ -47,8 +46,26 @@ final class CapabilityPolicy {
             e.putBoolean("smart_auto_cleanup", false);
             e.apply();
         } catch (Exception ignored) {
-            p.edit().putBoolean("cap_shell_ready", false).apply();
+            invalidateShellCapabilities(p, true);
         }
+    }
+
+    private static void invalidateShellCapabilities(SharedPreferences p, boolean resetProbe) {
+        boolean stale = p.getBoolean("cap_shell_ready", false)
+                || p.getBoolean("cap_psi", false)
+                || p.getBoolean("cap_cpu_write", false)
+                || p.getBoolean("cap_gpu_write", false)
+                || p.getBoolean("cap_zram_write", false)
+                || (resetProbe && p.contains("cap_checked_at"));
+        if (!stale) return;
+        SharedPreferences.Editor e = p.edit()
+                .putBoolean("cap_shell_ready", false)
+                .putBoolean("cap_psi", false)
+                .putBoolean("cap_cpu_write", false)
+                .putBoolean("cap_gpu_write", false)
+                .putBoolean("cap_zram_write", false);
+        if (resetProbe) e.remove("cap_checked_at");
+        e.apply();
     }
 
     /** Only sample features that can actually take effect in the current privilege mode. */

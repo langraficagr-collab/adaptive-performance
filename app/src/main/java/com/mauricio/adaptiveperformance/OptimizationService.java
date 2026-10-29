@@ -388,10 +388,11 @@ public class OptimizationService extends Service {
                 long now = SystemClock.elapsedRealtime();
                 // Native BatteryManager and thermal callbacks stay available; avoid
                 // repeated heavy dumpsys thermalservice calls when the phone is hot.
-                boolean cachedHot = tempC >= 38f
-                        || (cachedThermals != null && cachedThermals.skin >= 43f);
-                long thermalInterval = interactive ? 180_000L : 600_000L;
-                // Battery and native ThermalHeadroom callbacks provide prompt safety signals.
+                boolean heating = tempC >= 38f || nativeThermalRisk;
+                // Use lower-overhead native callbacks between bounded shell reads.
+                // Cached SoC/skin observations must not drive decisions indefinitely.
+                long thermalInterval = interactive
+                        ? (heating ? 60_000L : 90_000L) : 600_000L;
                 boolean readThermal = lastThermalReadElapsed <= 0L
                         || now - lastThermalReadElapsed >= thermalInterval;
 
@@ -417,7 +418,12 @@ public class OptimizationService extends Service {
                     cachedThermals = thermals;
                     lastThermalReadElapsed = now;
                 } else {
-                    thermals = cachedThermals;
+                    long age = lastThermalReadElapsed <= 0L
+                            ? Long.MAX_VALUE : now - lastThermalReadElapsed;
+                    // Screen-off remains low-impact; stale SoC/skin data is
+                    // discarded rather than treated as a current measurement.
+                    if (age >= 0L && age <= 120_000L && cachedThermals != null)
+                        thermals = cachedThermals;
                     thermals.battery = tempC;
                 }
             } catch (Throwable ignored) {}
@@ -971,6 +977,14 @@ public class OptimizationService extends Service {
                     .putBoolean("hot_hardware_guard", false)
                     .putString("charging_low_impact_note", "Temperatura normal; modo normal")
                     .apply();
+        }
+        // CPU-budget throttling must not override thermal-protection cadence
+        // while the screen is interactive and a temperature/risk signal is hot.
+        if (interactive && (tempC >= 38f || nativeThermalRisk
+                || thermalLevelApplied > 0
+                || (thermals.skin > 0f && thermals.skin >= 42f)
+                || (thermals.soc > 0f && thermals.soc >= 54f))) {
+            nextLoopDelayMs = Math.min(nextLoopDelayMs, emergency ? 30_000L : 60_000L);
         }
     }
 

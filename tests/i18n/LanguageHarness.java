@@ -8,7 +8,7 @@ public class LanguageHarness {
         return (SharedPreferences) Proxy.newProxyInstance(
                 LanguageHarness.class.getClassLoader(), new Class[]{SharedPreferences.class},
                 (proxy, method, args) -> {
-                    if (method.getName().equals("getString") && "app_language".equals(args[0])) return lang;
+                    if (method.getName().equals("getString") && args != null && args.length > 0 && "app_language".equals(args[0])) return lang;
                     return args != null && args.length > 1 ? args[1] : null;
                 });
     }

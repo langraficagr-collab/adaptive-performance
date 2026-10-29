@@ -44,8 +44,7 @@ final class AdaptivePreloadController {
                         .putBoolean("auto_preload_monitor_pending", false).apply();
             return;
         }
-        if (BuildConfig.CONSERVATIVE_MODE
-                && prefs.getBoolean("auto_preload_monitor_pending", false)) {
+        if (prefs.getBoolean("auto_preload_monitor_pending", false)) {
             boolean sameScreenState = prefs.getBoolean("auto_preload_monitor_interactive", interactive)
                     == interactive;
             float priorControlTemp = prefs.getFloat("auto_preload_monitor_control_temp", -1f);
@@ -89,7 +88,7 @@ final class AdaptivePreloadController {
                         "Pré-carga pausada: previsão de uso/temperatura").apply();
             return;
         }
-        if (!prefs.getBoolean("auto_preload_enabled", true)) {
+        if (!prefs.getBoolean("auto_preload_enabled", false)) {
             if (!prefs.getString("auto_preload_status", "").startsWith("Pré-carga desativada")) {
                 setStatus("Pré-carga desativada pelo usuário", 0, now);
             }
@@ -187,13 +186,11 @@ final class AdaptivePreloadController {
                 .putLong("auto_preload_cycle_at", now)
                 .putString("auto_preload_status", preloadStatus)
                 .putString("auto_preload_last_result", normalizedResult);
-        if (BuildConfig.CONSERVATIVE_MODE) {
-            resultEditor.putBoolean("auto_preload_monitor_pending", !preloadFailed)
+        resultEditor.putBoolean("auto_preload_monitor_pending", !preloadFailed)
                     .putBoolean("auto_preload_monitor_interactive", interactive)
                     .putFloat("auto_preload_monitor_control_temp", temperatureC)
                     .putFloat("auto_preload_monitor_battery_temp", batteryTemperatureC)
                     .putFloat("auto_preload_monitor_power_w", powerW);
-        }
         resultEditor.apply();
     }
 

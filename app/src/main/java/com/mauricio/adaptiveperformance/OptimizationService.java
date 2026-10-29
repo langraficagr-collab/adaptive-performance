@@ -246,6 +246,7 @@ public class OptimizationService extends Service {
         super.onCreate();
         serviceDestroyed = false;
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        BatteryFirstDefaults.apply(prefs);
         ServiceContinuityMonitor.onServiceStart(prefs);
         incidentProbe = new IncidentProbe(prefs);
         personalUsageML = new PersonalUsageML(prefs);
@@ -389,15 +390,17 @@ public class OptimizationService extends Service {
                 // repeated heavy dumpsys thermalservice calls when the phone is hot.
                 boolean cachedHot = tempC >= 38f
                         || (cachedThermals != null && cachedThermals.skin >= 43f);
-                long thermalInterval = cachedHot || batteryChargingNow
-                        ? 90_000L : (interactive ? 60_000L : 120_000L);
+                long thermalInterval = interactive ? 180_000L : 600_000L;
+                // Battery and native ThermalHeadroom callbacks provide prompt safety signals.
                 boolean readThermal = lastThermalReadElapsed <= 0L
                         || now - lastThermalReadElapsed >= thermalInterval;
 
                 String command =
                     "cat /proc/stat | head -1; echo __SEP__; " +
                     "for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq; do cat \"$f\" 2>/dev/null; done; " +
-                    "echo __SEP__; dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'; ";
+                    "echo __SEP__; " + (interactive
+                        ? "dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'; "
+                        : "printf '\n'; ");
                 if (readThermal) {
                     command += "echo __THERM__; dumpsys thermalservice 2>/dev/null | awk '/Current temperatures from HAL:/{cur=1; next} /Current cooling devices from HAL:/{cur=0} cur && /Temperature\\{mValue=/{print}'";
                 }
@@ -1487,10 +1490,12 @@ public class OptimizationService extends Service {
         long before = dataFreeKb();
         ArrayList<String> done = new ArrayList<>();
         ArrayList<String> notes = new ArrayList<>();
-        if (cache) {
+        if (cache || dexCache) {
             String trim = CachePolicy.manualTrim(privileged);
-            if (trim.startsWith("Solicitação de limpeza")) done.add("cache de apps (solicitação enviada)");
-            else notes.add("cache de apps: " + trim);
+            String label = cache && dexCache ? "cache de apps/Android"
+                    : (cache ? "cache de apps" : "caches do Android");
+            if (trim.startsWith("Solicitação de limpeza")) done.add(label + " (solicitação enviada)");
+            else notes.add(label + ": " + trim);
         }
         if (thumbs) {
             privileged.exec("find /sdcard/DCIM/.thumbnails /sdcard/Pictures/.thumbnails -mindepth 1 -type f -delete 2>/dev/null; true");
@@ -1525,12 +1530,6 @@ public class OptimizationService extends Service {
         if (editorTemp) {
             privileged.exec("find /sdcard/Download -maxdepth 2 -type f \\( -name '*~' -o -name '*.temp' -o -name '*.swp' -o -name '*.swo' \\) -mtime +7 -delete 2>/dev/null; true");
             done.add("temporários de editores");
-        }
-        if (dexCache) {
-            // Solicita apenas a limpeza suportada pelo Package Manager; não remove APK/dados do usuário.
-            String trim = CachePolicy.manualTrim(privileged);
-            if (trim.startsWith("Solicitação de limpeza")) done.add("caches do Android (solicitação enviada)");
-            else notes.add("caches do Android: " + trim);
         }
         try { Thread.sleep(700L); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
         long after = dataFreeKb();

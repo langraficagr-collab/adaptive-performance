@@ -62,7 +62,7 @@ final class ConservativeTuningController {
                 .putBoolean("wakeup_network_guard", false)
                 .putBoolean("system_radio_savings", false)
                 .putBoolean("adaptive_refresh", true)
-                .putBoolean("auto_preload_enabled", true);
+                .putBoolean("auto_preload_enabled", false);
     }
 
     static void evaluate(SharedPreferences prefs, int batteryPct, float tempC,
@@ -420,6 +420,8 @@ final class ConservativeTuningController {
             return "CONSUMO";
         }
         if (base.avgPower > 0f && test.avgPower > 0f) {
+            // An unstable workload/current signal cannot validate a 2-minute A/B win.
+            if (base.powerCv > 0.40f || test.powerCv > 0.40f) return "DADOS";
             if (test.avgPower > base.avgPower * 1.02f) return "CONSUMO";
             // CPU/RAM changes are safety signals, never evidence of battery saving.
             if (test.avgPower <= base.avgPower * 0.93f) return "MELHORA";
@@ -467,6 +469,8 @@ final class ConservativeTuningController {
                 .putFloat(P + "max_soc", Math.max(p.getFloat(P + "max_soc", 0f), socTempC));
         if (powerW > 0f) e.putFloat(P + "sum_power",
                 p.getFloat(P + "sum_power", 0f) + powerW)
+                .putFloat(P + "sum_power_sq",
+                    p.getFloat(P + "sum_power_sq", 0f) + powerW * powerW)
                 .putInt(P + "power_samples", p.getInt(P + "power_samples", 0) + 1);
         if (jankPct >= 0f) e.putFloat(P + "sum_jank",
                 p.getFloat(P + "sum_jank", 0f) + jankPct)
@@ -486,6 +490,11 @@ final class ConservativeTuningController {
         m.maxSoc = p.getFloat(P + "max_soc", -1f);
         int pn = p.getInt(P + "power_samples", 0);
         m.avgPower = pn > 0 ? p.getFloat(P + "sum_power", 0f) / pn : -1f;
+        if (pn > 1 && m.avgPower > 0f) {
+            double variance = Math.max(0d,
+                    p.getFloat(P + "sum_power_sq", 0f) / pn - m.avgPower * m.avgPower);
+            m.powerCv = (float) (Math.sqrt(variance) / m.avgPower);
+        } else m.powerCv = 1f;
         int jn = p.getInt(P + "jank_samples", 0);
         m.avgJank = jn > 0 ? p.getFloat(P + "sum_jank", 0f) / jn : -1f;
         m.maxTemp = p.getFloat(P + "max_temp", 0f);
@@ -501,6 +510,7 @@ final class ConservativeTuningController {
                 .putFloat(P + "base_cpu", m.avgCpu)
                 .putFloat(P + "base_ram", m.avgRam)
                 .putFloat(P + "base_power", m.avgPower)
+                .putFloat(P + "base_power_cv", m.powerCv)
                 .putFloat(P + "base_jank", m.avgJank)
                 .putFloat(P + "base_max_temp", m.maxTemp)
                 .putFloat(P + "base_soc", m.avgSoc)
@@ -515,6 +525,7 @@ final class ConservativeTuningController {
         m.avgCpu = p.getFloat(P + "base_cpu", -1f);
         m.avgRam = p.getFloat(P + "base_ram", -1f);
         m.avgPower = p.getFloat(P + "base_power", -1f);
+        m.powerCv = p.getFloat(P + "base_power_cv", 1f);
         m.avgJank = p.getFloat(P + "base_jank", -1f);
         m.maxTemp = p.getFloat(P + "base_max_temp", -1f);
         m.avgSoc = p.getFloat(P + "base_soc", -1f);
@@ -621,6 +632,7 @@ final class ConservativeTuningController {
                 .putInt(P + "power_samples", 0).putInt(P + "jank_samples", 0)
                 .putFloat(P + "sum_temp", 0f).putFloat(P + "sum_cpu", 0f)
                 .putFloat(P + "sum_ram", 0f).putFloat(P + "sum_power", 0f)
+                .putFloat(P + "sum_power_sq", 0f)
                 .putFloat(P + "sum_jank", 0f).putFloat(P + "max_temp", 0f)
                 .putFloat(P + "sum_soc", 0f).putFloat(P + "max_soc", 0f)
                 .putInt(P + "soc_samples", 0)
@@ -744,7 +756,7 @@ final class ConservativeTuningController {
 
     private static final class Metrics {
         int n;
-        float avgTemp, avgCpu, avgRam, avgPower, avgJank, maxTemp, avgSoc, maxSoc;
+        float avgTemp, avgCpu, avgRam, avgPower, powerCv, avgJank, maxTemp, avgSoc, maxSoc;
         int startBattery, endBattery;
         long startAt, endAt;
 

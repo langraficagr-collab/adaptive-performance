@@ -22,16 +22,15 @@ final class AppCostGuard {
         cycles++;
         if (windowWall >= 600000L) {
             float pct = 100f * windowCpu / Math.max(1L, windowWall);
-            // CPU-only estimate using 1 watt/core while CPU time is consumed.
-            float mwhEstimate = windowCpu / 3600f;
-            throttle = pct > 3f;
+            // Process CPU time is measurable; battery energy is not inferable from it.
+            throttle = pct > 1.5f;
             p.edit().putFloat("app_cost_cpu_pct", pct)
-                .putFloat("app_cost_estimated_mwh", mwhEstimate)
+                .putFloat("app_cost_estimated_mwh", -1f)
                 .putInt("app_cost_poll_count", cycles)
                 .putBoolean("app_cost_throttled", throttle)
                 .putString("app_cost_status", String.format(Locale.US,
-                    "CPU %.2f%% • energia CPU estimada %.3f mWh • %d verificações • %s",
-                    pct, mwhEstimate, cycles, throttle ? "cadência reduzida" : "normal"))
+                    "CPU %.2f%% • %d ms de CPU / janela • %d verificações • %s",
+                    pct, windowCpu, cycles, throttle ? "cadência reduzida" : "normal"))
                 .apply();
             windowWall = windowCpu = 0L;
             cycles = 0;

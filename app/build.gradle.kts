@@ -16,8 +16,8 @@ android {
         buildConfigField("boolean", "LEAN_MODE", "false")
         buildConfigField("boolean", "CONSERVATIVE_MODE", "false")
         resValue("string", "app_name", "Adaptive Performance")
-        versionCode = 88
-        versionName = "1.11.6-shizuku-ml"
+        versionCode = 89
+        versionName = "1.11.7-battery-fluidity"
     }
 
     flavorDimensions += "edition"

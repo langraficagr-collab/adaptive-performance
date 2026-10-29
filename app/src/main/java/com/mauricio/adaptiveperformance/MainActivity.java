@@ -76,6 +76,7 @@ public class MainActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        BatteryFirstDefaults.apply(prefs);
         uiFrameSampler = new UiFrameSampler(this,prefs);
         if (BuildConfig.LEAN_MODE) {
             prefs.edit().putString("user_mode", "auto").putBoolean("master", false).apply();
@@ -574,7 +575,7 @@ public class MainActivity extends Activity {
         String preloadLabel = BuildConfig.CONSERVATIVE_MODE
                 ? "Pré-aquecer até 2 APKs a cada 15 minutos"
                 : "Pré-carregar automaticamente os 4 apps mais usados";
-        Switch preloadSwitch = actionSwitch(preloadLabel, "auto_preload_enabled", true);
+        Switch preloadSwitch = actionSwitch(preloadLabel, "auto_preload_enabled", false);
         if (!BuildConfig.CONSERVATIVE_MODE) c.addView(preloadSwitch);
 
         preloadStatusText = text(prefs.getString("auto_preload_status",

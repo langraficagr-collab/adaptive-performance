@@ -149,7 +149,12 @@ public final class AutoUserModeController {
                 e.putBoolean("auto_preload_enabled", true);
             e.apply();
         }
+        // initialize() can reset defaults on a schema migration. Preserve an
+        // existing explicit opt-in across that first conservative initialization.
+        boolean manualPreloadOptIn = prefs.getBoolean("auto_preload_enabled", false);
         ConservativeTuningController.initialize(prefs);
+        if (manualPreloadOptIn && !prefs.getBoolean("auto_preload_enabled", false))
+            prefs.edit().putBoolean("auto_preload_enabled", true).apply();
         String battery = batteryPct >= 0 ? " • bateria " + batteryPct + "%" : "";
         String heat = tempC > 0f ? String.format(java.util.Locale.US, " • %.1f°C", tempC) : "";
         prefs.edit().putLong("auto_user_last_apply", now)

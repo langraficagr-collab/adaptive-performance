@@ -6,7 +6,7 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "AdaptivePerformance"
-include(":app", ":reddit-promo", ":liteapp", ":nativeapp")
+include(":app", ":reddit-promo", ":liteapp")
 
 // pythonapp is an independent prototype, not part of the primary build.
 

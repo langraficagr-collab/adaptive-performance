@@ -68,10 +68,10 @@ public class StorageCleanupActivity extends Activity {
 
         Button trim=btn("Desfragmentar / otimizar armazenamento (TRIM)");
         trim.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("Otimizar armazenamento")
-                .setMessage("Em armazenamento flash/F2FS não é feita desfragmentação tradicional. Este botão executa TRIM/manutenção do Android para sinalizar blocos livres e ajudar o sistema a manter o armazenamento eficiente. Não apaga arquivos pessoais.")
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Otimizar", (d,w) -> requestTrim()).show());
+                .setTitle(tr("Otimizar armazenamento"))
+                .setMessage(tr("Em armazenamento flash/F2FS não é feita desfragmentação tradicional. Este botão executa TRIM/manutenção do Android para sinalizar blocos livres e ajudar o sistema a manter o armazenamento eficiente. Não apaga arquivos pessoais."))
+                .setNegativeButton(tr("Cancelar"), null)
+                .setPositiveButton(tr("Otimizar"), (d,w) -> requestTrim()).show());
         options.addView(trim);
         Button pauseTrim=btn("Pausar otimização / TRIM");
         pauseTrim.setOnClickListener(v -> requestPauseTrim());
@@ -109,14 +109,14 @@ public class StorageCleanupActivity extends Activity {
         setContentView(root);
     }
 
-    private void requestScan(){ status.setText("Analisando…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_SCAN); startForegroundService(i); }
-    private void requestLarge(){ largeFiles.setText("Analisando arquivos grandes…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_LARGE_SCAN); startForegroundService(i); }
+    private void requestScan(){ status.setText(tr("Analisando…")); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_SCAN); startForegroundService(i); }
+    private void requestLarge(){ largeFiles.setText(tr("Analisando arquivos grandes…")); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_LARGE_SCAN); startForegroundService(i); }
     private void showLargeDeleteDialog(){
         Set<String> raw=new HashSet<>(prefs.getStringSet("storage_large_entries",Collections.emptySet()));
         if(raw.isEmpty()){
-            new AlertDialog.Builder(this).setTitle("Arquivos grandes")
-                    .setMessage("Nenhum arquivo grande disponível. Execute a análise primeiro.")
-                    .setPositiveButton("OK",null).show();
+            new AlertDialog.Builder(this).setTitle(tr("Arquivos grandes"))
+                    .setMessage(tr("Nenhum arquivo grande disponível. Execute a análise primeiro."))
+                    .setPositiveButton(tr("OK"),null).show();
             return;
         }
         ArrayList<String> entries=new ArrayList<>(raw);
@@ -129,10 +129,10 @@ public class StorageCleanupActivity extends Activity {
             labels[i]=fmt(entryBytes(entries.get(i))/1024L)+" • "+name;
         }
         new AlertDialog.Builder(this)
-                .setTitle("Excluir arquivos grandes — marque os arquivos")
+                .setTitle(tr("Excluir arquivos grandes — marque os arquivos"))
                 .setMultiChoiceItems(labels,checked,(d,which,isChecked)->checked[which]=isChecked)
-                .setNegativeButton("Cancelar",null)
-                .setPositiveButton("Continuar",(d,w)->{
+                .setNegativeButton(tr("Cancelar"),null)
+                .setPositiveButton(tr("Continuar"),(d,w)->{
                     ArrayList<String> paths=new ArrayList<>(); long total=0;
                     for(int i=0;i<checked.length;i++) if(checked[i]){
                         paths.add(entryPath(entries.get(i))); total+=entryBytes(entries.get(i));
@@ -142,13 +142,13 @@ public class StorageCleanupActivity extends Activity {
                 }).show();
     }
     private void confirmLargeDelete(ArrayList<String> paths,long bytes){
-        new AlertDialog.Builder(this).setTitle("Confirmar exclusão")
-                .setMessage("Excluir permanentemente "+paths.size()+" arquivo(s), aproximadamente "+fmt(bytes/1024L)+"?\n\nEsta ação não pode ser desfeita.")
-                .setNegativeButton("Cancelar",null)
-                .setPositiveButton("Excluir",(d,w)->{
+        new AlertDialog.Builder(this).setTitle(tr("Confirmar exclusão"))
+                .setMessage(tr("Excluir permanentemente ")+paths.size()+tr(" arquivo(s), aproximadamente ")+fmt(bytes/1024L)+"?\n\n"+tr("Esta ação não pode ser desfeita."))
+                .setNegativeButton(tr("Cancelar"),null)
+                .setPositiveButton(tr("Excluir"),(d,w)->{
                     Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_DELETE_LARGE);
                     i.putStringArrayListExtra("paths",paths); startForegroundService(i);
-                    status.setText("Excluindo arquivos grandes selecionados…");
+                    status.setText(tr("Excluindo arquivos grandes selecionados…"));
                 }).show();
     }
     private long entryBytes(String entry){ try{ int b=entry.indexOf('|'); return Long.parseLong(entry.substring(0,b)); }catch(Exception e){return 0L;} }
@@ -160,10 +160,10 @@ public class StorageCleanupActivity extends Activity {
     }
     private void showUnusedApps(){
         if(!hasUsageAccess()){
-            new AlertDialog.Builder(this).setTitle("Acesso ao uso necessário")
-                    .setMessage("Para recomendar apps realmente sem uso há 15 dias, permita Acesso ao uso para o Adaptive Performance.")
-                    .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Abrir configurações",(d,w)->startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))).show();
+            new AlertDialog.Builder(this).setTitle(tr("Acesso ao uso necessário"))
+                    .setMessage(tr("Para recomendar apps realmente sem uso há 15 dias, permita Acesso ao uso para o Adaptive Performance."))
+                    .setNegativeButton(tr("Cancelar"),null)
+                    .setPositiveButton(tr("Abrir configurações"),(d,w)->startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))).show();
             return;
         }
         long now=System.currentTimeMillis(), cutoff=now-15L*24L*60L*60L*1000L;
@@ -184,22 +184,22 @@ public class StorageCleanupActivity extends Activity {
             apps.add(new AppCandidate(pkg,AppSafety.label(this,pkg),last));
         }
         apps.sort((a,b)->Long.compare(a.lastUse,b.lastUse));
-        unusedAppsSummary.setText(apps.isEmpty()?"Nenhum app elegível sem uso há mais de 15 dias.":apps.size()+" app(s) podem ser revisados para desinstalação.");
+        unusedAppsSummary.setText(tr(apps.isEmpty()?"Nenhum app elegível sem uso há mais de 15 dias.":apps.size()+" app(s) podem ser revisados para desinstalação."));
         if(apps.isEmpty()) return;
         String[] labels=new String[apps.size()];
         for(int i=0;i<apps.size();i++){
             AppCandidate a=apps.get(i);
             labels[i]=a.label+"\n"+(a.lastUse<=0?"Sem uso registrado nos últimos 120 dias":("Último uso há "+Math.max(15,(now-a.lastUse)/(24L*60L*60L*1000L))+" dias"));
         }
-        new AlertDialog.Builder(this).setTitle("Apps sem uso há mais de 15 dias")
+        new AlertDialog.Builder(this).setTitle(tr("Apps sem uso há mais de 15 dias"))
                 .setItems(labels,(d,which)->confirmUninstall(apps.get(which)))
-                .setNegativeButton("Fechar",null).show();
+                .setNegativeButton(tr("Fechar"),null).show();
     }
     private void confirmUninstall(AppCandidate app){
         new AlertDialog.Builder(this).setTitle("Desinstalar "+app.label+"?")
-                .setMessage("O Android abrirá a tela oficial de desinstalação. Nenhum app será removido automaticamente.")
-                .setNegativeButton("Cancelar",null)
-                .setPositiveButton("Abrir desinstalação",(d,w)->startActivity(new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+app.pkg))))
+                .setMessage(tr("O Android abrirá a tela oficial de desinstalação. Nenhum app será removido automaticamente."))
+                .setNegativeButton(tr("Cancelar"),null)
+                .setPositiveButton(tr("Abrir desinstalação"),(d,w)->startActivity(new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+app.pkg))))
                 .show();
     }
     private static class AppCandidate{
@@ -207,16 +207,16 @@ public class StorageCleanupActivity extends Activity {
         AppCandidate(String p,String l,long u){pkg=p;label=l;lastUse=u;}
     }
 
-    private void requestTrim(){ status.setText("Otimizando armazenamento…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM); startForegroundService(i); }
-    private void requestPauseTrim(){ status.setText("Pausando otimização…"); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM_ABORT); startForegroundService(i); }
+    private void requestTrim(){ status.setText(tr("Otimizando armazenamento…")); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM); startForegroundService(i); }
+    private void requestPauseTrim(){ status.setText(tr("Pausando otimização…")); Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_TRIM_ABORT); startForegroundService(i); }
     private void requestStorageHealthCheck(){
-        if(storageHealth!=null) storageHealth.setText("Verificando agora…");
+        if(storageHealth!=null) storageHealth.setText(tr("Verificando agora…"));
         Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_HEALTH_CHECK);
         startForegroundService(i);
     }
     private void confirmClean(){
         String msg="A limpeza vai atuar somente nas categorias marcadas. Fotos, vídeos, músicas e documentos pessoais não serão apagados automaticamente.";
-        new AlertDialog.Builder(this).setTitle("Confirmar limpeza").setMessage(msg).setNegativeButton("Cancelar",null).setPositiveButton("Limpar",(d,w)->requestClean()).show();
+        new AlertDialog.Builder(this).setTitle(tr("Confirmar limpeza")).setMessage(msg).setNegativeButton(tr("Cancelar"),null).setPositiveButton(tr("Limpar"),(d,w)->requestClean()).show();
     }
     private void requestClean(){
         Intent i=new Intent(this,OptimizationService.class).setAction(OptimizationService.ACTION_STORAGE_CLEAN)
@@ -224,17 +224,17 @@ public class StorageCleanupActivity extends Activity {
                 .putExtra("apk",apkSw.isChecked()).putExtra("diag",diagSw.isChecked()).putExtra("empty",emptySw.isChecked())
                 .putExtra("logs",logsSw.isChecked()).putExtra("stale",staleSw.isChecked())
                 .putExtra("editorTemp",editorTempSw.isChecked()).putExtra("dexCache",dexCacheSw.isChecked());
-        startForegroundService(i); status.setText("Limpando…");
+        startForegroundService(i); status.setText(tr("Limpando…"));
     }
 
     private final Runnable refreshLoop=new Runnable(){ @Override public void run(){ refresh(); h.postDelayed(this,1500); }};
     private void refresh(){
-        String st=prefs.getString("storage_cleanup_status","Ainda não analisado"); status.setText(st);
+        String st=prefs.getString("storage_cleanup_status","Ainda não analisado"); status.setText(tr(st));
         long kb=prefs.getLong("storage_scan_total_kb",0L);
         long th=prefs.getLong("storage_scan_thumbnails_kb",0L), pa=prefs.getLong("storage_scan_partial_kb",0L), ap=prefs.getLong("storage_scan_apk_kb",0L), dg=prefs.getLong("storage_scan_diag_kb",0L);
         String s="Potencial seguro identificado: "+fmt(kb)+"\nMiniaturas: "+fmt(th)+" • temporários: "+fmt(pa)+"\nAPKs antigos: "+fmt(ap)+" • diagnósticos: "+fmt(dg);
         long freed=prefs.getLong("storage_last_freed_kb",0L); if(freed>0) s += "\nÚltima limpeza liberou aproximadamente "+fmt(freed);
-        summary.setText(s);
+        summary.setText(tr(s));
         updateTrimProgress();
         if(storageHealth!=null){
             String hs=prefs.getString("storage_health_summary","Aguardando primeira verificação.");
@@ -243,9 +243,9 @@ public class StorageCleanupActivity extends Activity {
                 long min=Math.max(0L,(System.currentTimeMillis()-hc)/60000L);
                 hs += "\nÚltima verificação: " + (min<1 ? "agora" : (min+" min atrás"));
             }
-            storageHealth.setText(hs);
+            storageHealth.setText(tr(hs));
         }
-        largeFiles.setText(prefs.getString("storage_large_files","Nenhuma análise feita."));
+        largeFiles.setText(tr(prefs.getString("storage_large_files","Nenhuma análise feita.")));
     }
     private void updateTrimProgress(){
         if(trimProgress==null || trimPercent==null) return;
@@ -265,10 +265,12 @@ public class StorageCleanupActivity extends Activity {
         trimProgress.setProgress(pct);
         String state=running?"em andamento":paused?"pausado":"parado";
         if(pct>=100) state="estimativa concluída";
-        trimPercent.setText(pct+"% • "+state+" • estimado");
+        trimPercent.setText(tr(pct+"% • "+state+" • estimado"));
     }
 
     private String fmt(long kb){ if(kb>=1024*1024) return String.format(Locale.US,"%.2f GB",kb/1048576.0); if(kb>=1024) return String.format(Locale.US,"%.1f MB",kb/1024.0); return kb+" KB"; }
+
+    private String tr(String value){ return UiLanguage.tr(prefs,value); }
 
     private LinearLayout card(){ LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); l.setPadding(dp(16),dp(16),dp(16),dp(16)); l.setBackground(bg(CARD,BORDER,18)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.setMargins(0,0,0,dp(12)); l.setLayoutParams(p); return l; }
     private void addTitle(LinearLayout p,String icon,String a,String b){ TextView x=t(icon+"  "+a,19,TEXT,true); p.addView(x); TextView y=t(b,12,MUTED,false); y.setPadding(0,dp(4),0,dp(8)); p.addView(y); }

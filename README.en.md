@@ -4,6 +4,10 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
+## 1.11.9 — review findings addressed (PR #12, not yet released)
+
+Development build **1.11.9-review-fixes** (versionCode **91**) addresses the earlier 13 CodeRabbit comments plus the CodeQL warning in thermal sampling, radio read-only checks, Shizuku reconnects, preload persistence, inconclusive ML trials, ZRAM profiles and tests. Local Android build and lint passed, as did JVM migration/language tests. **Independent CI and code review of this new head are still required**; this is not a stable APK release. [Technical details](docs/review-fixes-1.11.9.md).
+
 ## Development updates — 1.11.8 (PR #12, not yet released)
 
 **Release status (October 29, 2026):** [1.11.1 is the latest published stable release](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1). [1.11.6 is a preview](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml). **1.11.8-i18n-settings** (versionCode **90**) was built and installed on a POCO X7 5G but is available only as code in [PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12), **not as a stable APK release**.

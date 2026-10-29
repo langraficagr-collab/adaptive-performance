@@ -12,6 +12,10 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
+## 1.11.9 — correções da revisão (PR #12, ainda sem release)
+
+Foi preparada a versão de desenvolvimento **1.11.9-review-fixes** (versionCode **91**) para tratar as 13 observações do CodeRabbit e o alerta CodeQL da versão anterior: cadência térmica, leitura de sinal sem troca de rede, reconexão Shizuku, persistência de pré-carga, vereditos inconclusivos, ZRAM e verificações de memória. Compilação e Android Lint local passaram; testes de migração/idioma passaram. **A nova revisão automatizada ainda é necessária** e nenhum APK estável foi publicado. [Detalhes das alterações](docs/review-fixes-1.11.9.md).
+
 ## Novidades em desenvolvimento — 1.11.8 (PR #12, ainda não lançada)
 
 **Situação das versões (29/10/2026):** [1.11.1 é a última versão estável publicada](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.1). A [1.11.6 é uma prévia](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.6-shizuku-ml). A **1.11.8-i18n-settings** (versionCode **90**) foi compilada e instalada em um POCO X7 5G, mas está somente no [PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12), **sem APK estável publicado**.

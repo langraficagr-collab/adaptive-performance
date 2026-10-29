@@ -246,6 +246,7 @@ public class OptimizationService extends Service {
         super.onCreate();
         serviceDestroyed = false;
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
+        BatteryFirstDefaults.apply(prefs);
         ServiceContinuityMonitor.onServiceStart(prefs);
         incidentProbe = new IncidentProbe(prefs);
         personalUsageML = new PersonalUsageML(prefs);
@@ -387,17 +388,19 @@ public class OptimizationService extends Service {
                 long now = SystemClock.elapsedRealtime();
                 // Native BatteryManager and thermal callbacks stay available; avoid
                 // repeated heavy dumpsys thermalservice calls when the phone is hot.
-                boolean cachedHot = tempC >= 38f
-                        || (cachedThermals != null && cachedThermals.skin >= 43f);
-                long thermalInterval = cachedHot || batteryChargingNow
-                        ? 90_000L : (interactive ? 60_000L : 120_000L);
+                // Keep hardware thermal samples bounded; never make decisions using
+                // ancient SoC/skin values after a failed or throttled shell read.
+                long thermalInterval = interactive ? 90_000L : 300_000L;
+                // Battery and native ThermalHeadroom callbacks provide prompt safety signals.
                 boolean readThermal = lastThermalReadElapsed <= 0L
                         || now - lastThermalReadElapsed >= thermalInterval;
 
                 String command =
                     "cat /proc/stat | head -1; echo __SEP__; " +
                     "for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq; do cat \"$f\" 2>/dev/null; done; " +
-                    "echo __SEP__; dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'; ";
+                    "echo __SEP__; " + (interactive
+                        ? "dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'; "
+                        : "printf '\n'; ");
                 if (readThermal) {
                     command += "echo __THERM__; dumpsys thermalservice 2>/dev/null | awk '/Current temperatures from HAL:/{cur=1; next} /Current cooling devices from HAL:/{cur=0} cur && /Temperature\\{mValue=/{print}'";
                 }
@@ -413,9 +416,16 @@ public class OptimizationService extends Service {
                     thermals = parseThermals(thermSplit[1], tempC);
                     cachedThermals = thermals;
                     lastThermalReadElapsed = now;
-                } else {
+                } else if (lastThermalReadElapsed > 0L
+                        && now - lastThermalReadElapsed < thermalInterval) {
                     thermals = cachedThermals;
                     thermals.battery = tempC;
+                } else {
+                    // BatteryManager and native ThermalHeadroom remain available.
+                    thermals = new ThermalSnapshot();
+                    thermals.battery = tempC;
+                    cachedThermals = thermals;
+                    lastThermalReadElapsed = 0L;
                 }
             } catch (Throwable ignored) {}
         }
@@ -458,6 +468,10 @@ public class OptimizationService extends Service {
         final boolean hotHardware = tempC >= 39f
                 || (thermals.skin > 0f && thermals.skin >= 44f)
                 || (thermals.soc > 0f && thermals.soc >= 60f);
+        final boolean thermalGuardActive = tempC >= 38f || nativeThermalRisk
+                || thermalLevelApplied > 0
+                || (thermals.skin > 0f && thermals.skin >= 43f)
+                || (thermals.soc > 0f && thermals.soc >= 54f);
         boolean automaticMode = AutoUserModeController.enabled(prefs);
         boolean lowBatteryAutomatic = automaticMode && !chargingNow && smartBatteryPct >= 0
                 && smartBatteryPct <= 50;
@@ -641,6 +655,7 @@ public class OptimizationService extends Service {
         }
         final int adaptivePressureScore = effectivePressure;
         prefs.edit().putFloat("thermal_soc_c", thermals.soc).apply();
+        CapabilityPolicy.reconcile(prefs, privileged);
         if (!BuildConfig.LEAN_MODE) restoreConservativeOptionIfNeeded();
         try {
             SmartRecommendationSuite.evaluate(this, prefs, privileged, fg, interactive,
@@ -947,17 +962,23 @@ public class OptimizationService extends Service {
                 || (thermals.soc > 0 && thermals.soc >= 69f);
         // CPU budget always applies, including hot conditions: a frequent
         // profiler loop adds heat rather than taking heat away.
-        long budgetDelay = appCostGuard.record(prefs, interactive, emergency);
+        long budgetDelay = appCostGuard.record(prefs, interactive,
+                emergency || thermalGuardActive);
         if (budgetDelay > 0L) nextLoopDelayMs = Math.max(nextLoopDelayMs, budgetDelay);
+        // Do not let optimizer CPU throttling postpone active thermal protection.
+        if (interactive && thermalGuardActive)
+            nextLoopDelayMs = Math.min(nextLoopDelayMs, 60_000L);
         if (lowImpactMode) {
             nextLoopDelayMs = Math.max(nextLoopDelayMs,
-                    !interactive ? 600_000L : (emergency ? 60_000L : 120_000L));
+                    !interactive ? 600_000L : (thermalGuardActive ? 60_000L : 120_000L));
             // Genuine thermal API and low-overhead battery broadcast remain active.
             String reason = !interactive
                     ? "Tela apagada: tarefas pesadas pausadas até desbloquear"
                     : (chargingNow
                     ? "Carregando: manutenção, diagnósticos e pré-carga pausados"
                     : "Aparelho quente: varreduras e pré-carga pausadas");
+            if (interactive && thermalGuardActive)
+                nextLoopDelayMs = Math.min(nextLoopDelayMs, 60_000L);
             prefs.edit().putBoolean("charging_low_impact_monitor", true)
                     .putBoolean("hot_hardware_guard", hotHardware)
                     .putString("charging_low_impact_note", reason)
@@ -1148,33 +1169,30 @@ public class OptimizationService extends Service {
     }
 
     private void setThermalLevel(int level) {
-        try {
-            if (level < 1 || level > 5) return;
-            if (thermalLevelApplied == level) return;
-            privileged.exec("cmd thermalservice override-status " + level);
-            thermalLevelApplied = level;
-            prefs.edit()
-                    .putInt("thermal_level", level)
-                    .putBoolean("thermal_stage1", level == 1)
-                    .apply();
-            String msg = level == 5 ? "Thermal nível 5 (emergência) ativado." :
-                    "Thermal nível " + level + " ativado.";
-            ChangeNotifier.notifyChange(this, "Proteção térmica alterada", msg, 1);
-        } catch (Throwable ignored) {}
+        // ThermalService override-status only spoofs Android's thermal status.
+        // It does not tune OEM power/clock limits and can interfere with safety.
+        thermalLevelApplied = 0;
+        prefs.edit().putInt("thermal_level", 0)
+                .putBoolean("thermal_stage1", false)
+                .putString("thermal_action_status",
+                        "Monitor térmico ativo; override inseguro desabilitado").apply();
     }
 
     private void resetThermalOverride() {
-        try {
-            if (thermalLevelApplied == 0) return;
-            privileged.exec("cmd thermalservice reset");
-            thermalLevelApplied = 0;
-            prefs.edit()
-                    .putInt("thermal_level", 0)
-                    .putBoolean("thermal_stage1", false)
-                    .apply();
-            ChangeNotifier.notifyChange(this, "Temperatura normalizada",
-                    "Override térmico removido; controle normal restaurado.", 1);
-        } catch (Throwable ignored) {}
+        // Clear a legacy Android thermal status override, never set a new one.
+        if (thermalLevelApplied > 0 && privileged != null) {
+            try {
+                String result = privileged.exec("cmd thermalservice reset 2>&1");
+                if (result != null && (result.contains("Error") || result.contains("Exception")
+                        || result.contains("Permission denied"))) return;
+            } catch (Throwable ignored) {
+                // Keep the prior state so another cleanup attempt is possible.
+                return;
+            }
+        }
+        thermalLevelApplied = 0;
+        prefs.edit().putInt("thermal_level", 0)
+                .putBoolean("thermal_stage1", false).apply();
     }
 
     private void apply60Hz() {
@@ -1488,9 +1506,13 @@ public class OptimizationService extends Service {
         prefs.edit().putString("storage_cleanup_status", "Limpando categorias selecionadas…").apply();
         long before = dataFreeKb();
         ArrayList<String> done = new ArrayList<>();
-        if (cache) {
-            privileged.exec("pm trim-caches 256G 2>/dev/null; true");
-            done.add("cache de apps");
+        ArrayList<String> notes = new ArrayList<>();
+        if (cache || dexCache) {
+            String trim = CachePolicy.manualTrim(privileged);
+            String label = cache && dexCache ? "cache de apps/Android"
+                    : (cache ? "cache de apps" : "caches do Android");
+            if (trim.startsWith("Solicitação de limpeza")) done.add(label + " (solicitação enviada)");
+            else notes.add(label + ": " + trim);
         }
         if (thumbs) {
             privileged.exec("find /sdcard/DCIM/.thumbnails /sdcard/Pictures/.thumbnails -mindepth 1 -type f -delete 2>/dev/null; true");
@@ -1526,18 +1548,17 @@ public class OptimizationService extends Service {
             privileged.exec("find /sdcard/Download -maxdepth 2 -type f \\( -name '*~' -o -name '*.temp' -o -name '*.swp' -o -name '*.swo' \\) -mtime +7 -delete 2>/dev/null; true");
             done.add("temporários de editores");
         }
-        if (dexCache) {
-            // Solicita apenas a limpeza suportada pelo Package Manager; não remove APK/dados do usuário.
-            privileged.exec("pm trim-caches 512G 2>/dev/null; true");
-            done.add("caches temporários do Android");
-        }
         try { Thread.sleep(700L); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
         long after = dataFreeKb();
         long freed = Math.max(0L, after - before);
         prefs.edit().putLong("storage_last_freed_kb", freed)
                 .putLong("storage_last_clean_at", System.currentTimeMillis())
-                .putString("storage_cleanup_status", "Limpeza concluída • " + (done.isEmpty() ? "nenhuma categoria selecionada" : String.join(", ", done))).apply();
-        IncidentHistory.add(prefs, "storage_cleanup", "Limpeza de espaço", "Liberado aprox. " + freed + " KB; " + String.join(", ", done), -1);
+                .putString("storage_cleanup_status", "Limpeza concluída • "
+                        + (done.isEmpty() ? "nenhuma ação confirmada" : String.join(", ", done))
+                        + (notes.isEmpty() ? "" : " • " + String.join("; ", notes))).apply();
+        IncidentHistory.add(prefs, "storage_cleanup", "Limpeza de espaço",
+                "Liberado aprox. " + freed + " KB; " + String.join(", ", done)
+                        + (notes.isEmpty() ? "" : "; " + String.join("; ", notes)), -1);
         storageScan();
     }
 

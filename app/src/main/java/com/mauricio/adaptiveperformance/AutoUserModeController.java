@@ -20,13 +20,17 @@ public final class AutoUserModeController {
         long now = System.currentTimeMillis();
         if (BuildConfig.CONSERVATIVE_MODE) {
             if (!prefs.getBoolean("conservative_preload_configured_v2", false)) {
-                prefs.edit().putBoolean("auto_preload_enabled", true)
-                        .putBoolean("conservative_preload_configured_v2", true)
+                SharedPreferences.Editor preload = prefs.edit();
+                if (!prefs.contains("auto_preload_enabled"))
+                    preload.putBoolean("auto_preload_enabled", false);
+                preload.putBoolean("conservative_preload_configured_v2", true)
                         .putInt("auto_preload_max_apps", 2)
                         .putInt("auto_preload_budget_cap_mb", 32)
                         .putLong("auto_preload_cycle_at", 0L)
                         .putString("auto_preload_status",
-                                "Pré-carga ativada: até 2 APKs a cada 15 min, máx. 32 MB")
+                                prefs.getBoolean("auto_preload_enabled", false)
+                                        ? "Pré-carga autorizada pelo usuário"
+                                        : "Pré-carga opcional: desligada para economizar bateria")
                         .apply();
             }
             long lastApply = prefs.getLong("auto_user_last_apply", 0L);
@@ -136,18 +140,26 @@ public final class AutoUserModeController {
                     .putBoolean("smart_auto_cleanup", false)
                     .putBoolean("app_ram_limiter_enabled", false)
                     .putBoolean("adaptive_freeze_enabled", false)
-                    .putBoolean("auto_preload_enabled", true)
+                    // Preserve the explicit preloading choice initialized above.
                     .putString("thermal_mode", "auto")
                     .putString("zram_profile", "normal");
             ConservativeTuningController.applySafeDefaults(e);
+            // The safe-default profile must not undo a user's explicit opt-in.
+            if (prefs.getBoolean("auto_preload_enabled", false))
+                e.putBoolean("auto_preload_enabled", true);
             e.apply();
         }
+        // initialize() can reset defaults on a schema migration. Preserve an
+        // existing explicit opt-in across that first conservative initialization.
+        boolean manualPreloadOptIn = prefs.getBoolean("auto_preload_enabled", false);
         ConservativeTuningController.initialize(prefs);
+        if (manualPreloadOptIn && !prefs.getBoolean("auto_preload_enabled", false))
+            prefs.edit().putBoolean("auto_preload_enabled", true).apply();
         String battery = batteryPct >= 0 ? " • bateria " + batteryPct + "%" : "";
         String heat = tempC > 0f ? String.format(java.util.Locale.US, " • %.1f°C", tempC) : "";
         prefs.edit().putLong("auto_user_last_apply", now)
                 .putString("auto_user_status",
-                        "Perfil conservador • até 2 APKs/15 min • cache limitado e pausado por calor, RAM ou bateria"
+                        "Perfil conservador • cache preservado e pré-carga opcional • economia de bateria"
                                 + battery + heat)
                 .apply();
     }

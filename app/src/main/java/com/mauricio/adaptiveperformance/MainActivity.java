@@ -77,6 +77,12 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
         BatteryFirstDefaults.apply(prefs);
+        // One-time migration: the removed ZRAM selector must not leave an
+        // inaccessible high-CPU profile selected on upgraded installations.
+        if (!prefs.getBoolean("zram_selector_removed_migration_v1", false)) {
+            prefs.edit().putString("zram_profile", "normal")
+                    .putBoolean("zram_selector_removed_migration_v1", true).commit();
+        }
         uiFrameSampler = new UiFrameSampler(this,prefs);
         if (BuildConfig.LEAN_MODE) {
             prefs.edit().putString("user_mode", "auto").putBoolean("master", false).apply();

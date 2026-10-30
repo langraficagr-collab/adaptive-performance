@@ -1,20 +1,25 @@
 # Adaptive Performance — English guide
 
-[Português](README.md) · [English website](https://langraficagr-collab.github.io/adaptive-performance/en.html) · [Download latest APK](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
+[Português](README.md) · [English website](https://langraficagr-collab.github.io/adaptive-performance/en.html) · [Download latest APK](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11)
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
-## Latest release: 1.11.9 — published October 29, 2026
+## Available version: 1.11.11 — test release · October 30, 2026
 
-**APK:** [Download Adaptive Performance v1.11.9](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.9/Adaptive-Performance-v1.11.9.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.9) · [Merged PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12).
+**APK:** [Download Adaptive Performance v1.11.11](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.11/Adaptive-Performance-v1.11.11.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11) · [Code under review in PR #14](https://github.com/langraficagr-collab/adaptive-performance/pull/14).
 
-**1.11.9-review-fixes** (versionCode **91**) includes lower optional background polling, preloading off by default while honoring user settings, broader PT/EN translations, clearer Automatic-mode Settings, Shizuku reconnect handling and capability audits, read-only signal checks, and safeguards against stale thermal data. See [1.11.9 details](docs/review-fixes-1.11.9.md), [1.11.8](docs/i18n-settings-1.11.8.md), and [1.11.7](docs/battery-fluidity-1.11.7.md).
+**1.11.11-user-apps-only** (versionCode **93**) applies inactivity restrictions only to user-installed apps. System apps, including updated system apps, are excluded. Previously tracked restrictions are restored automatically while preserving external changes.
 
-**Testing:** Android build and lint passed; local persistence/migration and language harnesses passed. CodeQL reported no new alerts in changed PR code. CodeRabbit skipped the final complete review, and local Android Lint reported 111 nonblocking warnings. **This is a development/debug-signed Full APK, not production-signed.** Battery savings and device compatibility vary. Install over the existing app only if the signing certificates match to preserve app data.
+- Normal monitoring: at least **120 seconds** with the display on; **60 seconds** under thermal/high-pressure conditions; at least **10 minutes** with the display off. Native events may request earlier readings.
+- Automatic trials require **30-minute** baseline/candidate windows with at least **12 spaced readings**. Provisional changes remain under **6–24-hour** observation; confirmation requires 12 comparable readings.
+- Cost accounting includes app/bridge/reaped-shell CPU when observable, command latency and timeouts. This is not complete energy attribution.
+- Recurrence counting and refresh-rate-aware frame sampling are corrected. Preloading remains optional and off by default.
 
-### Version history: 1.11.7 and 1.11.8
+**Validation:** Android build and Lint passed without errors; four regression harnesses passed. Lint retains 111 warnings. This is a development-signed prerelease, with code still under review in PR #14. Real 24-hour battery-life gains have not been established. Matching signatures are required to preserve data when updating.
 
-Battery/fluency changes from 1.11.7 and localization/navigation fixes from 1.11.8 are included in the published **1.11.9** release. See [PR #12 history](https://github.com/langraficagr-collab/adaptive-performance/pull/12). Version 1.11.6 remains an older preview; 1.11.1 is a historical release.
+### History: 1.11.9 and earlier versions
+
+Version 1.11.9 remains in the [release history](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.9). Historical descriptions below do not override the current behavior above.
 
 ## Previous release: 1.11.1 — stability review
 

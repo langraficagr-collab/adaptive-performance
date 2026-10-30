@@ -6,23 +6,28 @@
 
 O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para executar operações privilegiadas sem exigir root.
 
-[Site oficial](https://langraficagr-collab.github.io/adaptive-performance/) · [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
+[Site oficial](https://langraficagr-collab.github.io/adaptive-performance/) · [Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11)
 
 ## Idiomas / Languages
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
-## Versão atual: 1.11.9 — publicada em 29/10/2026
+## Versão disponível: 1.11.11 — versão de teste · 30/10/2026
 
-**APK:** [Baixar Adaptive Performance v1.11.9](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.9/Adaptive-Performance-v1.11.9.apk) · [Notas da release](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.9) · [PR #12 integrado](https://github.com/langraficagr-collab/adaptive-performance/pull/12).
+**APK:** [Baixar Adaptive Performance v1.11.11](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.11/Adaptive-Performance-v1.11.11.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11) · [Código em revisão no PR #14](https://github.com/langraficagr-collab/adaptive-performance/pull/14).
 
-A versão **1.11.9-review-fixes** (versionCode **91**) integra a redução de verificações opcionais em segundo plano, pré-carregamento desativado por padrão com respeito às escolhas do usuário, traduções PT/EN ampliadas, melhorias do botão Ajustes no modo Automático, recuperação de permissões Shizuku após desconexão, auditoria de capacidades, leitura de sinal sem alternar a rede e proteção contra dados térmicos antigos. Veja [detalhes da 1.11.9](docs/review-fixes-1.11.9.md), [1.11.8](docs/i18n-settings-1.11.8.md) e [1.11.7](docs/battery-fluidity-1.11.7.md).
+A versão **1.11.11-user-apps-only** (versionCode **93**) restringe por inatividade somente aplicativos instalados pelo usuário. Aplicativos do sistema, inclusive atualizados, ficam excluídos. Restrições anteriores rastreadas pelo Adaptive são restauradas automaticamente, preservando alterações externas.
 
-**Teste:** compilação e Android Lint concluídos; harnesses locais de persistência/migração e idioma aprovados. O CodeQL do PR concluiu sem novos alertas no código alterado. O CodeRabbit não fez revisão completa do commit final; há 111 avisos não bloqueantes no Android Lint local. **APK FullDebug com assinatura de desenvolvimento**, não assinatura de produção. A duração da bateria e a compatibilidade dependem do aparelho e das permissões. Para atualizar preservando dados, instale sobre o aplicativo existente quando a assinatura for compatível.
+- Monitoramento normal com tela ativa: intervalo mínimo de **120 segundos**; proteção térmica/pressão elevada: **60 segundos**; tela apagada: pelo menos **10 minutos**. Eventos do Android podem antecipar uma leitura.
+- Testes automáticos: referência e candidato de **30 minutos**, com pelo menos **12 amostras** espaçadas. Melhorias provisórias são acompanhadas em **6–24 horas**; confirmação exige 12 leituras comparáveis.
+- Orçamento de custo inclui CPU do app, ponte e filhos shell recolhidos quando disponível, além de duração e timeouts dos comandos. Não é medição completa de energia.
+- Contagem de recorrências corrigida e medição de fluidez adaptada ao prazo de quadro/taxa da tela. Pré-carregamento permanece opcional e desligado por padrão.
 
-### Histórico das versões 1.11.7 e 1.11.8
+**Validação:** compilação e Android Lint sem erros; quatro testes de regressão aprovados. Permanecem 111 avisos do Lint. APK de desenvolvimento assinado, publicado como prévia; o PR #14 ainda está em revisão. Ganhos de autonomia não foram comprovados em teste real de 24 horas. Atualizações preservam os dados quando a assinatura é compatível.
 
-As melhorias de bateria e fluidez da 1.11.7 e de tradução/navegação da 1.11.8 foram incluídas na **1.11.9 publicada**. Consulte o [histórico do PR #12](https://github.com/langraficagr-collab/adaptive-performance/pull/12). A 1.11.6 permanece como prévia anterior e a 1.11.1 como release histórica.
+### Histórico: 1.11.9 e versões anteriores
+
+A 1.11.9 permanece no [histórico de releases](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.9). As descrições históricas abaixo não substituem as regras da 1.11.11 apresentadas acima.
 
 ## Versão anterior: 1.11.1 — revisão de estabilidade
 
@@ -380,7 +385,7 @@ O congelamento automático agora espera o período escolhido depois que o app sa
 
 A seção de divulgação do Reddit foi removida do Adaptive Performance e agora está em um APK independente. O aplicativo separado prepara um rascunho, abre o formulário oficial para revisão manual e lembra o intervalo entre publicações; não envia posts sozinho. Os controles adaptativos ampliados e o monitor de bateria permanecem no Adaptive Performance.
 
-[Baixar o APK Divulgação Reddit](https://github.com/langraficagr-collab/adaptive-performance/releases/latest/download/Reddit-Promo-1.0.apk)
+[Baixar o APK Divulgação Reddit](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11/download/Reddit-Promo-1.0.apk)
 
 **1.8.4 — assistente de divulgação no Reddit**
 
@@ -388,7 +393,7 @@ O assistente de divulgação que antes fazia parte do Adaptive Performance agora
 
 A versão 1.8.3 incluiu economia GPS opcional em segundo plano com restauração automática, confirmação de sinal fraco e testes de rede de 10 segundos. A verificação padrão da rede é a cada 1 minuto e o cooldown mínimo é 5 minutos. Mantém as melhorias de repouso da versão 1.8.2: verificações em segundo plano mais espaçadas com tela apagada e aparelho frio, mantendo rapidez quando há calor ou pressão alta.
 
-[Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/latest)
+[Baixar a versão mais recente](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11)
 
 ## Compilação
 

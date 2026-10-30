@@ -439,12 +439,12 @@ public class MainActivity extends Activity {
                 ? (BuildConfig.LEAN_MODE
                 ? "Simple mode: Android-compatible optimization without ADB or Shizuku."
                 : advancedMode ? "Advanced: all controls are available for manual tuning."
-                : "Automatic: reversible options are tested individually for 2 minutes, keeping proven improvements only.")
+                : "Automatic: reversible options are tested individually for 30 minutes, keeping proven improvements only.")
                 : BuildConfig.LEAN_MODE
                 ? "Modo simples: o aplicativo cuida das otimizações compatíveis com o Android, sem ADB ou Shizuku."
                 : (advancedMode
                 ? "Avançado: todas as opções ficam disponíveis para ajuste manual."
-                : "Automático: o app mede uma referência e testa cada opção reversível por 2 minutos, mantendo somente melhorias comprovadas."),
+                : "Automático: o app mede uma referência e testa cada opção reversível por 30 minutos, mantendo somente melhorias comprovadas."),
                 12, MUTED, false);
         help.setPadding(dp(4), dp(10), dp(4), 0);
         c.addView(help);
@@ -538,10 +538,10 @@ public class MainActivity extends Activity {
         c.addView(status);
 
         TextView details = text(UiLanguage.english(prefs) ?
-                "Automatic mode takes a 2-minute baseline, trials one reversible setting for 2 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. Optional app preloading is off by default to save battery." :
+                "Automatic mode takes a 30-minute baseline, trials one reversible setting for 30 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. Optional app preloading is off by default to save battery." :
                 BuildConfig.CONSERVATIVE_MODE
                 ? "Testa uma opção por vez e desfaz se houver piora. Pré-aquece no máximo 2 APKs usados nos últimos 15 min, a cada 15 min, com limite total de 32 MB. Pausa em bateria baixa, carregamento, pouca RAM ou calor; desativa ciclos futuros se medir aumento relevante de consumo ou temperatura. O Android pode liberar o cache; os apps não ficam presos na RAM."
-                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível por 2 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. O pré-carregamento de apps é opcional e fica desligado por padrão para economizar bateria.",
+                : "O modo automático mede uma referência de 30 minutos e testa uma opção reversível por 30 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. O pré-carregamento de apps é opcional e fica desligado por padrão para economizar bateria.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
@@ -601,8 +601,8 @@ public class MainActivity extends Activity {
 
         if (BuildConfig.CONSERVATIVE_MODE) {
             TextView rules = text("Fila automática: " + prefs.getInt("conservative_tune_option_count", 26)
-                    + " ajustes avaliáveis. Primeiro mede uma referência de 2 min; depois testa "
-                    + "um ajuste por 2 min. Se reverter, mede uma nova referência antes do próximo. "
+                    + " ajustes avaliáveis. Primeiro mede uma referência de 30 min; depois testa "
+                    + "um ajuste por 30 min. Se reverter, mede uma nova referência antes do próximo. "
                     + "Sem medições confiáveis, não aprova. Dependências indisponíveis aparecem como não testadas. "
                     + "Proteções ficam ativas; ações sem restauração ficam desativadas.", 12, MUTED, false);
             rules.setPadding(dp(4), dp(12), dp(4), dp(8));
@@ -1796,6 +1796,7 @@ public class MainActivity extends Activity {
                     "\nEficácia da última ação: " + prefs.getInt("action_effectiveness_score",0) + "%";
             report += "\n\n=== Custo do próprio Adaptive Performance ==="
                     + "\n" + prefs.getString("app_cost_status", "Sem leituras")
+                    + "\n" + prefs.getString("app_cost_scope", "")
                     + "\nAmostragens (proxy, não wakeups reais): "
                     + prefs.getInt("app_cost_poll_count", 0)
                     + "\nCPU do processo: " + prefs.getFloat("app_cost_cpu_pct", -1f) + "%"

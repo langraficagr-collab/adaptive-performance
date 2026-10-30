@@ -14,7 +14,7 @@ public final class BatteryFirstHarness {
         if (!ok) throw new AssertionError(label);
     }
 
-    private static SharedPreferences reboot(Map<String,Object> disk) {
+    static SharedPreferences reboot(Map<String,Object> disk) {
         return (SharedPreferences) Proxy.newProxyInstance(
             BatteryFirstHarness.class.getClassLoader(), new Class[]{SharedPreferences.class},
             (prefs, method, args) -> {

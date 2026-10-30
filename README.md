@@ -12,6 +12,14 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
+## Chat do site — Assistente Adaptive
+
+O chatbot foi renovado para conversar em português e inglês sobre as funções reais do aplicativo. Ele considera o assunto da mensagem anterior, apresenta respostas mais naturais, sugestões de perguntas, links verificados, histórico durante a sessão e leitura em voz alta opcional (quando o navegador permite).
+
+**Transparência:** é um assistente virtual baseado na documentação, não uma pessoa nem uma IA generativa conectada a servidores. As mensagens são processadas no navegador, sem envio a um serviço de IA; o histórico é armazenado apenas na sessão local e pode ser limpo pelo usuário. O bot não acessa o aparelho nem realiza alterações remotas.
+
+**Testes:** `node tests/site-chat/test.js` verifica o reconhecimento de perguntas, continuidade, links, componentes de ambas as páginas e simulações de eventos da interface.
+
 ## Versão disponível: 1.11.15 — teste de interface e confiabilidade · 30/10/2026
 
 **APK:** [Baixar Adaptive Performance v1.11.15](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15) · **versionCode 97**.

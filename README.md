@@ -12,18 +12,20 @@ O projeto foi desenvolvido principalmente para Android 16 e usa **Shizuku** para
 
 [🇧🇷 Documentação em português](README.md) · [English documentation](README.en.md) · [Site em português](https://langraficagr-collab.github.io/adaptive-performance/) · [Website in English](https://langraficagr-collab.github.io/adaptive-performance/en.html)
 
-## Versão disponível: 1.11.11 — versão de teste · 30/10/2026
+## Versão disponível: 1.11.15 — teste de interface e confiabilidade · 30/10/2026
 
-**APK:** [Baixar Adaptive Performance v1.11.11](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.11/Adaptive-Performance-v1.11.11.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11) · [Código em revisão no PR #14](https://github.com/langraficagr-collab/adaptive-performance/pull/14).
+**APK:** [Baixar Adaptive Performance v1.11.15](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15) · **versionCode 97**.
 
-A versão **1.11.11-user-apps-only** (versionCode **93**) restringe por inatividade somente aplicativos instalados pelo usuário. Aplicativos do sistema, inclusive atualizados, ficam excluídos. Restrições anteriores rastreadas pelo Adaptive são restauradas automaticamente, preservando alterações externas.
+**Melhorias desta versão:**
 
-- Monitoramento normal com tela ativa: intervalo mínimo de **120 segundos**; proteção térmica/pressão elevada: **60 segundos**; tela apagada: pelo menos **10 minutos**. Eventos do Android podem antecipar uma leitura.
-- Testes automáticos: referência e candidato de **30 minutos**, com pelo menos **12 amostras** espaçadas. Melhorias provisórias são acompanhadas em **6–24 horas**; confirmação exige 12 leituras comparáveis.
-- Orçamento de custo inclui CPU do app, ponte e filhos shell recolhidos quando disponível, além de duração e timeouts dos comandos. Não é medição completa de energia.
-- Contagem de recorrências corrigida e medição de fluidez adaptada ao prazo de quadro/taxa da tela. Pré-carregamento permanece opcional e desligado por padrão.
+- **Atividade recente** registra reparos, restrições, congelamentos e alterações mesmo com pontuação de eficácia desativada, com histórico completo.
+- **Restrições por inatividade** removem cadastros de apps desinstalados sem alterar AppOps dos instalados; mostram total, detalhes e estado da varredura. Apps de sistema não entram em novas restrições.
+- **Notificações** mostram status de permissão e canal Android, botão de teste e acesso direto às configurações; os alertas de mudança não são desligados pelo ajuste automático.
+- **Congelamento manual** permite parada persistente de apps selecionados ao sair, protegendo aplicativos críticos, mediante privilégios Shizuku.
+- **Sugestões térmicas** exigem CPU elevada observada repetidamente e temperatura alta, com aprovação explícita antes de congelar. Não provam qual app aqueceu o dispositivo.
+- **Proteção da bateria:** varreduras pesadas são adiadas durante carga/aquecimento. A autonomia real exige medição em condições controladas.
 
-**Validação:** compilação e Android Lint sem erros; quatro testes de regressão aprovados. Permanecem 111 avisos do Lint. APK de desenvolvimento assinado, publicado como prévia; o PR #14 ainda está em revisão. Ganhos de autonomia não foram comprovados em teste real de 24 horas. Atualizações preservam os dados quando a assinatura é compatível.
+**Validação:** APK compilado com Gradle e instalado no Android 16; 29 registros obsoletos removidos no teste; notificação de teste recebida pelo Android; histórico e lista atualizados. Uma varredura posterior de inatividade estava em execução e não foi validada até sua conclusão. APK assinado com certificado de desenvolvimento; atualização direta requer assinatura compatível.
 
 ### Histórico: 1.11.9 e versões anteriores
 

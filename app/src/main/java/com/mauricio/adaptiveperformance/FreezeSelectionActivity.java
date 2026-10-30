@@ -78,12 +78,12 @@ public class FreezeSelectionActivity extends Activity {
         LinearLayout titles=new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         TextView title=tv("Selecionar apps para congelar",23,TEXT,true);
-        TextView sub=tv("Congelamento apenas em segundo plano",13,MUTED,false);
+        TextView sub=tv("Congelamento imediato ao sair do aplicativo",13,MUTED,false);
         titles.addView(title); titles.addView(sub);
         top.addView(titles,new LinearLayout.LayoutParams(0,-2,1f));
         page.addView(top);
 
-        TextView note=tv("Apps críticos ficam protegidos. Apps de sistema elegíveis aparecem marcados como [Sistema] e podem ser congelados quando necessário.",13,MUTED,false);
+        TextView note=tv("Selecionados aparecem primeiro. Ao salvar, apps fora da tela são congelados imediatamente. Apps críticos continuam protegidos.",13,MUTED,false);
         note.setPadding(dp(4),dp(12),dp(4),dp(12));
         page.addView(note);
 
@@ -143,7 +143,7 @@ public class FreezeSelectionActivity extends Activity {
                         // A corrupted/unavailable app entry must not abort the full list.
                     }
                 }
-                loaded.sort((a,b)->a.label.compareToIgnoreCase(b.label));
+                loaded.sort((a,b)->a.label.compareToIgnoreCase(b.label)); // initial alpha order
             } catch(Throwable ex) {
                 error = ex.getClass().getSimpleName();
             }
@@ -177,7 +177,14 @@ public class FreezeSelectionActivity extends Activity {
         save.setOnClickListener(v->{
             if (!listReady) return;
             Set<String> newSet=new HashSet<>(selectedPackages);
-            prefs.edit().putStringSet("manual_freeze_selected",newSet).apply();
+            prefs.edit().putStringSet("manual_freeze_selected",newSet)
+                    .putBoolean("manual_freeze_enabled", !newSet.isEmpty()).commit();
+            // Force the running Shizuku worker to apply the new selection immediately.
+            try {
+                Intent refresh = new Intent(this, OptimizationService.class)
+                        .setAction(OptimizationService.ACTION_MANUAL_FREEZE_REFRESH);
+                startService(refresh);
+            } catch (Throwable ignored) {}
             ChangeNotifier.notifyChange(this,"Seleção de congelamento atualizada",
                     newSet.size()+" app(s) selecionado(s) para congelamento em segundo plano.",6);
             finish();
@@ -195,7 +202,14 @@ public class FreezeSelectionActivity extends Activity {
         String f=filter==null?"":filter.trim().toLowerCase(Locale.ROOT);
         int matches=0;
         int shown=0;
-        for(Item item:items) {
+        List<Item> ordered = new ArrayList<>(items);
+        // Selected packages always appear first, including in filtered search results.
+        ordered.sort((a, b) -> {
+            boolean sa = selectedPackages.contains(a.pkg), sb = selectedPackages.contains(b.pkg);
+            if (sa != sb) return sa ? -1 : 1;
+            return a.label.compareToIgnoreCase(b.label);
+        });
+        for(Item item:ordered) {
             String hay=(item.label+" "+item.pkg).toLowerCase(Locale.ROOT);
             if(!f.isEmpty() && !hay.contains(f)) continue;
             matches++;
@@ -216,6 +230,8 @@ public class FreezeSelectionActivity extends Activity {
                 else selectedPackages.remove(item.pkg);
                 countText.setText(selectedPackages.size()
                         + " selecionado(s) • seleções mantidas ao pesquisar");
+                // Move checked apps to the beginning as soon as selection changes.
+                list.post(() -> { if (!isFinishing()) rebuildList(filter, null); });
             });
             boxes.put(item.pkg,cb);
             list.addView(cb);

@@ -22,10 +22,10 @@ public class MainActivity extends Activity {
     private TextView socValue, batValue, ramValue, cpuValue, freqValue;
     private TextView appCostText, evidencePanelText, thermalForecastText, serviceContinuityText, incidentDiagText, personalMlText, brainV2Text;
     private UiFrameSampler uiFrameSampler;
-    private TextView batteryText, batteryForecastText, maintenanceText, restrictedText, cpuPressureText, freezeStateText, advancedText, healthText, extendedText, limitingDashboardText;
+    private TextView batteryText, batteryForecastText, maintenanceText, restrictedText, notificationDeliveryText, cpuPressureText, freezeStateText, advancedText, healthText, extendedText, limitingDashboardText;
     private TextView thermalLevel1, thermalLevel2, thermalLevel3, thermalLevel4, thermalLevel5, thermalAuto;
     private Switch autoRepairSwitch, effectivenessSwitch, profilesSwitch, restrictionGuardSwitch, emergencySwitch, startupSwitch;
-    private Switch refreshSwitch, cleanupSwitch, aggressiveMemorySwitch, bugCleanupSwitch, unusedRestrictSwitch, cpuPressureSwitch, manualFreezeSwitch, notifySwitch;
+    private Switch refreshSwitch, cleanupSwitch, aggressiveMemorySwitch, bugCleanupSwitch, unusedRestrictSwitch, cpuPressureSwitch, manualFreezeSwitch, heatAdvisorSwitch, notifySwitch;
     private Switch memoryCompactionSwitch, appRamLimiterSwitch;
     private SeekBar appRamLimitSeekBar;
     private TextView appRamLimitLabel;
@@ -77,6 +77,19 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         prefs = getSharedPreferences("adaptive", MODE_PRIVATE);
         BatteryFirstDefaults.apply(prefs);
+        RecentActivityStore.migrate(prefs);
+        if ("auto".equals(prefs.getString("user_mode", "")) &&
+                !prefs.getBoolean("ui_activity_unused_scan_v11115", false)) {
+            prefs.edit().putBoolean("auto_unused_restrict", true)
+                    .putBoolean("ui_activity_unused_scan_v11115", true).apply();
+            RecentActivityStore.add(prefs, "setting", "Restrição por inatividade",
+                    "Varredura periódica de apps do usuário ativada; apps de sistema excluídos.");
+        }
+        if (!prefs.getBoolean("ui_activity_notifications_v11115", false)) {
+            // Explicit upgrade to the requested notification feature; later user toggles are respected.
+            prefs.edit().putBoolean("notify_changes", true)
+                    .putBoolean("ui_activity_notifications_v11115", true).apply();
+        }
         uiFrameSampler = new UiFrameSampler(this,prefs);
         if (BuildConfig.LEAN_MODE) {
             prefs.edit().putString("user_mode", "auto").putBoolean("master", false).apply();
@@ -439,12 +452,12 @@ public class MainActivity extends Activity {
                 ? (BuildConfig.LEAN_MODE
                 ? "Simple mode: Android-compatible optimization without ADB or Shizuku."
                 : advancedMode ? "Advanced: all controls are available for manual tuning."
-                : "Automatic: reversible options are tested individually for 2 minutes, keeping proven improvements only.")
+                : "Automatic: reversible options are tested individually for 30 minutes, keeping proven improvements only.")
                 : BuildConfig.LEAN_MODE
                 ? "Modo simples: o aplicativo cuida das otimizações compatíveis com o Android, sem ADB ou Shizuku."
                 : (advancedMode
                 ? "Avançado: todas as opções ficam disponíveis para ajuste manual."
-                : "Automático: o app mede uma referência e testa cada opção reversível por 2 minutos, mantendo somente melhorias comprovadas."),
+                : "Automático: o app mede uma referência e testa cada opção reversível por 30 minutos, mantendo somente melhorias comprovadas."),
                 12, MUTED, false);
         help.setPadding(dp(4), dp(10), dp(4), 0);
         c.addView(help);
@@ -538,10 +551,10 @@ public class MainActivity extends Activity {
         c.addView(status);
 
         TextView details = text(UiLanguage.english(prefs) ?
-                "Automatic mode takes a 2-minute baseline, trials one reversible setting for 2 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. Optional app preloading is off by default to save battery." :
+                "Automatic mode takes a 30-minute baseline, trials one reversible setting for 30 minutes, then validates provisional improvements over 6–24 hours. Unproven or harmful changes are rolled back. Optional app preloading is off by default to save battery." :
                 BuildConfig.CONSERVATIVE_MODE
                 ? "Testa uma opção por vez e desfaz se houver piora. Pré-aquece no máximo 2 APKs usados nos últimos 15 min, a cada 15 min, com limite total de 32 MB. Pausa em bateria baixa, carregamento, pouca RAM ou calor; desativa ciclos futuros se medir aumento relevante de consumo ou temperatura. O Android pode liberar o cache; os apps não ficam presos na RAM."
-                : "O modo automático mede uma referência de 2 minutos e testa uma opção reversível por 2 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. O pré-carregamento de apps é opcional e fica desligado por padrão para economizar bateria.",
+                : "O modo automático mede uma referência de 30 minutos e testa uma opção reversível por 30 minutos. Melhorias provisórias são reavaliadas em 6–24 horas. Reverte mudanças sem economia comprovada ou com piora. O pré-carregamento de apps é opcional e fica desligado por padrão para economizar bateria.",
                 12, MUTED, false);
         details.setPadding(dp(4), dp(2), dp(4), dp(4));
         c.addView(details);
@@ -601,8 +614,8 @@ public class MainActivity extends Activity {
 
         if (BuildConfig.CONSERVATIVE_MODE) {
             TextView rules = text("Fila automática: " + prefs.getInt("conservative_tune_option_count", 26)
-                    + " ajustes avaliáveis. Primeiro mede uma referência de 2 min; depois testa "
-                    + "um ajuste por 2 min. Se reverter, mede uma nova referência antes do próximo. "
+                    + " ajustes avaliáveis. Primeiro mede uma referência de 30 min; depois testa "
+                    + "um ajuste por 30 min. Se reverter, mede uma nova referência antes do próximo. "
                     + "Sem medições confiáveis, não aprova. Dependências indisponíveis aparecem como não testadas. "
                     + "Proteções ficam ativas; ações sem restauração ficam desativadas.", 12, MUTED, false);
             rules.setPadding(dp(4), dp(12), dp(4), dp(8));
@@ -990,7 +1003,8 @@ public class MainActivity extends Activity {
         maximumBatterySwitch = actionSwitch("Máxima economia: desativar dois-toques no repouso","maximum_battery_mode",false);
         safeModeManualSwitch = actionSwitch("Forçar modo seguro dos módulos avançados","extended_safe_mode_manual",false);
         manualFreezeSwitch = actionSwitch("Ativar congelamento manual dos apps selecionados","manual_freeze_enabled",false);
-        notifySwitch = actionSwitch("Notificar somente problemas que não puderem ser resolvidos","notify_changes",true);
+        heatAdvisorSwitch = actionSwitch("Perguntar antes de congelar apps que podem estar aquecendo o celular", "app_heat_suggestions_enabled", true);
+        notifySwitch = actionSwitch("Notificar mudanças importantes e problemas não resolvidos","notify_changes",true);
 
         refreshSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("adaptive_refresh",v).apply());
         cleanupSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("critical_cleanup",v).apply());
@@ -1051,7 +1065,15 @@ public class MainActivity extends Activity {
         safeModeManualSwitch.setOnCheckedChangeListener((b,v)->prefs.edit().putBoolean("extended_safe_mode_manual",v).apply());
         manualFreezeSwitch.setOnCheckedChangeListener((b,v)->{
             prefs.edit().putBoolean("manual_freeze_enabled",v).apply();
+            try {
+                startService(new Intent(this, OptimizationService.class)
+                        .setAction(OptimizationService.ACTION_MANUAL_FREEZE_REFRESH));
+            } catch (Throwable ignored) {}
             ChangeNotifier.notifyChange(this,"Congelamento manual",v?"Congelamento manual ativado.":"Congelamento manual desativado; apps serão liberados.",6);
+        });
+        heatAdvisorSwitch.setOnCheckedChangeListener((b,v)->{
+            prefs.edit().putBoolean("app_heat_suggestions_enabled", v).apply();
+            if (!v) ThermalAppAdvisor.clearPending(prefs);
         });
         notifySwitch.setOnCheckedChangeListener((b,v)->{
             prefs.edit().putBoolean("notify_changes",v).apply();
@@ -1075,6 +1097,8 @@ public class MainActivity extends Activity {
         c.addView(dynamicDozeSwitch); c.addView(adaptiveTimeoutSwitch); c.addView(maximumBatterySwitch);
         c.addView(safeModeManualSwitch);
         c.addView(manualFreezeSwitch);
+        c.addView(heatAdvisorSwitch);
+        c.addView(text("Aquecimento + CPU alta em duas leituras: você decide pela notificação. Não há prova de causa única.", 12, MUTED, false));
 
         Button signalOptimizer = actionButton("📶  Otimizador automático de sinal móvel");
         signalOptimizer.setOnClickListener(v -> startActivity(new Intent(this, SignalOptimizerActivity.class)));
@@ -1091,6 +1115,7 @@ public class MainActivity extends Activity {
         Button appExceptions = actionButton("Apps que nunca devem ser congelados automaticamente");
         appExceptions.setOnClickListener(v->startActivity(new Intent(this, AppExceptionActivity.class)));
         c.addView(appExceptions);
+
         c.addView(notifySwitch);
         Button trimRamNow = actionButton("Limpar RAM agora");
         trimRamNow.setOnClickListener(v -> {
@@ -1136,6 +1161,12 @@ public class MainActivity extends Activity {
         maintenanceText = text("Nenhuma atividade recente.",13,Color.rgb(206,224,236),false);
         maintenanceText.setPadding(dp(2),dp(12),0,0);
         activity.addView(maintenanceText);
+        Button allActivities = actionButton("Ver todas as atividades");
+        allActivities.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle("Atividades recentes e histórico")
+                .setMessage(RecentActivityStore.history(prefs))
+                .setPositiveButton("Fechar", (d, w) -> d.dismiss()).show());
+        activity.addView(allActivities);
 
         row.addView(battery); row.addView(activity);
         content.addView(row);
@@ -1145,7 +1176,30 @@ public class MainActivity extends Activity {
         restrictedText = text("Nenhum app restrito automaticamente.",13,Color.rgb(206,224,236),false);
         restrictedText.setPadding(0,dp(10),0,0);
         restrict.addView(restrictedText);
+        Button listRestrictions = actionButton("Ver todos os apps com restrições registradas");
+        listRestrictions.setOnClickListener(v -> showRestrictedApps());
+        restrict.addView(listRestrictions);
         content.addView(restrict);
+
+        LinearLayout alerts = card();
+        addSectionTitle(alerts, "◉", "Notificações de alterações", "Status das permissões e do canal do Android");
+        notificationDeliveryText = text("Verificando notificações…", 13, Color.rgb(206,224,236), false);
+        alerts.addView(notificationDeliveryText);
+        Button testAlert = actionButton("Enviar notificação de teste");
+        testAlert.setOnClickListener(v -> {
+            String status = ChangeNotifier.deliveryStatus(this, prefs);
+            if ("Alertas de mudanças habilitados".equals(status)) {
+                ChangeNotifier.notifyChange(this, "Teste do Adaptive Performance",
+                        "Notificações de mudanças estão funcionando.", 97);
+                Toast.makeText(this, "Notificação de teste enviada", Toast.LENGTH_SHORT).show();
+            } else Toast.makeText(this, status, Toast.LENGTH_LONG).show();
+            updateUi();
+        });
+        alerts.addView(testAlert);
+        Button openAlertSettings = actionButton("Configurar canal de notificações no Android");
+        openAlertSettings.setOnClickListener(v -> openChangeNotificationSettings());
+        alerts.addView(openAlertSettings);
+        content.addView(alerts);
 
         Button historyButton = actionButton("Histórico de saúde — 24 horas");
         historyButton.setOnClickListener(v -> startActivity(new Intent(this, HealthHistoryActivity.class)));
@@ -1612,7 +1666,7 @@ public class MainActivity extends Activity {
         }
 
         if(maintenanceText!=null) {
-            String log=prefs.getString("maintenance_log","Nenhuma atividade recente.");
+            String log=RecentActivityStore.history(prefs);
             String[] lines=log.split("\n");
             StringBuilder out=new StringBuilder();
             for(int i=0;i<Math.min(4,lines.length);i++) {
@@ -1632,10 +1686,14 @@ public class MainActivity extends Activity {
             }
             setTextIfChanged(restrictedText, out.toString());
         }
+        if (notificationDeliveryText != null)
+            setTextIfChanged(notificationDeliveryText, ChangeNotifier.deliveryStatus(this, prefs));
 
         int sel=prefs.getStringSet("manual_freeze_selected",Collections.emptySet()).size();
         int active=prefs.getInt("manual_frozen_active_count",0);
-        if(freezeStateText!=null) setTextIfChanged(freezeStateText, sel+" selecionado(s) • "+active+" congelado(s) agora\n"+prefs.getString("last_effectiveness_summary", ""));
+        if(freezeStateText!=null) setTextIfChanged(freezeStateText, sel+" selecionado(s) • "+active+" congelado(s) agora\n"+
+                prefs.getString("heat_advisor_status", "Sugestões térmicas ativas • aguardando evidências") + "\n"+
+                prefs.getString("last_effectiveness_summary", ""));
         if(limitingDashboardText!=null) setTextIfChanged(limitingDashboardText, prefs.getString("limiting_dashboard", "Nenhuma limitação ativa"));
 
         if(cpuPressureText!=null) {
@@ -1796,6 +1854,7 @@ public class MainActivity extends Activity {
                     "\nEficácia da última ação: " + prefs.getInt("action_effectiveness_score",0) + "%";
             report += "\n\n=== Custo do próprio Adaptive Performance ==="
                     + "\n" + prefs.getString("app_cost_status", "Sem leituras")
+                    + "\n" + prefs.getString("app_cost_scope", "")
                     + "\nAmostragens (proxy, não wakeups reais): "
                     + prefs.getInt("app_cost_poll_count", 0)
                     + "\nCPU do processo: " + prefs.getFloat("app_cost_cpu_pct", -1f) + "%"
@@ -1878,6 +1937,46 @@ public class MainActivity extends Activity {
                 : bordered(Color.rgb(15,36,50),Color.rgb(40,70,88),15));
     }
 
+    private void showRestrictedApps() {
+        Set<String> set = prefs.getStringSet("auto_restricted", Collections.emptySet());
+        List<String> apps = new ArrayList<>();
+        for (String pkg : set) {
+            try {
+                getPackageManager().getApplicationInfo(pkg, 0);
+                apps.add(AppSafety.label(this, pkg));
+            } catch (PackageManager.NameNotFoundException ignored) { }
+        }
+        Collections.sort(apps, String.CASE_INSENSITIVE_ORDER);
+        StringBuilder report = new StringBuilder(apps.size() + " apps com restrições registradas.\n");
+        report.append(prefs.getBoolean("auto_unused_restrict", true)
+                ? "Verificação automática habilitada" : "Novas restrições por inatividade desativadas");
+        long scanned = prefs.getLong("last_unused_scan", 0L);
+        if (scanned > 0) report.append("\nÚltima busca: ")
+                .append(DateFormat.getDateTimeInstance().format(new Date(scanned)));
+        report.append("\n\n");
+        for (String name : apps) report.append("• ").append(name).append('\n');
+        new AlertDialog.Builder(this).setTitle("Apps restritos por inatividade")
+                .setMessage(report.toString()).setPositiveButton("Fechar", (d, w) -> d.dismiss()).show();
+    }
+
+    private void openChangeNotificationSettings() {
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 26) {
+            intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, ChangeNotifier.CHANNEL);
+        } else {
+            intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        }
+        try { startActivity(intent); }
+        catch (Exception ignored) {
+            try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.parse("package:" + getPackageName()))); }
+            catch (Exception ignoredAgain) { }
+        }
+    }
+
     private final Runnable refreshLoop = new Runnable() {
         @Override public void run() {
             long now = SystemClock.elapsedRealtime();
@@ -1926,7 +2025,7 @@ public class MainActivity extends Activity {
         refreshSwitch = cleanupSwitch = aggressiveMemorySwitch = bugCleanupSwitch = unusedRestrictSwitch = cpuPressureSwitch = null;
         memoryCompactionSwitch = null; memoryCompactionLabel = null; memoryCompactionSeekBar = null;
         zramProfileSpinner = null; zramProfileHint = null;
-        manualFreezeSwitch = notifySwitch = advancedAdaptiveSwitch = screenOffSwitch = wakeupGuardSwitch = null;
+        manualFreezeSwitch = heatAdvisorSwitch = notifySwitch = advancedAdaptiveSwitch = screenOffSwitch = wakeupGuardSwitch = null;
         healthGuardSwitch = autoCalibrationSwitch = appLearningSwitch = antiStallSwitch = historySwitch = null;
         rollbackSwitch = crashLoopSwitch = extendedDiagnosticsSwitch = thermalPredictionSwitch = diagnosticBurstSwitch = null;
         adaptiveAggressivenessSwitch = abTestingSwitch = sensorModemSwitch = storageGuardSwitch = duplicateDetectionSwitch = null;

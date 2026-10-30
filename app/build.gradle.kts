@@ -16,8 +16,8 @@ android {
         buildConfigField("boolean", "LEAN_MODE", "false")
         buildConfigField("boolean", "CONSERVATIVE_MODE", "false")
         resValue("string", "app_name", "Adaptive Performance")
-        versionCode = 91
-        versionName = "1.11.9-review-fixes"
+        versionCode = 97
+        versionName = "1.11.15-ui-activity-fix"
     }
 
     flavorDimensions += "edition"

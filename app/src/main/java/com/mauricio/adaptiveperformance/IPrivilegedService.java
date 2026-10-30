@@ -8,6 +8,7 @@ import android.os.RemoteException;
 
 public interface IPrivilegedService extends IInterface {
     String exec(String command) throws RemoteException;
+    long[] costStats() throws RemoteException;
     int remoteUid() throws RemoteException;
     void destroy() throws RemoteException;
 
@@ -16,6 +17,8 @@ public interface IPrivilegedService extends IInterface {
         static final int TRANSACTION_exec = IBinder.FIRST_CALL_TRANSACTION;
         static final int TRANSACTION_remoteUid = IBinder.FIRST_CALL_TRANSACTION + 1;
         static final int TRANSACTION_destroy = IBinder.FIRST_CALL_TRANSACTION + 2;
+
+        static final int TRANSACTION_costStats = IBinder.FIRST_CALL_TRANSACTION + 3;
 
         public Stub() { attachInterface(this, DESCRIPTOR); }
 
@@ -42,6 +45,11 @@ public interface IPrivilegedService extends IInterface {
                     String result = exec(command);
                     reply.writeNoException();
                     reply.writeString(result);
+                    return true;
+                case TRANSACTION_costStats:
+                    long[] stats = costStats();
+                    reply.writeNoException();
+                    reply.writeLongArray(stats);
                     return true;
                 case TRANSACTION_remoteUid:
                     int uid = remoteUid();
@@ -71,6 +79,17 @@ public interface IPrivilegedService extends IInterface {
                     remote.transact(TRANSACTION_exec, data, reply, 0);
                     reply.readException();
                     return reply.readString();
+                } finally { reply.recycle(); data.recycle(); }
+            }
+
+            @Override public long[] costStats() throws RemoteException {
+                Parcel data = Parcel.obtain(), reply = Parcel.obtain();
+                try {
+                    data.writeInterfaceToken(DESCRIPTOR);
+                    if (!remote.transact(TRANSACTION_costStats, data, reply, 0))
+                        return null; // An older bridge may still be shutting down after upgrade.
+                    reply.readException();
+                    return reply.createLongArray();
                 } finally { reply.recycle(); data.recycle(); }
             }
 

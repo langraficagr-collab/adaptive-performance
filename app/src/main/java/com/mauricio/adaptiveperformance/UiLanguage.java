@@ -160,7 +160,7 @@ final class UiLanguage {
         put("não comprovou","not proven");
         put("aplicativo","app");
         put("bateria baixa","low battery");
-        put("Teste automático reversível: uma função por vez, durante 2 minutos","Reversible automatic test: one function at a time for 2 minutes");
+        put("Teste automático reversível: uma função por vez, durante 30 minutos","Reversible automatic test: one function at a time for 30 minutes");
         put("Selecionar apps para congelar","Select apps to freeze");
         put("Congelamento apenas em segundo plano","Freeze only in the background");
         put("Apps críticos ficam protegidos. Apps de sistema elegíveis aparecem marcados como [Sistema] e podem ser congelados quando necessário.","Critical apps stay protected. Eligible system apps are marked [System] and can be frozen when needed.");
@@ -292,8 +292,8 @@ final class UiLanguage {
         put("Preparando primeiro ciclo de testes","Preparing first test cycle");
         put("Sem testes concluídos","No tests completed");
         put("Fila automática: ","Automatic queue: ");
-        put(" ajustes avaliáveis. Primeiro mede uma referência de 2 min; depois testa "," evaluable settings. It first measures a 2-minute baseline, then tests ");
-        put("um ajuste por 2 min. Se reverter, mede uma nova referência antes do próximo. ","one setting for 2 minutes. If reverted, it measures a new baseline before the next. ");
+        put(" ajustes avaliáveis. Primeiro mede uma referência de 30 min; depois testa "," evaluable settings. It first measures a 30-minute baseline, then tests ");
+        put("um ajuste por 30 min. Se reverter, mede uma nova referência antes do próximo. ","one setting for 30 minutes. If reverted, it measures a new baseline before the next. ");
         put("Sem medições confiáveis, não aprova. Dependências indisponíveis aparecem como não testadas. ","Without reliable measurements, it does not approve. Unavailable dependencies appear as not tested. ");
         put("Proteções ficam ativas; ações sem restauração ficam desativadas.","Protections stay active; actions without safe restoration stay disabled.");
         put("Configurações automáticas no início da tela. Para opções manuais, selecione Avançado.","Automatic settings are at the top of the screen. Select Advanced for manual options.");

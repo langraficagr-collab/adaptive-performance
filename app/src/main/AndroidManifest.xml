@@ -85,6 +85,10 @@
         </service>
 
         <receiver
+            android:name=".ThermalDecisionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".CauseDecisionReceiver"
             android:exported="false" />
 

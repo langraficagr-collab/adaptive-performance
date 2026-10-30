@@ -35,14 +35,13 @@ final class ConservativeTuningController {
         {"dynamic_doze_whitelist", "Exceções de Doze", "system_battery_guard"},
         {"adaptive_screen_timeout", "Tempo de tela", "system_battery_guard"},
         {"maximum_battery_mode", "Dois-toques em repouso", "system_battery_guard"},
-        {"notify_changes", "Notificação de problemas", ""},
     };
     private static final int PHASES = OPTIONS.length;
-    private static final long SAMPLE_INTERVAL_MS = 30L * 1000L;
-    private static final long WINDOW_MS = 2L * 60L * 1000L;
-    private static final long MAX_WINDOW_MS = 8L * 60L * 1000L;
+    private static final long SAMPLE_INTERVAL_MS = 120L * 1000L;
+    private static final long WINDOW_MS = 30L * 60L * 1000L;
+    private static final long MAX_WINDOW_MS = 45L * 60L * 1000L;
     private static final long CYCLE_COOLDOWN_MS = 24L * 60L * 60L * 1000L;
-    private static final int MIN_SAMPLES = 4;
+    private static final int MIN_SAMPLES = 12;
     private static final long REVIEW_6H = 21600000L, CONFIRM_24H = 86400000L;
     private static final long PROBATION_INTERVAL = 1800000L;
 
@@ -76,6 +75,15 @@ final class ConservativeTuningController {
             return;
         }
 
+        // Discard old two-minute windows without keeping an unverified candidate.
+        if (!prefs.getBoolean(P + "evidence_11110", false)) {
+            String oldStage = prefs.getString(P + "stage", "baseline");
+            if ("trial".equals(oldStage) || "probation".equals(oldStage)) restoreSnapshot(prefs);
+            startWindow(prefs, "baseline", now);
+            prefs.edit().putBoolean(P + "evidence_11110", true).remove(P + "base_samples").apply();
+            if (!prefs.getString(P + "restore_pending", "").isEmpty()) return;
+        }
+
         // A temporarily disconnected Shizuku shell is not a measured failure.
         // Keep the current phase/snapshot, resume with a fresh window later.
         int pendingPhase = prefs.getInt(P + "phase", 0);
@@ -92,7 +100,7 @@ final class ConservativeTuningController {
                 prefs.edit().putBoolean(P + "shell_paused", false).apply();
                 if ("trial".equals(pendingStage)) {
                     startWindow(prefs, "trial", now);
-                    prefs.edit().putLong(P + "deadline", now + WINDOW_MS).apply();
+                    prefs.edit().putLong(P + "deadline", now + MAX_WINDOW_MS).apply();
                 } else if ("baseline".equals(pendingStage)) {
                     startWindow(prefs, "baseline", now);
                 }
@@ -199,10 +207,10 @@ final class ConservativeTuningController {
                         ? "medição indisponível" : "piora de CPU, RAM ou fluidez"));
                 return;
             }
-            if (now >= prefs.getLong(P + "deadline", now + WINDOW_MS)
+            if (now >= prefs.getLong(P + "deadline", now + MAX_WINDOW_MS)
                     && prefs.getInt(P + "samples", 0) < MIN_SAMPLES) {
                 restoreSnapshot(prefs);
-                advance(prefs, phase, now, "Revertido " + phaseName(phase) + ": janela de 2 min sem dados suficientes");
+                advance(prefs, phase, now, "Revertido " + phaseName(phase) + ": janela de 45 min sem dados suficientes");
                 return;
             }
         }
@@ -219,7 +227,13 @@ final class ConservativeTuningController {
 
         long lastCheck = prefs.getLong(P + "last_check", 0L);
         boolean deadline = "trial".equals(stage) && now >= prefs.getLong(P + "deadline", Long.MAX_VALUE);
-        if (!deadline && lastCheck > 0L && now - lastCheck < SAMPLE_INTERVAL_MS) return;
+        if (lastCheck > 0L && now - lastCheck < SAMPLE_INTERVAL_MS && !deadline) return;
+        // Expiring a trial cannot turn an immediate repeated reading into evidence.
+        if (deadline && now - prefs.getLong(P + "last_sample", 0L) < SAMPLE_INTERVAL_MS) {
+            restoreSnapshot(prefs);
+            advance(prefs, phase, now, "Revertido: prazo sem novas amostras independentes");
+            return;
+        }
         prefs.edit().putLong(P + "last_check", now).apply();
         long started = prefs.getLong(P + "stage_started", now);
         int samples = prefs.getInt(P + "samples", 0);
@@ -260,7 +274,7 @@ final class ConservativeTuningController {
         addSample(prefs, now, batteryPct, tempC, socTempC, cpuLoad, freeRamPct,
                 powerW, prefs.getFloat("jank_pct", -1f), interactive);
         samples = prefs.getInt(P + "samples", 0);
-        if ((!deadline && now - started < WINDOW_MS) || samples < MIN_SAMPLES) {
+        if (now - prefs.getLong(P + "window_start", now) < WINDOW_MS || samples < MIN_SAMPLES) {
             setStatus(prefs, stageStatus(stage, phase, samples));
             return;
         }
@@ -343,7 +357,7 @@ final class ConservativeTuningController {
                     .putLong(P + "probation_last", now).apply();
         }
         int n = p.getInt(P + "probation_n", 0);
-        if (elapsed >= REVIEW_6H && n >= 3) {
+        if (elapsed >= REVIEW_6H && n >= 6) {
             float avgPower = p.getFloat(P + "probation_power", 0) / n;
             float avgTemp = p.getFloat(P + "probation_temp", 0) / n;
             float avgCpu = p.getFloat(P + "probation_cpu", 0) / n;
@@ -359,11 +373,11 @@ final class ConservativeTuningController {
             p.edit().putBoolean(P + "probation_6h_ok", true).apply();
         }
         if (elapsed >= CONFIRM_24H) {
-            if (n < 8 && elapsed < CONFIRM_24H + REVIEW_6H) {
-                setStatus(p, "Validação 24h: aguardando 8 leituras comparáveis");
+            if (n < 12 && elapsed < CONFIRM_24H + REVIEW_6H) {
+                setStatus(p, "Validação 24h: aguardando 12 leituras comparáveis");
                 return;
             }
-            boolean confirmed = n >= 8 && basePower > 0f
+            boolean confirmed = n >= 12 && basePower > 0f
                     && p.getFloat(P + "probation_power", 0) / n <= basePower * .93f
                     && p.getBoolean(P + "probation_6h_ok", false);
             if (confirmed) {
@@ -443,16 +457,13 @@ final class ConservativeTuningController {
             return "CONSUMO";
         }
         if (base.avgPower > 0f && test.avgPower > 0f) {
-            // An unstable workload/current signal cannot validate a 2-minute A/B win.
+            // An unstable workload/current signal cannot validate an A/B win.
             if (base.powerCv > 0.40f || test.powerCv > 0.40f) return "DADOS";
             if (test.avgPower > base.avgPower * 1.02f) return "CONSUMO";
             // CPU/RAM changes are safety signals, never evidence of battery saving.
-            if (test.avgPower <= base.avgPower * 0.93f) return "MELHORA";
+            if (MonitoringPolicy.clearPowerReduction(base.avgPower, base.powerCv, base.n,
+                    test.avgPower, test.powerCv, test.n)) return "MELHORA";
             return "SEM_MELHORA";
-        }
-        if (baseDrain >= 0d && testDrain >= 0d) {
-            if (testDrain > baseDrain + 0.10d) return "CONSUMO";
-            if (baseDrain > 0.1d && testDrain <= baseDrain * 0.90d) return "MELHORA";
         }
         return "DADOS";
     }
@@ -534,6 +545,7 @@ final class ConservativeTuningController {
                 .putFloat(P + "base_ram", m.avgRam)
                 .putFloat(P + "base_power", m.avgPower)
                 .putFloat(P + "base_power_cv", m.powerCv)
+                .putInt(P + "base_samples", m.n)
                 .putFloat(P + "base_jank", m.avgJank)
                 .putFloat(P + "base_max_temp", m.maxTemp)
                 .putFloat(P + "base_soc", m.avgSoc)
@@ -543,7 +555,7 @@ final class ConservativeTuningController {
 
     private static Metrics readBaseline(SharedPreferences p) {
         Metrics m = new Metrics();
-        m.n = MIN_SAMPLES;
+        m.n = p.getInt(P + "base_samples", 0);
         m.avgTemp = p.getFloat(P + "base_temp", -1f);
         m.avgCpu = p.getFloat(P + "base_cpu", -1f);
         m.avgRam = p.getFloat(P + "base_ram", -1f);
@@ -587,7 +599,7 @@ final class ConservativeTuningController {
         String key = OPTIONS[phase][0];
         // Snapshot and trial marker are durable BEFORE the setting can take effect.
         p.edit().putString(P + "stage", "trial")
-                .putLong(P + "deadline", System.currentTimeMillis() + WINDOW_MS)
+                .putLong(P + "deadline", System.currentTimeMillis() + MAX_WINDOW_MS)
                 .putBoolean(key, !p.getBoolean(P + "snapshot_value", false)).commit();
     }
 
@@ -732,7 +744,7 @@ final class ConservativeTuningController {
                 .putString(P + "exclusions", "Proteções permanecem ativas. Limpeza de dados/cache, "
                     + "encerramento de processos, congelamento, compactação/ZRAM e ações sem restauração "
                     + "ficam desativados. Autocalibração, A/B paralelo e deep idle não podem interferir "
-                    + "na medição. Diagnóstico de inicialização e ações manuais não são testes de 2 min.")
+                    + "na medição. Diagnóstico de inicialização e ações manuais não são testes de 30 min.")
                 .commit();
     }
 
@@ -752,7 +764,7 @@ final class ConservativeTuningController {
         StringBuilder lines = new StringBuilder();
         for (int i = 0; i < PHASES; i++) {
             if (!p.getBoolean(P + "accepted_" + i, false)) continue;
-            if (p.getInt(P + "accepted_samples_" + i, 0) < 8
+            if (p.getInt(P + "accepted_samples_" + i, 0) < 12
                     || p.getFloat(P + "accepted_saving_pct_" + i, -1f) < 0f) {
                 legacy++;
                 continue;

@@ -23,9 +23,11 @@ final class NativeThermalForecast {
         if (pm == null || Build.VERSION.SDK_INT < 29) return;
         try {
             listener = status -> {
+                int previous = prefs.getInt("native_thermal_status", PowerManager.THERMAL_STATUS_NONE);
                 prefs.edit().putInt("native_thermal_status", status)
                         .putLong("native_thermal_event_at", System.currentTimeMillis()).apply();
-                if (status >= PowerManager.THERMAL_STATUS_MODERATE) onChange.run();
+                if (status != previous && (status >= PowerManager.THERMAL_STATUS_MODERATE
+                        || previous >= PowerManager.THERMAL_STATUS_MODERATE)) onChange.run();
             };
             pm.addThermalStatusListener(listener);
             prefs.edit().putString("native_thermal_api", "listener ativo").apply();

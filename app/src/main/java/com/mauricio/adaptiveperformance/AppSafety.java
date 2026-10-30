@@ -116,7 +116,8 @@ public final class AppSafety {
     }
 
     public static boolean isEligibleForManualFreeze(Context context, String pkg) {
-        return isEligibleForAdaptiveOptimization(context, pkg);
+        // Never stop core apps such as Play Store, even if older settings selected them.
+        return !isCritical(context, pkg) && isEligibleForAdaptiveOptimization(context, pkg);
     }
 
     /** Lista pessoal de apps que nunca devem ser finalizados/congelados automaticamente. */
@@ -146,8 +147,11 @@ public final class AppSafety {
     public static boolean hasLeftForegroundLongEnough(SharedPreferences prefs, String pkg) {
         if (prefs == null || pkg == null || pkg.isEmpty()) return false;
         if (pkg.equals(prefs.getString("foreground", ""))) return false;
-        long delayMinutes = Math.max(1L, Math.min(360L,
-                prefs.getLong("freeze_delay_minutes", 15L)));
+        // Legacy installations stored this value as Integer. SharedPreferences.getLong()
+        // throws ClassCastException for those values and aborts the freeze pass.
+        Object saved = prefs.getAll().get("freeze_delay_minutes");
+        long configuredMinutes = saved instanceof Number ? ((Number) saved).longValue() : 15L;
+        long delayMinutes = Math.max(1L, Math.min(360L, configuredMinutes));
         long last = prefs.getLong("app_last_foreground_at_" + Integer.toHexString(pkg.hashCode()), 0L);
         return last <= 0L || System.currentTimeMillis() - last >= delayMinutes * 60_000L;
     }

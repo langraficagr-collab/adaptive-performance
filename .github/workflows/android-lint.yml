@@ -60,6 +60,9 @@ jobs:
           # The nativeapp prototype is not committed to this repository.
           sed -i '/include(.*:nativeapp.*)/s/, *":nativeapp"//' settings.gradle.kts
 
+      - name: Verify monitoring and battery regression policies
+        run: sh tests/monitoring/run.sh
+
       - name: Run Android Lint (full and conservative editions)
         run: gradle --no-daemon --stacktrace :app:lintFullDebug :app:lintConservativeDebug
 

@@ -19,6 +19,9 @@ final class UiFrameSampler {
     private int frames=0, dropped=0, slow=0;
     private long duration=0L;
     private long startElapsed;
+    private long lastBudgetNs;
+    private final Handler stopHandler = new Handler(Looper.getMainLooper());
+    private final Runnable stopTask = this::stop;
 
     UiFrameSampler(Activity activity, SharedPreferences prefs){
         this.activity=activity; this.prefs=prefs;
@@ -38,7 +41,15 @@ final class UiFrameSampler {
             if(ns>0 && ns<2_000_000_000L) {
                 frames++;
                 duration+=ns;
-                if(ns>32_000_000L)slow++;
+                long deadline = Build.VERSION.SDK_INT >= 31
+                        ? metrics.getMetric(FrameMetrics.DEADLINE) : -1L;
+                float hz = 60f;
+                try {
+                    android.view.Display display = activity.getWindowManager().getDefaultDisplay();
+                    if (display != null) hz = display.getRefreshRate();
+                } catch (RuntimeException ignored) { }
+                lastBudgetNs = MonitoringPolicy.frameBudgetNs(hz, deadline);
+                if(ns > lastBudgetNs)slow++;
                 dropped+=Math.max(0,droppedFrames);
             }
             if((frames>=150 || SystemClock.elapsedRealtime()-startElapsed>=10_000L)
@@ -51,12 +62,14 @@ final class UiFrameSampler {
             listening=true;
             activity.getWindow().addOnFrameMetricsAvailableListener(
                     listener,new Handler(Looper.getMainLooper()));
+            stopHandler.postDelayed(stopTask, 10_000L);
         } catch(RuntimeException problem){listening=false;listener=null;}
     }
 
     void stop(){
         if(!listening)return;
         listening=false;
+        stopHandler.removeCallbacks(stopTask);
         try{activity.getWindow().removeOnFrameMetricsAvailableListener(listener);}
         catch(RuntimeException ignored){}
         listener=null;
@@ -67,8 +80,8 @@ final class UiFrameSampler {
                     .putLong("v2_ui_last_sample",System.currentTimeMillis())
                     .putString("v2_ui_jank_note",
                             String.format(Locale.US,
-                                "Interface do Adaptive Performance: %.1f%% de quadros >32 ms (%d quadros)",
-                                pct,frames))
+                                "Interface do Adaptive Performance: %.1f%% de quadros acima do prazo da tela (último %.2f ms; %d quadros)",
+                                pct,lastBudgetNs / 1_000_000d,frames))
                     .apply();
         }
     }

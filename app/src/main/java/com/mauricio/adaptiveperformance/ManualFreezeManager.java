@@ -24,48 +24,53 @@ public class ManualFreezeManager {
 
     public synchronized void update(String foregroundPackage) {
         Set<String> selected = new HashSet<>(prefs.getStringSet("manual_freeze_selected", Collections.emptySet()));
+        if (selected.removeIf(pkg -> AppSafety.isCritical(context, pkg))) {
+            prefs.edit().putStringSet("manual_freeze_selected", new HashSet<>(selected)).commit();
+        }
         boolean enabled = prefs.getBoolean("manual_freeze_enabled", false);
 
-        // Um lançamento explícito pelo usuário tira o pacote do estado stopped.
-        // Assim que ele aparece em primeiro plano, restauramos o bucket original.
+        // A manual selection freezes immediately when no longer on screen.
+        // No idle-time delay is applied to user-selected apps.
         for (String pkg : new ArrayList<>(active)) {
             try {
                 if (!enabled || !selected.contains(pkg) || !AppSafety.isEligibleForManualFreeze(context, pkg)
                         || AppSafety.isNeverFreeze(context, pkg)) {
                     unfreeze(pkg, false);
                 } else if (pkg.equals(foregroundPackage)) {
-                    active.remove(pkg);
-                    openedByUser.add(pkg);
-                    persist();
-                    prefs.edit().putString("manual_freeze_last_reason",
-                            pkg + ": aberto pelo usuário; será finalizado ao sair").apply();
-                    report(pkg, "Aberto pelo usuário; será finalizado ao sair");
+                    // Explicit user launch is allowed: restore its previous standby bucket.
+                    unfreeze(pkg, true);
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": erro ao restaurar: " + t.getClass().getSimpleName()).apply();
+            }
         }
         if (!enabled) return;
 
-        for (String pkg : new HashSet<>(openedByUser)) {
-            if (!pkg.equals(foregroundPackage)
-                    && AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) {
-                openedByUser.remove(pkg);
-                freeze(pkg);
-            }
-        }
-
         for (String pkg : selected) {
             if (active.contains(pkg) || pkg.equals(foregroundPackage)) continue;
-            String reason = null;
-            if (!AppSafety.isEligibleForManualFreeze(context, pkg)) reason = "inelegível/protegido";
-            else if (AppSafety.isNeverFreeze(context, pkg)) reason = "lista nunca congelar";
-            else if (!AppSafety.hasLeftForegroundLongEnough(prefs, pkg)) reason = "aguardando período após uso";
-            if (reason != null) {
-                prefs.edit().putString("manual_freeze_last_reason", pkg + ": " + reason).apply();
-                continue;
-            }
+            if (!AppSafety.isEligibleForManualFreeze(context, pkg)
+                    || AppSafety.isNeverFreeze(context, pkg)) continue;
             freeze(pkg);
         }
         persist();
+    }
+
+    /** Invoked only after explicit confirmation on an internal thermal notification. */
+    public synchronized boolean freezeApprovedNow(String pkg) {
+        if (pkg == null || !pkg.matches("[A-Za-z0-9_.]+")
+                || AppSafety.isCritical(context, pkg)
+                || AppSafety.isSystemApp(context, pkg)
+                || !AppSafety.isEligibleForManualFreeze(context, pkg)
+                || AppSafety.isNeverFreeze(context, pkg)
+                || AppSafety.isAutoProtected(context, pkg)) return false;
+        Set<String> selected = new HashSet<>(prefs.getStringSet("manual_freeze_selected", Collections.emptySet()));
+        selected.add(pkg);
+        if (!prefs.edit().putStringSet("manual_freeze_selected", selected)
+                .putBoolean("manual_freeze_enabled", true).commit()) return false;
+        if (!active.contains(pkg)) freeze(pkg);
+        persist();
+        return active.contains(pkg);
     }
 
     public synchronized void restoreAll() {
@@ -80,7 +85,21 @@ public class ManualFreezeManager {
 
     private void freeze(String pkg) {
         if (active.contains(pkg)) return;
+        if (pkg == null || !pkg.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
+                || !AppSafety.isEligibleForManualFreeze(context, pkg)
+                || AppSafety.isNeverFreeze(context, pkg)) return;
         try {
+            // Fail closed if Android cannot confirm which package is now resumed.
+            String resumed = privileged.exec(
+                    "dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'");
+            if (resumed == null || !resumed.contains("/")) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": primeiro plano não verificável").apply();
+                return;
+            }
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                    .compile("([A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+)/").matcher(resumed);
+            if (!matcher.find() || pkg.equals(matcher.group(1))) return;
             // A escolha manual do usuário tem prioridade sobre restrições automáticas.
             // Primeiro restaura somente estados que sabemos terem sido aplicados por nós,
             // remove o rastreamento desses módulos e então assume ownership "manual".

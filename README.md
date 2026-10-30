@@ -20,9 +20,9 @@ O chatbot foi renovado para conversar em português e inglês sobre as funções
 
 **Testes:** `node tests/site-chat/test.js` verifica o reconhecimento de perguntas, continuidade, links, componentes de ambas as páginas e simulações de eventos da interface.
 
-## Versão disponível: 1.11.15 — teste de interface e confiabilidade · 30/10/2026
+## Versão disponível: 1.11.16 — teste de interface e confiabilidade · 30/10/2026
 
-**APK:** [Baixar Adaptive Performance v1.11.15](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15) · **versionCode 97**.
+**APK:** [Baixar Adaptive Performance v1.11.16](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.16) · **versionCode 98**.
 
 **Melhorias desta versão:**
 
@@ -34,6 +34,14 @@ O chatbot foi renovado para conversar em português e inglês sobre as funções
 - **Proteção da bateria:** varreduras pesadas são adiadas durante carga/aquecimento. A autonomia real exige medição em condições controladas.
 
 **Validação:** APK compilado com Gradle e instalado no Android 16; 29 registros obsoletos removidos no teste; notificação de teste recebida pelo Android; histórico e lista atualizados. Uma varredura posterior de inatividade estava em execução e não foi validada até sua conclusão. APK assinado com certificado de desenvolvimento; atualização direta requer assinatura compatível.
+
+### Congelamento forte e detecção de RAM recorrente — 1.11.16
+
+- Os apps **escolhidos manualmente** podem receber força-parada + standby `restricted` + `RUN_IN_BACKGROUND/RUN_ANY_IN_BACKGROUND=ignore`. Os valores originais de AppOps são registrados e restaurados ao abrir o app ou ao retirá-lo da seleção. Em ROMs que negam AppOps, a força-parada continua disponível.
+- Aviso: enquanto congelados, apps selecionados — inclusive bancários, se escolhidos — podem perder notificações, alarmes e sincronização de fundo.
+- A detecção de possível **vazamento de memória** usa crescimento sustentado de PSS em janelas independentes. Uma ocorrência não basta: são necessárias pelo menos duas no período de 24h, separadas por nova amostragem, para perguntar por notificação ou diálogo no app.
+- **Consentimento obrigatório**: responder “Congelar ao sair” inclui o app elegível na seleção; ignorar não altera nenhuma restrição. Apps críticos/sistema permanecem protegidos. Os indícios de crescimento de PSS não provam vazamento.
+- **Testes:** compilação Gradle aprovada e seis testes de recorrência Java aprovados. A primeira compilação foi instalada e o congelamento/restauração do Vibes foi validado no Android. A reinstalação da compilação final com o teste auxiliar foi cancelada pelo Android, portanto não houve teste final de instalação desse pacote exato.
 
 ### Histórico: 1.11.9 e versões anteriores
 

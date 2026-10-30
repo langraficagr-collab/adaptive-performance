@@ -13,7 +13,7 @@ const cases = [
  ['pt','Não funciona congelamento','freeze'], ['pt','Não congela','freeze'],
  ['pt','Por que não aparece notificação?','notifications'], ['en','How do I enable notifications?','notifications'],
  ['en','Where do I download the APK?','install'], ['pt','onde baixar a versão atual?','release'],
- ['pt','Meu celular está esquentando','heat'], ['pt','O que mudou na 1.11.15?','release'],
+ ['pt','Meu celular está esquentando','heat'], ['pt','O que mudou na 1.11.16?','release'],
  ['en','Privacy and personal data','privacy'], ['pt','Qual a velocidade da luz?','unknown']
 ];
 for (const [lang, question, expected] of cases)
@@ -23,7 +23,7 @@ test('contextual follow-up', () => {
   assert.equal(r.topic,'notifications'); assert.match(r.text,/Enviar notificação de teste/);
 });
 test('links are verified GitHub URLs', () => {
-  for (const q of ['Como instalar?','O que mudou na 1.11.15?','erro no app']) {
+  for (const q of ['Como instalar?','O que mudou na 1.11.16?','erro no app']) {
     for (const l of engine.reply(q,{},'pt').links)
       assert.match(l.url, /^https:\/\/github\.com\/langraficagr-collab\/adaptive-performance(?:\/|$)/);
   }

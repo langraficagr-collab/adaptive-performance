@@ -236,6 +236,17 @@ public final class ExtendedDiagnosticsController {
         return r;
     }
 
+    /** Lightweight memory-only sampling when the costly diagnostics suite is disabled. */
+    public synchronized void maybeObserveLeakOnly(String fg) {
+        if (!prefs.getBoolean("leak_freeze_suggestions_enabled", true)
+                || prefs.getBoolean("extended_diagnostics", true)
+                || prefs.getBoolean("extended_safe_mode_manual", false)) return;
+        long now = SystemClock.elapsedRealtime();
+        if (now < safeModeUntil || fg == null || fg.equals(context.getPackageName())) return;
+        try { scanMemoryLeak(fg, now); }
+        catch (Throwable ignored) { }
+    }
+
     public synchronized void maybeRunDiagnostics(String fg) {
         if (!prefs.getBoolean("extended_diagnostics", true)) return;
         long now = SystemClock.elapsedRealtime();
@@ -260,7 +271,8 @@ public final class ExtendedDiagnosticsController {
             try { scanDuplicates(); } catch (Throwable ignored) {}
         }
         try { scanLaunchLog(); } catch (Throwable ignored) {}
-        if (prefs.getBoolean("memory_leak_detector", true)) {
+        if (prefs.getBoolean("memory_leak_detector", true)
+                || prefs.getBoolean("leak_freeze_suggestions_enabled", true)) {
             try { scanMemoryLeak(fg, now); } catch (Throwable ignored) {}
         }
 
@@ -338,6 +350,12 @@ public final class ExtendedDiagnosticsController {
                     memoryLeakPssMb = lastPoint.pssKb / 1024f;
                     memoryLeakSpanMin = span / 60000f;
                     memoryLeakDetectedElapsed = now;
+                    // A single continuing growth trend must not count as two incidents.
+                    // Restart the independent PSS window only after a confirmed episode.
+                    MemoryLeakFreezeAdvisor.confirmedEpisode(context, prefs, pkg,
+                            memoryLeakGrowthMb, memoryLeakSpanMin);
+                    q.clear();
+                    q.addLast(new MemPoint(now, lastPoint.pssKb));
                 }
             }
         }

@@ -994,6 +994,10 @@ public class MainActivity extends Activity {
         duplicateDetectionSwitch = actionSwitch("Detectar serviços de automação duplicados","duplicate_detection",true);
         deepSleepSwitch = actionSwitch("Monitorar deep sleep e Doze com a tela apagada","deep_sleep_monitor",true);
         memoryLeakSwitch = actionSwitch("Detectar crescimento anormal de memória por aplicativo","memory_leak_detector",true);
+        Switch repeatedLeakSwitch = actionSwitch("Perguntar após duas suspeitas distintas de vazamento de RAM",
+                "leak_freeze_suggestions_enabled", true);
+        repeatedLeakSwitch.setOnCheckedChangeListener((b,v)->prefs.edit()
+                .putBoolean("leak_freeze_suggestions_enabled",v).apply());
         thermalBrightnessSwitch = actionSwitch("Reduzir brilho temporariamente em aquecimento forte","thermal_brightness_control",true);
         systemBatteryGuardSwitch = actionSwitch("Economia sistêmica adaptativa","system_battery_guard",true);
         systemDeepIdleSwitch = actionSwitch("Deep idle: pausar monitoramento e liberar Doze","system_deep_idle",true);
@@ -1003,6 +1007,14 @@ public class MainActivity extends Activity {
         maximumBatterySwitch = actionSwitch("Máxima economia: desativar dois-toques no repouso","maximum_battery_mode",false);
         safeModeManualSwitch = actionSwitch("Forçar modo seguro dos módulos avançados","extended_safe_mode_manual",false);
         manualFreezeSwitch = actionSwitch("Ativar congelamento manual dos apps selecionados","manual_freeze_enabled",false);
+        Switch aggressiveFreezeSwitch = actionSwitch("Congelamento forte: força-parada, standby e bloqueio de segundo plano",
+                "manual_freeze_aggressive_enabled", true);
+        aggressiveFreezeSwitch.setOnCheckedChangeListener((b, v) -> {
+            prefs.edit().putBoolean("manual_freeze_aggressive_enabled", v).apply();
+            try { startService(new Intent(this, OptimizationService.class)
+                    .setAction(OptimizationService.ACTION_MANUAL_FREEZE_REFRESH)); }
+            catch (Throwable ignored) {}
+        });
         heatAdvisorSwitch = actionSwitch("Perguntar antes de congelar apps que podem estar aquecendo o celular", "app_heat_suggestions_enabled", true);
         notifySwitch = actionSwitch("Notificar mudanças importantes e problemas não resolvidos","notify_changes",true);
 
@@ -1092,11 +1104,16 @@ public class MainActivity extends Activity {
         c.addView(extendedDiagnosticsSwitch); c.addView(thermalPredictionSwitch); c.addView(diagnosticBurstSwitch);
         c.addView(adaptiveAggressivenessSwitch); c.addView(abTestingSwitch); c.addView(sensorModemSwitch);
         c.addView(storageGuardSwitch); c.addView(duplicateDetectionSwitch);
-        c.addView(deepSleepSwitch); c.addView(memoryLeakSwitch); c.addView(thermalBrightnessSwitch);
+        c.addView(deepSleepSwitch); c.addView(memoryLeakSwitch);
+        c.addView(repeatedLeakSwitch);
+        c.addView(text("Após duas tendências de aumento de RAM confirmadas em janelas separadas, pergunta antes de adicionar o app ao congelamento. Suspeitas não provam vazamento.", 12, MUTED, false));
+        c.addView(thermalBrightnessSwitch);
         c.addView(systemBatteryGuardSwitch); c.addView(systemDeepIdleSwitch); c.addView(systemRadioSwitch);
         c.addView(dynamicDozeSwitch); c.addView(adaptiveTimeoutSwitch); c.addView(maximumBatterySwitch);
         c.addView(safeModeManualSwitch);
         c.addView(manualFreezeSwitch);
+        c.addView(aggressiveFreezeSwitch);
+        c.addView(text("Atenção: o congelamento forte pode interromper notificações, alarmes e sincronização de apps selecionados. O estado anterior é restaurado ao abrir ou retirar o app da seleção.", 12, MUTED, false));
         c.addView(heatAdvisorSwitch);
         c.addView(text("Aquecimento + CPU alta em duas leituras: você decide pela notificação. Não há prova de causa única.", 12, MUTED, false));
 
@@ -1693,6 +1710,7 @@ public class MainActivity extends Activity {
         int active=prefs.getInt("manual_frozen_active_count",0);
         if(freezeStateText!=null) setTextIfChanged(freezeStateText, sel+" selecionado(s) • "+active+" congelado(s) agora\n"+
                 prefs.getString("heat_advisor_status", "Sugestões térmicas ativas • aguardando evidências") + "\n"+
+                prefs.getString("leak_advisor_status", "Vazamentos recorrentes: aguardando evidências") + "\n"+
                 prefs.getString("last_effectiveness_summary", ""));
         if(limitingDashboardText!=null) setTextIfChanged(limitingDashboardText, prefs.getString("limiting_dashboard", "Nenhuma limitação ativa"));
 
@@ -1995,6 +2013,31 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(refreshLoop);
         lastShizukuUiCheckElapsed = 0L;
         handler.post(refreshLoop);
+        handler.post(this::askAboutRepeatedMemoryLeak);
+    }
+
+    private void askAboutRepeatedMemoryLeak() {
+        if (isFinishing() || isDestroyed() || !MemoryLeakFreezeAdvisor.isPending(prefs)) return;
+        long token = prefs.getLong("leak_prompt_token", 0L);
+        String pkg = prefs.getString("leak_prompt_pkg", "");
+        if (token == 0L || pkg.isEmpty() || token == prefs.getLong("leak_prompt_displayed_token", 0L)) return;
+        prefs.edit().putLong("leak_prompt_displayed_token", token).apply();
+        String label = AppSafety.label(this, pkg);
+        new AlertDialog.Builder(this).setTitle("Possível vazamento de RAM recorrente")
+            .setMessage(label + " apresentou duas tendências distintas de aumento de memória. "
+                + "Isso não comprova vazamento. Deseja adicionar ao congelamento manual? "
+                + "A opção só atua quando você sair do aplicativo e pode interromper suas notificações.")
+            .setPositiveButton("Congelar ao sair", (d, w) -> sendLeakDecision(pkg, token, true))
+            .setNegativeButton("Ignorar", (d, w) -> sendLeakDecision(pkg, token, false))
+            .setNeutralButton("Mais tarde", (d, w) -> d.dismiss()).show();
+    }
+
+    private void sendLeakDecision(String pkg, long token, boolean approved) {
+        Intent i = new Intent(this, MemoryLeakDecisionReceiver.class)
+                .setAction(approved ? MemoryLeakFreezeAdvisor.ACTION_APPROVE : MemoryLeakFreezeAdvisor.ACTION_IGNORE)
+                .putExtra(MemoryLeakFreezeAdvisor.EXTRA_PKG, pkg)
+                .putExtra(MemoryLeakFreezeAdvisor.EXTRA_TOKEN, token);
+        sendBroadcast(i);
     }
 
     @Override protected void onPause() {

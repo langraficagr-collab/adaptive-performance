@@ -12,9 +12,9 @@ The refreshed Portuguese/English chatbot follows the previous topic, provides mo
 
 **Testing:** `node tests/site-chat/test.js` checks intent matching, context, links, both page components, and simulated widget events.
 
-## Available version: 1.11.15 — UI and reliability test · October 30, 2026
+## Available version: 1.11.16 — UI and reliability test · October 30, 2026
 
-**APK:** [Download Adaptive Performance v1.11.15](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15) · **versionCode 97**.
+**APK:** [Download Adaptive Performance v1.11.16](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.16) · **versionCode 98**.
 
 **What's new:**
 
@@ -26,6 +26,14 @@ The refreshed Portuguese/English chatbot follows the previous topic, provides mo
 - **Battery safety:** heavy scans are postponed while charging or hot; actual battery gains require sustained controlled measurement.
 
 **Validation:** Gradle build installed on Android 16; 29 stale tracking entries removed in testing; Android notification received; recent-history and restricted-apps UI verified. A later inactivity scan was not observed through completion. APK is development-signed; in-place updates require a matching certificate.
+
+### Strong manual freeze and recurrent RAM alerts — 1.11.16
+
+- User-selected apps may receive force-stop, restricted standby and `RUN_IN_BACKGROUND/RUN_ANY_IN_BACKGROUND=ignore` where supported. The original AppOps modes are saved and restored when the app is opened or deselected. Force-stop remains as a fallback if the ROM rejects an AppOp.
+- Selected banking or messaging apps may miss notifications, alarms and background sync while frozen.
+- Two independent sustained PSS growth episodes within 24h are needed before the virtual advisor asks whether to add the app to manual freezing, using an Android notification or in-app dialog. A single trend is insufficient and does not prove a leak.
+- No automatic addition without explicit approval. System, critical and protected packages remain excluded.
+- Gradle build and six Java recurrence tests passed; a previously built 1.11.16 APK was installed and tested for launch/exit restoration on-device. The final APK installation was cancelled at the Android install prompt, so that exact final artifact was not separately installed for on-device testing.
 
 ### History: 1.11.9 and earlier versions
 

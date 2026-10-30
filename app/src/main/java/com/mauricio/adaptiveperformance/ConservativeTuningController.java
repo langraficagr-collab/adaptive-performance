@@ -35,7 +35,6 @@ final class ConservativeTuningController {
         {"dynamic_doze_whitelist", "Exceções de Doze", "system_battery_guard"},
         {"adaptive_screen_timeout", "Tempo de tela", "system_battery_guard"},
         {"maximum_battery_mode", "Dois-toques em repouso", "system_battery_guard"},
-        {"notify_changes", "Notificação de problemas", ""},
     };
     private static final int PHASES = OPTIONS.length;
     private static final long SAMPLE_INTERVAL_MS = 120L * 1000L;

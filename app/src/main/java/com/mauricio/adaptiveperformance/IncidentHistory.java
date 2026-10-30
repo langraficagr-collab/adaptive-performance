@@ -5,7 +5,8 @@ import java.util.Date;
 public final class IncidentHistory {
     private IncidentHistory() {}
     public static synchronized void add(SharedPreferences p, String cause, String action, String result, int score) {
-        if (!p.getBoolean("action_effectiveness", true)) return;
+        // Diagnostics and activity history must not depend on effectiveness scoring.
+        RecentActivityStore.add(p, cause, action, result);
         String row = DateFormat.getDateTimeInstance().format(new Date()) + " | " + cause + " | " + action + " | " + result + " | score=" + score;
         row = row.replace('\n', ' ');
         if (row.length() > 1500) row = row.substring(0, 1500);

@@ -4,18 +4,20 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
-## Available version: 1.11.11 — test release · October 30, 2026
+## Available version: 1.11.15 — UI and reliability test · October 30, 2026
 
-**APK:** [Download Adaptive Performance v1.11.11](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.11/Adaptive-Performance-v1.11.11.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.11) · [Code under review in PR #14](https://github.com/langraficagr-collab/adaptive-performance/pull/14).
+**APK:** [Download Adaptive Performance v1.11.15](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15) · **versionCode 97**.
 
-**1.11.11-user-apps-only** (versionCode **93**) applies inactivity restrictions only to user-installed apps. System apps, including updated system apps, are excluded. Previously tracked restrictions are restored automatically while preserving external changes.
+**What's new:**
 
-- Normal monitoring: at least **120 seconds** with the display on; **60 seconds** under thermal/high-pressure conditions; at least **10 minutes** with the display off. Native events may request earlier readings.
-- Automatic trials require **30-minute** baseline/candidate windows with at least **12 spaced readings**. Provisional changes remain under **6–24-hour** observation; confirmation requires 12 comparable readings.
-- Cost accounting includes app/bridge/reaped-shell CPU when observable, command latency and timeouts. This is not complete energy attribution.
-- Recurrence counting and refresh-rate-aware frame sampling are corrected. Preloading remains optional and off by default.
+- **Recent activity:** unified change, recovery, restriction and freeze history, independent of ML effectiveness scoring, with a full-history view.
+- **Inactivity restrictions:** removes tracking records for uninstalled apps without altering surviving apps' AppOps; displays counts, details and scan status. System apps are excluded from new automatic restrictions.
+- **Notifications:** explicit Android permission/channel status, settings shortcut and test button. The battery tuning loop no longer disables change alerts.
+- **Manual freeze:** stops approved selected apps after exiting the foreground, with protected-app safety checks and Shizuku requirements.
+- **Heat advisor:** repeated high CPU combined with high temperature may suggest an app to freeze, but requires explicit user approval. It does not prove per-app thermal causality.
+- **Battery safety:** heavy scans are postponed while charging or hot; actual battery gains require sustained controlled measurement.
 
-**Validation:** Android build and Lint passed without errors; four regression harnesses passed. Lint retains 111 warnings. This is a development-signed prerelease, with code still under review in PR #14. Real 24-hour battery-life gains have not been established. Matching signatures are required to preserve data when updating.
+**Validation:** Gradle build installed on Android 16; 29 stale tracking entries removed in testing; Android notification received; recent-history and restricted-apps UI verified. A later inactivity scan was not observed through completion. APK is development-signed; in-place updates require a matching certificate.
 
 ### History: 1.11.9 and earlier versions
 

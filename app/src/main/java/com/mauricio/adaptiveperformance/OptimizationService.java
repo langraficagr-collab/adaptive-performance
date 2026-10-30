@@ -30,6 +30,8 @@ public class OptimizationService extends Service {
     public static final String ACTION_MEMORY_TRIM_NOW = "com.mauricio.adaptiveperformance.MEMORY_TRIM_NOW";
     public static final String ACTION_START_OPTIMIZATION = "com.mauricio.adaptiveperformance.START_OPTIMIZATION";
     public static final String ACTION_STOP_OPTIMIZATION = "com.mauricio.adaptiveperformance.STOP_OPTIMIZATION";
+    public static final String ACTION_MANUAL_FREEZE_REFRESH = "com.mauricio.adaptiveperformance.MANUAL_FREEZE_REFRESH";
+    public static final String ACTION_FREEZE_HEAT_APP = "com.mauricio.adaptiveperformance.FREEZE_HEAT_APP";
     public static final String ACTION_STORAGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_SCAN";
     public static final String ACTION_STORAGE_CLEAN = "com.mauricio.adaptiveperformance.STORAGE_CLEAN";
     public static final String ACTION_STORAGE_LARGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_LARGE_SCAN";
@@ -73,6 +75,8 @@ public class OptimizationService extends Service {
     private volatile boolean startupReady;
     private CpuPressureController cpuPressureController;
     private ManualFreezeManager manualFreezeManager;
+    private ManualFreezeWatcher manualFreezeWatcher;
+
     private AdvancedAdaptiveController advancedController;
     private SystemHealthController healthController;
     private ExtendedDiagnosticsController extendedController;
@@ -97,6 +101,8 @@ public class OptimizationService extends Service {
     private final AtomicBoolean cpuPressureBusy = new AtomicBoolean(false);
     private final ExecutorService manualFreezeExecutor = idleSingleExecutor("freeze");
     private final AtomicBoolean manualFreezeBusy = new AtomicBoolean(false);
+    private final ExecutorService heatAdvisorExecutor = idleSingleExecutor("heat-advisor");
+    private final AtomicBoolean heatAdvisorBusy = new AtomicBoolean(false);
     private final ExecutorService healthExecutor = idleSingleExecutor("health");
     private final AtomicBoolean healthBusy = new AtomicBoolean(false);
     private final ExecutorService extendedExecutor = idleSingleExecutor("extended");
@@ -218,6 +224,7 @@ public class OptimizationService extends Service {
                     recoveryReady = true;
                     startupReady = true;
                     prefs.edit().putBoolean("startup_ready", true).apply();
+                    handler.post(() -> requestImmediateManualFreeze(null));
                 }
             });
         }
@@ -280,7 +287,38 @@ public class OptimizationService extends Service {
         nativeForecast = new NativeThermalForecast(prefs);
         nativeForecast.attach((PowerManager)getSystemService(POWER_SERVICE), this::requestEventSample);
         bindShizukuIfPossible();
+        manualFreezeWatcher = new ManualFreezeWatcher(this, prefs, pkg -> {
+            AppSafety.recordForegroundUsage(prefs, pkg);
+            requestImmediateManualFreeze(pkg);
+        });
+        manualFreezeWatcher.start();
         handler.post(loop);
+    }
+
+    /** Foreground is checked again by the privileged shell before each force-stop. */
+    private void requestImmediateManualFreeze(String foregroundHint) {
+        final ManualFreezeManager manager = manualFreezeManager;
+        final IPrivilegedService bridge = privileged;
+        if (serviceDestroyed || manager == null || bridge == null || !startupReady) return;
+        if (!manualFreezeBusy.compareAndSet(false, true)) {
+            handler.postDelayed(() -> requestImmediateManualFreeze(foregroundHint), 900L);
+            return;
+        }
+        manualFreezeExecutor.execute(() -> {
+            try {
+                String foreground = foregroundHint == null ? "" : foregroundHint;
+                String resumed = bridge.exec(
+                        "dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'");
+                String actual = resumed == null ? "" : parseForeground(resumed);
+                if (!actual.isEmpty()) foreground = actual;
+                if (foreground.isEmpty()) return; // no safe information
+                AppSafety.recordForegroundUsage(prefs, foreground);
+                manager.update(foreground);
+            } catch (Throwable t) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        "Falha ao atualizar: " + t.getClass().getSimpleName()).apply();
+            } finally { manualFreezeBusy.set(false); }
+        });
     }
 
     private void bindShizukuIfPossible() {
@@ -431,6 +469,23 @@ public class OptimizationService extends Service {
         }
 
         if (!fg.isEmpty()) AppSafety.recordForegroundUsage(prefs, fg);
+        // Monitor only under real thermal stress. Off the critical sample/thermal path.
+        if (privileged != null && startupReady && interactive
+                && prefs.getBoolean("app_heat_suggestions_enabled", true)
+                && ((thermals.hasSoc() && thermals.soc >= 59.0f) || tempC >= 40.0f)
+                && heatAdvisorBusy.compareAndSet(false, true)) {
+            final IPrivilegedService advisorShell = privileged;
+            final float advisorSoc = thermals.hasSoc() ? thermals.soc : -1f;
+            final float advisorBattery = tempC;
+            final boolean advisorCharging = batteryChargingNow;
+            heatAdvisorExecutor.execute(() -> {
+                try { ThermalAppAdvisor.observe(this, prefs, advisorShell,
+                        true, advisorSoc, advisorBattery, advisorCharging); }
+                catch (Throwable t) { prefs.edit().putString("heat_advisor_status", "Erro de verificação: " + t.getClass().getSimpleName()).apply(); }
+                finally { heatAdvisorBusy.set(false); }
+            });
+        }
+
         float controlTemp = thermals.hasSoc() ? thermals.soc : tempC;
         String profile;
         if (!interactive) profile = "Economia/repouso";
@@ -1686,6 +1741,10 @@ public class OptimizationService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
+        if (ACTION_MANUAL_FREEZE_REFRESH.equals(action)) {
+            requestImmediateManualFreeze(null);
+            return START_STICKY;
+        }
         if (ACTION_STOP_OPTIMIZATION.equals(action)) {
             try { LocationBatteryController.restore(prefs, privileged); } catch (Throwable ignored) {}
             prefs.edit()
@@ -1694,6 +1753,14 @@ public class OptimizationService extends Service {
                     .apply();
             stopSelf();
             return START_NOT_STICKY;
+        }
+
+        if (ACTION_FREEZE_HEAT_APP.equals(action)) {
+            if (!prefs.getBoolean("master", false)) return START_NOT_STICKY;
+            String approvedPkg = intent.getStringExtra(ThermalAppAdvisor.EXTRA_PKG);
+            if (approvedPkg != null && approvedPkg.matches("[A-Za-z0-9_.]+"))
+                executeApprovedHeatFreeze(approvedPkg, 0);
+            return START_STICKY;
         }
 
         if (ACTION_MEMORY_TRIM_NOW.equals(action)) {
@@ -1818,6 +1885,30 @@ public class OptimizationService extends Service {
             }
         }
         return START_STICKY;
+    }
+
+    private void executeApprovedHeatFreeze(String pkg, int retry) {
+        if (serviceDestroyed || !prefs.getBoolean("master", false)) return;
+        if (privileged == null || manualFreezeManager == null || !startupReady) {
+            if (retry < 5) {
+                handler.postDelayed(() -> executeApprovedHeatFreeze(pkg, retry + 1), 1_200L);
+            } else {
+                prefs.edit().putString("heat_advisor_status", "Shizuku indisponível; não foi possível congelar " + AppSafety.label(this, pkg)).apply();
+                ChangeNotifier.notifyUnresolved(this, "Não foi possível congelar", "Verifique a permissão do Shizuku", 15);
+            }
+            return;
+        }
+        final ManualFreezeManager manager = manualFreezeManager;
+        manualFreezeExecutor.execute(() -> {
+            boolean success = false;
+            try { success = manager.freezeApprovedNow(pkg); }
+            catch (Throwable ignored) { }
+            String result = (success ? "Congelado após sua confirmação: " : "Falha ao congelar: ")
+                    + AppSafety.label(this, pkg);
+            prefs.edit().putString("heat_advisor_status", result).apply();
+            IncidentHistory.add(prefs, "heat_advisor", pkg, result, -1);
+            if (!success) ChangeNotifier.notifyUnresolved(this, "Congelamento não concluído", result, 16);
+        });
     }
 
     private void applyCauseFixAsync(String causeId, String causeText, int retryCount) {
@@ -2206,6 +2297,8 @@ public class OptimizationService extends Service {
         if (prefs != null) ConservativeTuningController.stopIfNeeded(prefs);
         serviceDestroyed = true;
         handler.removeCallbacksAndMessages(null);
+        if (manualFreezeWatcher != null) manualFreezeWatcher.stop();
+
         sampleExecutor.shutdownNow();
         if (nativeForecast != null) nativeForecast.close();
         try { unregisterReceiver(powerStateReceiver); } catch (Throwable ignored) {}
@@ -2268,6 +2361,7 @@ public class OptimizationService extends Service {
         maintenanceExecutor.shutdownNow();
         cpuPressureExecutor.shutdownNow();
         manualFreezeExecutor.shutdownNow();
+        heatAdvisorExecutor.shutdownNow();
         healthExecutor.shutdownNow();
         extendedExecutor.shutdownNow();
         brightnessExecutor.shutdownNow();

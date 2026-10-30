@@ -129,7 +129,7 @@ public final class AutoUserModeController {
                     .putBoolean("thermal_brightness_control", true)
                     .putBoolean("critical_cleanup", false)
                     .putBoolean("auto_bug_cleanup", false)
-                    .putBoolean("auto_unused_restrict", false)
+                    .putBoolean("auto_unused_restrict", true)
                     .putBoolean("wakeup_network_guard", false)
                     .putBoolean("cpu_pressure_control", false)
                     .putBoolean("adaptive_aggressiveness", false)

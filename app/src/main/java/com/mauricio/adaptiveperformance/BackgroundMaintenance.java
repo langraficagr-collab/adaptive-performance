@@ -311,7 +311,7 @@ public class BackgroundMaintenance {
         updateRestrictedText(restricted);
         if (newlyRestricted > 0) {
             ChangeNotifier.notifyChange(context, "Apps restringidos por inatividade",
-                    newlyRestricted + " app(s), incluindo apps de sistema não críticos, foram restringidos após mais de 3 dias sem uso.", 8);
+                    newlyRestricted + " app(s) instalados pelo usuário foram restringidos após mais de 3 dias sem uso.", 8);
         }
         if (newlyRestricted == 0 && prefs.getString("maintenance_log", "").isEmpty()) {
             log("Verificação de apps sem uso concluída; nenhuma nova restrição.");
@@ -322,9 +322,12 @@ public class BackgroundMaintenance {
         Set<String> restricted = new HashSet<>(prefs.getStringSet("auto_restricted", Collections.emptySet()));
         if (restricted.isEmpty()) return;
         for (String pkg : new ArrayList<>(restricted)) {
-            if (AppSafety.isAutoProtected(context, pkg) && !AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) {
+            if (!isInstalled(pkg)) {
+                discardUninstalled(pkg, restricted);
+            } else if (!isEligibleForAutoRestriction(pkg)) {
                 restoreAutoRestriction(pkg, restricted);
-                log("Exceção do usuário restaurada: " + label(pkg) + ".");
+                if (!restricted.contains(pkg))
+                    log("Exceção do usuário restaurada: " + label(pkg) + ".");
             }
         }
     }
@@ -335,14 +338,37 @@ public class BackgroundMaintenance {
         if (!restricted.contains(pkg)) return;
 
         restoreAutoRestriction(pkg, restricted);
-        String msg = "Restrição automática removida ao abrir: " + label(pkg) + ".";
-        log(msg);
-        ChangeNotifier.notifyChange(context, "Restrição removida", msg, 8);
+        if (!restricted.contains(pkg)) {
+            String msg = "Restrição automática removida ao abrir: " + label(pkg) + ".";
+            log(msg);
+            ChangeNotifier.notifyChange(context, "Restrição removida", msg, 8);
+        }
     }
 
     private boolean isEligibleForAutoRestriction(String pkg) {
+        try {
+            ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+            if ((ai.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0)
+                return false;
+        } catch (PackageManager.NameNotFoundException missing) { return false; }
         return AppSafety.isEligibleForAdaptiveOptimization(context, pkg)
                 && !AppSafety.isNeverFreeze(context, pkg);
+    }
+
+    private boolean isInstalled(String pkg) {
+        try { pm.getApplicationInfo(pkg, 0); return true; }
+        catch (PackageManager.NameNotFoundException e) { return false; }
+    }
+
+    /** Drop metadata for uninstalled packages without changing any Android AppOps. */
+    private void discardUninstalled(String pkg, Set<String> restricted) {
+        if (!restricted.remove(pkg)) return;
+        SharedPreferences.Editor e = prefs.edit()
+                .putStringSet("auto_restricted", new HashSet<>(restricted))
+                .remove("prev_bg_" + hash(pkg)).remove("prev_any_" + hash(pkg));
+        if ("maintenance".equals(prefs.getString("restriction_owner_" + pkg, "")))
+            e.remove("restriction_owner_" + pkg).remove("restriction_reason_" + pkg);
+        e.commit();
     }
 
     private void restoreAutoRestriction(String pkg, Set<String> restricted) throws Exception {
@@ -432,16 +458,23 @@ public class BackgroundMaintenance {
                     restricted.add(pkg);
                 }
             }
-            int restored = 0;
+            int restored = 0, stale = 0;
             for (String pkg : new ArrayList<>(restricted)) {
-                if (!isEligibleForAutoRestriction(pkg)) {
-                    try { restoreAutoRestriction(pkg, restricted); restored++; } catch (Throwable ignored) {}
+                if (!isInstalled(pkg)) {
+                    discardUninstalled(pkg, restricted);
+                    stale++;
+                } else if (!isEligibleForAutoRestriction(pkg)) {
+                    try {
+                        restoreAutoRestriction(pkg, restricted);
+                        if (!restricted.contains(pkg)) restored++;
+                    } catch (Throwable ignored) { }
                 }
             }
             prefs.edit().putStringSet("auto_restricted", new HashSet<>(restricted)).apply();
             updateRestrictedText(restricted);
+            if (stale > 0) log("Removidos " + stale + " registros de apps desinstalados; restrições existentes preservadas.");
             if (restored > 0) {
-                String msg = "Restaurados " + restored + " componentes protegidos/não elegíveis.";
+                String msg = "Restauradas " + restored + " restrições de componentes protegidos.";
                 log(msg);
                 ChangeNotifier.notifyChange(context, "Proteções restauradas", msg, 8);
             }
@@ -453,20 +486,25 @@ public class BackgroundMaintenance {
 
     private void updateRestrictedText(Set<String> restricted) {
         if (restricted.isEmpty()) {
-            prefs.edit().putString("restricted_text", "Nenhum app restrito automaticamente.").apply();
+            prefs.edit().putString("restricted_text", "Nenhum app com restrição automática registrada.")
+                    .putLong("restricted_updated_at", System.currentTimeMillis()).apply();
             return;
         }
         List<String> names = new ArrayList<>();
-        for (String pkg : restricted) names.add(label(pkg));
+        for (String pkg : restricted) if (isInstalled(pkg)) names.add(label(pkg));
         Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
         StringBuilder sb = new StringBuilder();
+        sb.append(names.size()).append(" app(s) com restrição registrada");
+        if (!prefs.getBoolean("auto_unused_restrict", true))
+            sb.append(" • novas restrições pausadas; anteriores mantidas");
         int max = Math.min(12, names.size());
         for (int i=0; i<max; i++) {
-            if (i>0) sb.append('\n');
+            sb.append('\n');
             sb.append("• ").append(names.get(i));
         }
         if (names.size() > max) sb.append("\n+ ").append(names.size()-max).append(" outros");
-        prefs.edit().putString("restricted_text", sb.toString()).apply();
+        prefs.edit().putString("restricted_text", sb.toString())
+                .putLong("restricted_updated_at", System.currentTimeMillis()).apply();
     }
 
     private void log(String message) {

@@ -141,7 +141,7 @@ public class BackgroundMaintenance {
             RankedApp r = ranked.get(i);
             if (i > 0) sb.append('\n');
             sb.append(i+1).append(". ").append(label(r.pkg))
-              .append(" — ").append(String.format(Locale.US, "%.3f mAh", r.mah));
+              .append(" — ").append(String.format(new Locale("pt", "BR"), "%.3f mAh", r.mah));
         }
         if (sb.length() == 0) sb.append("Ainda não há dados suficientes.");
         prefs.edit()

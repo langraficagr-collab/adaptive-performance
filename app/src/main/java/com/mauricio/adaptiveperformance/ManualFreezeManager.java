@@ -33,6 +33,19 @@ public class ManualFreezeManager {
         if (selected.removeIf(pkg -> AppSafety.isCritical(context, pkg))) {
             prefs.edit().putStringSet("manual_freeze_selected", new HashSet<>(selected)).commit();
         }
+        Set<String> pending = new HashSet<>(prefs.getStringSet("manual_freeze_rollback_pending",
+                Collections.emptySet()));
+        for (String pkg : pending) {
+            String original = prefs.getString("manual_freeze_prev_bucket_" + pkg, "");
+            if (!original.isEmpty() && restoreBucket(pkg, original)) {
+                Set<String> remaining = new HashSet<>(prefs.getStringSet("manual_freeze_rollback_pending",
+                        Collections.emptySet()));
+                remaining.remove(pkg);
+                if (prefs.edit().putStringSet("manual_freeze_rollback_pending", remaining)
+                        .remove("manual_freeze_prev_bucket_" + pkg).commit())
+                    RestrictionGuard.release(prefs, pkg, "manual");
+            }
+        }
         boolean enabled = prefs.getBoolean("manual_freeze_enabled", false);
 
         // A manual selection freezes immediately when no longer on screen.
@@ -58,7 +71,8 @@ public class ManualFreezeManager {
         if (!enabled) return;
 
         for (String pkg : selected) {
-            if (active.contains(pkg) || pkg.equals(foregroundPackage)) continue;
+            if (active.contains(pkg) || pkg.equals(foregroundPackage)
+                    || pending.contains(pkg)) continue;
             if (!AppSafety.isEligibleForManualFreeze(context, pkg)
                     || AppSafety.isNeverFreeze(context, pkg)) continue;
             freeze(pkg);
@@ -126,14 +140,22 @@ public class ManualFreezeManager {
             // A escolha manual do usuário tem prioridade sobre restrições automáticas.
             // Primeiro restaura somente estados que sabemos terem sido aplicados por nós,
             // remove o rastreamento desses módulos e então assume ownership "manual".
-            releaseAutomaticOwnership(pkg);
+            if (!releaseAutomaticOwnership(pkg)) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": restauração automática pendente").apply();
+                return;
+            }
             if (!RestrictionGuard.claim(prefs, pkg, "manual", "persistent user freeze")) {
                 prefs.edit().putString("manual_freeze_last_reason", pkg + ": controlado por outro módulo").apply();
                 return;
             }
 
             String previousBucket = getStandbyBucket(pkg);
-            prefs.edit().putString("manual_freeze_prev_bucket_" + pkg, previousBucket).commit();
+            if (previousBucket.isEmpty() || !prefs.edit()
+                    .putString("manual_freeze_prev_bucket_" + pkg, previousBucket).commit()) {
+                RestrictionGuard.release(prefs, pkg, "manual");
+                return;
+            }
 
             boolean restricted = RestrictionGuard.command(privileged,
                     "am set-standby-bucket " + pkg + " restricted");
@@ -141,10 +163,19 @@ public class ManualFreezeManager {
             boolean stopped = ManualFreezeShizuku.forceStop(prefs, privileged, pkg);
 
             if (!stopped) {
-                restoreBucket(pkg, previousBucket);
-                RestrictionGuard.release(prefs, pkg, "manual");
-                prefs.edit().remove("manual_freeze_prev_bucket_" + pkg)
-                        .putString("manual_freeze_last_reason", pkg + ": comando Shizuku/ADB não confirmado").commit();
+                boolean restored = restoreBucket(pkg, previousBucket);
+                if (restored) {
+                    if (prefs.edit().remove("manual_freeze_prev_bucket_" + pkg).commit())
+                        RestrictionGuard.release(prefs, pkg, "manual");
+                } else {
+                    Set<String> rollback = new HashSet<>(prefs.getStringSet(
+                            "manual_freeze_rollback_pending", Collections.emptySet()));
+                    rollback.add(pkg);
+                    prefs.edit().putStringSet("manual_freeze_rollback_pending", rollback).commit();
+                }
+                prefs.edit().putString("manual_freeze_last_reason", pkg +
+                        (restored ? ": parada falhou; standby restaurado"
+                                  : ": parada falhou; restauração pendente")).apply();
                 return;
             }
 
@@ -160,8 +191,19 @@ public class ManualFreezeManager {
                     + (prefs.getBoolean("manual_freeze_aggressive_applied_" + pkg, false)
                             ? " + AppOps de segundo plano" : ""));
         } catch (Throwable t) {
-            RestrictionGuard.release(prefs, pkg, "manual");
-            prefs.edit().putString("manual_freeze_last_reason", pkg + ": falha ao congelar").apply();
+            if (!active.contains(pkg)) {
+                String previous = prefs.getString("manual_freeze_prev_bucket_" + pkg, "");
+                if (!previous.isEmpty() && !restoreBucket(pkg, previous)) {
+                    Set<String> pending = new HashSet<>(prefs.getStringSet(
+                            "manual_freeze_rollback_pending", Collections.emptySet()));
+                    pending.add(pkg);
+                    prefs.edit().putStringSet("manual_freeze_rollback_pending", pending).commit();
+                } else {
+                    if (prefs.edit().remove("manual_freeze_prev_bucket_" + pkg).commit())
+                        RestrictionGuard.release(prefs, pkg, "manual");
+                }
+            }
+            prefs.edit().putString("manual_freeze_last_reason", pkg + ": falha ao congelar; verificar restauração").apply();
         }
     }
 
@@ -282,60 +324,64 @@ public class ManualFreezeManager {
         } catch (Throwable ignored) { return false; }
     }
 
-    private void releaseAutomaticOwnership(String pkg) {
+    private boolean releaseAutomaticOwnership(String pkg) {
         String h = Integer.toHexString(pkg.hashCode());
         try {
             Set<String> auto = new HashSet<>(prefs.getStringSet("auto_restricted", Collections.emptySet()));
             if (auto.contains(pkg)) {
-                String oldBg = prefs.getString("prev_bg_" + h, "");
-                String oldAny = prefs.getString("prev_any_" + h, "");
-                if (oldBg.matches("allow|ignore|deny|default")) {
-                    try { RestrictionGuard.command(privileged,
-                            "appops set --user 0 " + pkg + " RUN_IN_BACKGROUND " + oldBg); }
-                    catch (Throwable ignored) {}
-                }
-                if (oldAny.matches("allow|ignore|deny|default")) {
-                    try { RestrictionGuard.command(privileged,
-                            "appops set --user 0 " + pkg + " RUN_ANY_IN_BACKGROUND " + oldAny); }
-                    catch (Throwable ignored) {}
-                }
+                String bg = prefs.getString("prev_bg_" + h, "");
+                String any = prefs.getString("prev_any_" + h, "");
+                if (!bg.matches("allow|ignore|deny|default")
+                        || !any.matches("allow|ignore|deny|default")) return false;
+                if (!ManualFreezeRecoveryPolicy.restore(bg,
+                        () -> RestrictionGuard.command(privileged,
+                                "appops set --user 0 " + pkg + " RUN_IN_BACKGROUND " + bg),
+                        () -> getAppOp(pkg, "RUN_IN_BACKGROUND"))) return false;
+                if (!ManualFreezeRecoveryPolicy.restore(any,
+                        () -> RestrictionGuard.command(privileged,
+                                "appops set --user 0 " + pkg + " RUN_ANY_IN_BACKGROUND " + any),
+                        () -> getAppOp(pkg, "RUN_ANY_IN_BACKGROUND"))) return false;
                 auto.remove(pkg);
-                prefs.edit().putStringSet("auto_restricted", new HashSet<>(auto))
-                        .remove("prev_bg_" + h).remove("prev_any_" + h).commit();
+                if (!prefs.edit().putStringSet("auto_restricted", auto).remove("prev_bg_" + h)
+                        .remove("prev_any_" + h).commit()) return false;
                 RestrictionGuard.release(prefs, pkg, "maintenance");
             }
-
             Set<String> cpu = new HashSet<>(prefs.getStringSet("cpu_limited_set", Collections.emptySet()));
             if (cpu.contains(pkg)) {
                 String old = prefs.getString("cpu_prev_" + h, "");
-                if (RestrictionGuard.level(old)) {
-                    try { RestrictionGuard.command(privileged,
-                            "cmd activity set-bg-restriction-level --user 0 " + pkg + " " + old); }
-                    catch (Throwable ignored) {}
-                }
+                if (!RestrictionGuard.level(old) || !ManualFreezeRecoveryPolicy.restore(old,
+                        () -> RestrictionGuard.command(privileged,
+                                "cmd activity set-bg-restriction-level --user 0 " + pkg + " " + old),
+                        () -> {
+                            String out = privileged.exec(
+                                    "cmd activity get-bg-restriction-level --user 0 " + pkg + " 2>/dev/null");
+                            return out == null ? "" : out.trim();
+                        })) return false;
                 cpu.remove(pkg);
-                prefs.edit().putStringSet("cpu_limited_set", new HashSet<>(cpu))
-                        .remove("cpu_prev_" + h).remove("cpu_applied_at_" + h).commit();
+                if (!prefs.edit().putStringSet("cpu_limited_set", cpu).remove("cpu_prev_" + h)
+                        .remove("cpu_applied_at_" + h).commit()) return false;
                 RestrictionGuard.release(prefs, pkg, "cpu");
             }
-        } catch (Throwable ignored) {}
+            return true;
+        } catch (Throwable t) { return false; }
     }
 
     private String getStandbyBucket(String pkg) {
         try {
             String out = privileged.exec("am get-standby-bucket " + pkg + " 2>/dev/null");
             if (out != null) {
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("(10|20|30|40|45|50)").matcher(out);
-                if (m.find()) return m.group(1);
+                String normalized = out.trim();
+                if (normalized.matches("10|20|30|40|45|50")) return normalized;
             }
         } catch (Throwable ignored) {}
-        return "10";
+        return "";
     }
 
     private boolean restoreBucket(String pkg, String bucket) {
         if (bucket == null || !bucket.matches("10|20|30|40|45|50")) return false;
-        try { return RestrictionGuard.command(privileged, "am set-standby-bucket " + pkg + " " + bucket); }
-        catch (Throwable ignored) { return false; }
+        return ManualFreezeRecoveryPolicy.restore(bucket,
+                () -> RestrictionGuard.command(privileged, "am set-standby-bucket " + pkg + " " + bucket),
+                () -> getStandbyBucket(pkg));
     }
 
     private void report(String pkg, String action) {

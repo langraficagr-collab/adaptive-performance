@@ -52,20 +52,7 @@ public final class AdaptiveIntelligenceController {
         confidence = Math.max(0, Math.min(100, confidence));
         e.putInt("cause_confidence", confidence);
 
-        // Recurrence in a rolling six-hour window.
-        boolean recurrenceEnabled = p.getBoolean("recurrence_guard", true);
-        String lastCause = p.getString("recurrence_cause", "");
-        long recStart = p.getLong("recurrence_window_start", 0L);
-        int rec = p.getInt("recurrence_count", 0);
-        if (recurrenceEnabled && !lc.contains("sem causa")) {
-            if (!cause.equals(lastCause) || recStart <= 0 || now-recStart > 6L*60L*60L*1000L) {
-                rec = 1; recStart = now;
-            } else if (now - p.getLong("recurrence_last_seen",0L) >= 5L*60L*1000L) rec = Math.min(20, rec+1);
-            e.putString("recurrence_cause", cause).putLong("recurrence_window_start", recStart)
-                    .putLong("recurrence_last_seen", now).putInt("recurrence_count", rec);
-        } else if (recurrenceEnabled && recStart > 0 && now-recStart > 6L*60L*60L*1000L) {
-            e.putInt("recurrence_count",0).remove("recurrence_cause").remove("recurrence_window_start"); rec = 0;
-        }
+        int rec = RecurrenceTracker.record(p, e, cause, !lc.contains("sem causa"), now);
         String strategy = rec >= 4 ? "Recidiva alta: evitar repetir a mesma ação; priorizar rollback/causa raiz"
                 : rec >= 2 ? "Recidiva detectada: exigir confiança maior antes de nova ação"
                 : "Estratégia normal";

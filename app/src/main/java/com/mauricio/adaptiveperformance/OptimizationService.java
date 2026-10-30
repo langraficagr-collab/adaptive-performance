@@ -32,6 +32,7 @@ public class OptimizationService extends Service {
     public static final String ACTION_STOP_OPTIMIZATION = "com.mauricio.adaptiveperformance.STOP_OPTIMIZATION";
     public static final String ACTION_MANUAL_FREEZE_REFRESH = "com.mauricio.adaptiveperformance.MANUAL_FREEZE_REFRESH";
     public static final String ACTION_FREEZE_HEAT_APP = "com.mauricio.adaptiveperformance.FREEZE_HEAT_APP";
+    public static final String ACTION_ADD_LEAK_FREEZE = "com.mauricio.adaptiveperformance.ADD_LEAK_FREEZE";
     public static final String ACTION_STORAGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_SCAN";
     public static final String ACTION_STORAGE_CLEAN = "com.mauricio.adaptiveperformance.STORAGE_CLEAN";
     public static final String ACTION_STORAGE_LARGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_LARGE_SCAN";
@@ -679,13 +680,16 @@ public class OptimizationService extends Service {
             }
         }
 
-        if (extendedController != null && !deferHeavyDiagnostics
+        if (extendedController != null
+                && (!deferHeavyDiagnostics || prefs.getBoolean("leak_freeze_suggestions_enabled", true))
                 && extendedBusy.compareAndSet(false, true)) {
             final ExtendedDiagnosticsController ec = extendedController;
             final String extendedFg = fg;
-                        extendedExecutor.execute(() -> {
-                try { ec.maybeRunDiagnostics(extendedFg); }
-                catch (Throwable ignored) {}
+            extendedExecutor.execute(() -> {
+                try {
+                    if (!deferHeavyDiagnostics) ec.maybeRunDiagnostics(extendedFg);
+                    ec.maybeObserveLeakOnly(extendedFg);
+                } catch (Throwable ignored) { }
                 finally { extendedBusy.set(false); }
             });
         }
@@ -1755,6 +1759,13 @@ public class OptimizationService extends Service {
             return START_NOT_STICKY;
         }
 
+        if (ACTION_ADD_LEAK_FREEZE.equals(action)) {
+            final String pkg = intent.getStringExtra(MemoryLeakFreezeAdvisor.EXTRA_PKG);
+            if (pkg != null && pkg.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+"))
+                executeApprovedLeakSelection(pkg, 0);
+            return START_STICKY;
+        }
+
         if (ACTION_FREEZE_HEAT_APP.equals(action)) {
             if (!prefs.getBoolean("master", false)) return START_NOT_STICKY;
             String approvedPkg = intent.getStringExtra(ThermalAppAdvisor.EXTRA_PKG);
@@ -1885,6 +1896,29 @@ public class OptimizationService extends Service {
             }
         }
         return START_STICKY;
+    }
+
+    private void executeApprovedLeakSelection(String pkg, int retry) {
+        if (serviceDestroyed) return;
+        if (privileged == null || manualFreezeManager == null || !startupReady) {
+            if (retry < 5) handler.postDelayed(() -> executeApprovedLeakSelection(pkg, retry + 1), 1200L);
+            else prefs.edit().putString("leak_advisor_status",
+                    "Seleção autorizada, mas Shizuku indisponível; tente novamente com o serviço ligado").apply();
+            return;
+        }
+        final ManualFreezeManager manager = manualFreezeManager;
+        manualFreezeExecutor.execute(() -> {
+            boolean added = false;
+            try { added = manager.addApprovedLeakTarget(pkg); }
+            catch (Throwable ignored) { }
+            String msg = added ? "Adicionado ao congelamento manual (age ao sair): "
+                    : "Não foi possível adicionar ao congelamento: ";
+            msg += AppSafety.label(this, pkg);
+            prefs.edit().putString("leak_advisor_status", msg).apply();
+            IncidentHistory.add(prefs, "memory_leak", pkg, msg, -1);
+            if (added) handler.post(() -> requestImmediateManualFreeze(null));
+            else ChangeNotifier.notifyUnresolved(this, "Congelamento não concluído", msg, 19);
+        });
     }
 
     private void executeApprovedHeatFreeze(String pkg, int retry) {

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Adaptive Performance 1.11.15 — APK, activity history, battery and Shizuku</title>
-<meta name="description" content="Adaptive Performance 1.11.15 for Android: reliable activity history, tracked app restrictions, testable notifications, consent-based thermal suggestions and manual freezing with Shizuku.">
+<title>Adaptive Performance 1.11.16 — APK, activity history, battery and Shizuku</title>
+<meta name="description" content="Adaptive Performance 1.11.16 for Android: reliable activity history, tracked app restrictions, testable notifications, consent-based thermal suggestions and manual freezing with Shizuku.">
 <meta name="theme-color" content="#07131d">
-<meta property="og:title" content="Adaptive Performance 1.11.15 — Android test build">
+<meta property="og:title" content="Adaptive Performance 1.11.16 — Android test build">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://langraficagr-collab.github.io/adaptive-performance/branding/banner.jpg">
 <link rel="icon" href="branding/avatar.jpg">
@@ -41,10 +41,10 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <nav class="nav"><div class="brand" style="display:flex;align-items:center;gap:10px"><img src="branding/avatar.jpg" alt="" width="34" height="34" style="border-radius:50%">Adaptive Performance</div><div class="navlinks"><a href="#novidades">Updates</a><a href="#recursos">Features</a><a href="#instalar">Installation</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">GitHub</a><label class="lang-picker" for="siteLanguage"><span>Language</span><select id="siteLanguage" aria-label="Select language / Selecionar idioma"><option value="pt">Português</option><option value="en">English</option></select></label></div></nav>
 <section class="hero">
 <div>
-<div class="eyebrow">TEST BUILD 1.11.15 · ACTIVITY AND ALERTS · PT / EN</div>
+<div class="eyebrow">TEST BUILD 1.11.16 · STRONG APP FREEZING · PT / EN</div>
 <h1>More control.<br><span>Battery life that adapts to you.</span></h1>
 <p>Adaptive Brain 2.0 learns device usage patterns, predicts heat and memory pressure, and puts safety first. Predictions can only skip optional preloading; they never freeze apps. Automatic mode retains reversible 30-minute tests, follow-up evidence and native Android thermal protection. Portuguese and English included.</p>
-<p>Version 1.11.15: consolidated activity history, notification test, corrected inactivity restriction list, and heat-related freezing suggestions requiring explicit consent.</p><div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk">Download APK 1.11.15</a><a class="btn secondary" href="#novidades">What's new</a></div>
+<p>Version 1.11.16: stronger manual freezing for selected apps, restoration on launch, and explicit opt-in after two independent suspected RAM leak events.</p><div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk">Download APK 1.11.16</a><a class="btn secondary" href="#novidades">What's new</a></div>
 <div class="fine">Open-source project · Android 8 or later · advanced features require Shizuku</div>
 </div>
 <div class="phone-stage"><img class="phone" src="site/home.png" alt="Adaptive Performance home screen"><div class="float-card float-one"><span class="float-icon">◎</span><span><strong>Daily target</strong><small>Adaptive savings</small></span></div><div class="float-card float-two"><span class="float-icon">↗</span><span><strong>Smart idle</strong><small>Fewer background checks</small></span></div></div>
@@ -53,10 +53,12 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <div class="wrap">
 
 <section class="section" id="novidades" aria-labelledby="latest-heading">
-<div class="eyebrow">TEST RELEASE · 1.11.15 · OCTOBER 30, 2026</div>
-<h2 id="latest-heading">What's new in version 1.11.15</h2>
+<div class="eyebrow">TEST RELEASE · 1.11.16 · OCTOBER 30, 2026</div>
+<h2 id="latest-heading">What's new in version 1.11.16</h2>
 <p class="lead">This build was compiled and installed for testing on Android 16 with Shizuku. UI and history were checked on-device, and a test notification was delivered. Battery-life gains and identification of the actual heat source have not been conclusively established.</p>
 <div class="grid">
+<div class="card"><div class="icon">07</div><b>Stronger manual freezing</b><p>Combines force-stop, restricted standby and background AppOps for manually selected apps where supported. Original settings are restored on launch or deselection. Background banking and messaging notifications may stop while frozen.</p></div>
+<div class="card"><div class="icon">08</div><b>Repeated RAM growth warnings</b><p>After two independent suspected memory leak events within 24 hours, asks for permission via notification or in-app dialog before adding a user app to the freeze list. It never freezes without approval. Trends are not conclusive diagnoses.</p></div>
 <div class="card"><div class="icon">01</div><b>Reliable recent activity</b><p>Unified records for changes, maintenance, freezes and diagnostics, independent of ML effectiveness scoring. A full-history button is included.</p></div>
 <div class="card"><div class="icon">02</div><b>Inactivity restrictions</b><p>Removes entries for uninstalled apps without changing surviving apps' restrictions. Shows the complete tracked list and scan status, excluding system apps from new restrictions.</p></div>
 <div class="card"><div class="icon">03</div><b>Testable notifications</b><p>Change and unresolved-issue alerts are no longer tuned by the battery-learning loop. A status panel detects a blocked Android channel, offers settings access and a test action.</p></div>
@@ -64,8 +66,8 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <div class="card"><div class="icon">05</div><b>Thermal consent advisor</b><p>Repeated high CPU use together with elevated temperature can prompt a freeze suggestion. Explicit approval is required; per-app heat itself is not measured.</p></div>
 <div class="card"><div class="icon">06</div><b>Battery-focused safety</b><p>Retains adaptive monitoring and avoids heavy scans during charging or high heat. Existing app preferences are preserved on upgrade.</p></div>
 </div>
-<p class="lead">Development-signed APK, versionCode 97. In-place upgrades require a matching signing certificate. Notification delivery depends on Android permission and channel settings; Shizuku support varies by device.</p>
-<div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk">Download APK 1.11.15</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15">Release notes and asset</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">Source code</a></div>
+<p class="lead">Development-signed APK, versionCode 98. In-place upgrades require a matching signing certificate. Notification delivery depends on Android permission and channel settings; Shizuku support varies by device.</p>
+<div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk">Download APK 1.11.16</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.16">Release notes and asset</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">Source code</a></div>
 </section>
 <section class="section" id="release-1111"><h2>History: version 1.11.1</h2><p class="lead">This update preserves Adaptive Brain 2.0 and fixes local learning-history persistence, makes CodeRabbit comment retrieval more accurate and stabilizes Android Lint in GitHub Actions. No additional always-on monitoring services.</p><p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk">Download 1.11.1 update</a></p></section>
 <section class="section" id="brain">
@@ -125,7 +127,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <h2>Installation simples. Features extras quando precisar.</h2>
 <div class="grid steps"><div class="card step"><b>Download the APK</b><p>Use the latest version published under Releases in this repository.</p></div><div class="card step"><b>Install on Android</b><p>Allow the browser or file manager to install the APK when Android prompts you.</p></div><div class="card step"><b>Connect Shizuku</b><p>Some features work without Shizuku, but advanced controls need shell privileges.</p></div></div>
 </section>
-<div class="cta"><h2>See what consumes your battery.</h2><p class="lead" style="margin:0 auto 22px">Explore Automatic and Advanced modes and tailor the strategy to your device and routine.</p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk">Download Adaptive Performance 1.11.15</a></div>
+<div class="cta"><h2>See what consumes your battery.</h2><p class="lead" style="margin:0 auto 22px">Explore Automatic and Advanced modes and tailor the strategy to your device and routine.</p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk">Download Adaptive Performance 1.11.16</a></div>
 <footer class="footer">Adaptive Performance is an independent open-source project. It does not promise fixed battery gains; results depend on hardware, ROM, battery health, network and usage patterns. <a href="https://github.com/langraficagr-collab/adaptive-performance">Source code on GitHub</a>.</footer>
 </div>
 <button class="faq-button chat-launcher" id="faqBot" type="button" aria-controls="faqPanel" aria-expanded="false"><span aria-hidden="true">✦</span> Chat with Adaptive</button>

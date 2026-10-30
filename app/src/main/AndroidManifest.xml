@@ -89,6 +89,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".MemoryLeakDecisionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".CauseDecisionReceiver"
             android:exported="false" />
 

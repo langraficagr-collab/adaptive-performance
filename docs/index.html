@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Adaptive Performance 1.11.15 — APK, histórico de atividades, bateria e Shizuku</title>
-<meta name="description" content="Adaptive Performance 1.11.15 para Android: histórico de alterações, lista confiável de restrições, avisos testáveis, sugestão térmica com consentimento e congelamento manual com Shizuku.">
+<title>Adaptive Performance 1.11.16 — APK, histórico de atividades, bateria e Shizuku</title>
+<meta name="description" content="Adaptive Performance 1.11.16 para Android: histórico de alterações, lista confiável de restrições, avisos testáveis, sugestão térmica com consentimento e congelamento manual com Shizuku.">
 <meta name="theme-color" content="#07131d">
-<meta property="og:title" content="Adaptive Performance 1.11.15 — versão de teste Android">
+<meta property="og:title" content="Adaptive Performance 1.11.16 — versão de teste Android">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://langraficagr-collab.github.io/adaptive-performance/branding/banner.jpg">
 <link rel="icon" href="branding/avatar.jpg">
@@ -41,10 +41,10 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <nav class="nav"><div class="brand" style="display:flex;align-items:center;gap:10px"><img src="branding/avatar.jpg" alt="" width="34" height="34" style="border-radius:50%">Adaptive Performance</div><div class="navlinks"><a href="#novidades">Novidades</a><a href="#recursos">Recursos</a><a href="#instalar">Instalação</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">GitHub</a><label class="lang-picker" for="siteLanguage"><span>Idioma</span><select id="siteLanguage" aria-label="Selecionar idioma / Select language"><option value="pt">Português</option><option value="en">English</option></select></label></div></nav>
 <section class="hero">
 <div>
-<div class="eyebrow">VERSÃO DE TESTE 1.11.15 · HISTÓRICO E ALERTAS · PT / EN</div>
+<div class="eyebrow">VERSÃO DE TESTE 1.11.16 · CONGELAMENTO FORTE · PT / EN</div>
 <h1>Mais controle.<br><span>Sua bateria no seu ritmo.</span></h1>
 <p>O Adaptive Brain 2.0 aprende padrões de uso, prevê aquecimento e pressão de memória e prioriza segurança: pode adiar pré-carregamentos opcionais, mas não congela aplicativos por previsões. O modo Automático mantém testes reversíveis de 30 minutos, acompanhamento posterior e proteção térmica nativa. Português e inglês no próprio app.</p>
-<p>Versão 1.11.15: histórico unificado, notificações com teste, lista corrigida de restrições por inatividade e sugestões de congelamento por aquecimento somente com aprovação.</p><div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk">Baixar APK 1.11.15</a><a class="btn secondary" href="#novidades">Ver novidades</a></div>
+<p>Versão 1.11.16: congelamento forte dos apps escolhidos, restauração ao abrir e pergunta após duas suspeitas distintas de vazamento de RAM.</p><div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk">Baixar APK 1.11.16</a><a class="btn secondary" href="#novidades">Ver novidades</a></div>
 <div class="fine">Projeto open source · Android 8 ou superior · recursos avançados usam Shizuku</div>
 </div>
 <div class="phone-stage"><img class="phone" src="site/home.png" alt="Tela principal do Adaptive Performance"><div class="float-card float-one"><span class="float-icon">◎</span><span><strong>Meta diária</strong><small>Economia adaptativa</small></span></div><div class="float-card float-two"><span class="float-icon">↗</span><span><strong>Repouso inteligente</strong><small>Menos verificações em segundo plano</small></span></div></div>
@@ -53,10 +53,12 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <div class="wrap">
 
 <section class="section" id="novidades" aria-labelledby="latest-heading">
-<div class="eyebrow">RELEASE DE TESTE · 1.11.15 · 30/10/2026</div>
-<h2 id="latest-heading">Novidades da versão 1.11.15</h2>
+<div class="eyebrow">RELEASE DE TESTE · 1.11.16 · 30/10/2026</div>
+<h2 id="latest-heading">Novidades da versão 1.11.16</h2>
 <p class="lead">Esta versão foi compilada e instalada para testes em Android 16 com Shizuku. O histórico e a interface foram testados no aparelho e uma notificação de teste foi recebida; a autonomia da bateria e a identificação do app responsável pelo calor não têm comprovação conclusiva.</p>
 <div class="grid">
+<div class="card"><div class="icon">07</div><b>Congelamento manual reforçado</b><p>Para os apps selecionados, combina parada forçada, standby restrito e AppOps de segundo plano (quando permitidos). Salva os estados originais e restaura ao abrir o app ou desativar o congelamento. Pode interromper alertas de bancos e mensagens.</p></div>
+<div class="card"><div class="icon">08</div><b>Vazamento de RAM recorrente</b><p>Após duas tendências independentes de crescimento de memória dentro de 24 horas, pergunta por notificação e no app se deve adicionar o aplicativo à seleção de congelamento. Nunca adiciona sem consentimento. São suspeitas, não diagnóstico definitivo.</p></div>
 <div class="card"><div class="icon">01</div><b>Atividade recente confiável</b><p>Histórico unificado de mudanças, reparos, congelamentos e diagnósticos, independente da opção de pontuação da IA. Botão para consultar a lista completa.</p></div>
 <div class="card"><div class="icon">02</div><b>Restrições por inatividade</b><p>Remove entradas de aplicativos desinstalados sem mudar as restrições dos apps restantes. Mostra a lista completa, o estado da varredura e preserva a exclusão dos apps do sistema.</p></div>
 <div class="card"><div class="icon">03</div><b>Notificações verificáveis</b><p>Alertas de alterações e problemas separados do ajuste automático de economia. Indica quando o Android bloqueia o canal, oferece acesso às configurações e botão para enviar um teste.</p></div>
@@ -64,8 +66,8 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <div class="card"><div class="icon">05</div><b>Sugestão por aquecimento</b><p>Quando há evidências repetidas de uso elevado de CPU e temperatura alta, sugere um possível app para congelamento. Só congela após aprovação explícita. Não mede calor por aplicativo diretamente.</p></div>
 <div class="card"><div class="icon">06</div><b>Economia e preservação de dados</b><p>Mantém o monitoramento adaptativo e evita varreduras pesadas enquanto o aparelho carrega ou está quente. A atualização preserva as preferências existentes.</p></div>
 </div>
-<p class="lead">APK de desenvolvimento assinado, versãoCode 97. Atualizações diretas exigem a mesma assinatura. Algumas notificações dependem de autorização do Android; recursos Shizuku variam conforme ROM e permissões.</p>
-<div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk">Baixar APK 1.11.15</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15">Notas e arquivo da versão</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">Ver código-fonte</a></div>
+<p class="lead">APK de desenvolvimento assinado, versionCode 98. Atualizações diretas exigem a mesma assinatura. Algumas notificações dependem de autorização do Android; recursos Shizuku variam conforme ROM e permissões.</p>
+<div class="actions"><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk">Baixar APK 1.11.16</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.16">Notas e arquivo da versão</a><a class="btn secondary" href="https://github.com/langraficagr-collab/adaptive-performance">Ver código-fonte</a></div>
 </section>
 <section class="section" id="release-1111"><h2>Histórico: versão 1.11.1</h2><p class="lead">A atualização mantém o Adaptive Brain 2.0 e corrige a persistência do aprendizado local, melhora a consulta às revisões do CodeRabbit e estabiliza os testes Android Lint no GitHub Actions. O aplicativo continua sem novos serviços de monitoramento contínuo.</p><p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.1/Adaptive-Performance-v1.11.1.apk">Baixar atualização 1.11.1</a></p></section>
 <section class="section" id="brain">
@@ -125,7 +127,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <h2>Instalação simples. Recursos extras quando precisar.</h2>
 <div class="grid steps"><div class="card step"><b>Baixe o APK</b><p>Use a versão mais recente publicada em Releases neste repositório.</p></div><div class="card step"><b>Instale no Android</b><p>Autorize a instalação do APK pelo navegador ou gerenciador de arquivos quando o Android solicitar.</p></div><div class="card step"><b>Conecte o Shizuku</b><p>O app funciona parcialmente sem ele, mas os controles avançados dependem de privilégios de shell.</p></div></div>
 </section>
-<div class="cta"><h2>Mais clareza sobre o que consome sua bateria.</h2><p class="lead" style="margin:0 auto 22px">Conheça os modos Automático e Avançado e ajuste a estratégia ao seu aparelho e à sua rotina.</p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk">Baixar Adaptive Performance 1.11.15</a></div>
+<div class="cta"><h2>Mais clareza sobre o que consome sua bateria.</h2><p class="lead" style="margin:0 auto 22px">Conheça os modos Automático e Avançado e ajuste a estratégia ao seu aparelho e à sua rotina.</p><a class="btn primary" href="https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk">Baixar Adaptive Performance 1.11.16</a></div>
 <footer class="footer">Adaptive Performance é um projeto independente e open source. Não promete ganhos fixos de autonomia; resultados dependem do aparelho, ROM, bateria, rede e padrão de uso. <a href="https://github.com/langraficagr-collab/adaptive-performance">Código-fonte no GitHub</a>.</footer>
 </div>
 <button class="faq-button chat-launcher" id="faqBot" type="button" aria-controls="faqPanel" aria-expanded="false"><span aria-hidden="true">✦</span> Conversar com o Adaptive</button>

@@ -78,12 +78,12 @@ public class FreezeSelectionActivity extends Activity {
         LinearLayout titles=new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         TextView title=tv("Selecionar apps para congelar",23,TEXT,true);
-        TextView sub=tv("Congelamento imediato ao sair do aplicativo",13,MUTED,false);
+        TextView sub=tv("Congelamento forte ao sair, com restauração ao abrir",13,MUTED,false);
         titles.addView(title); titles.addView(sub);
         top.addView(titles,new LinearLayout.LayoutParams(0,-2,1f));
         page.addView(top);
 
-        TextView note=tv("Selecionados aparecem primeiro. Ao salvar, apps fora da tela são congelados imediatamente. Apps críticos continuam protegidos.",13,MUTED,false);
+        TextView note=tv("Apps selecionados serão encerrados e podem perder notificações em segundo plano. Com modo forte, o Android também bloqueia execução de fundo até você abrir o app. Apps essenciais ficam protegidos.",13,MUTED,false);
         note.setPadding(dp(4),dp(12),dp(4),dp(12));
         page.addView(note);
 

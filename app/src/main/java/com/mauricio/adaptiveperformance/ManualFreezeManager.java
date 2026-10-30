@@ -37,8 +37,12 @@ public class ManualFreezeManager {
                         || AppSafety.isNeverFreeze(context, pkg)) {
                     unfreeze(pkg, false);
                 } else if (pkg.equals(foregroundPackage)) {
-                    // Explicit user launch is allowed: restore its previous standby bucket.
+                    // Always undo hard background blocks when the user opens an app.
                     unfreeze(pkg, true);
+                } else if (prefs.getBoolean("manual_freeze_aggressive_enabled", true)) {
+                    strengthen(pkg);
+                } else {
+                    restoreAggressiveState(pkg);
                 }
             } catch (Throwable t) {
                 prefs.edit().putString("manual_freeze_last_reason",
@@ -71,6 +75,18 @@ public class ManualFreezeManager {
         if (!active.contains(pkg)) freeze(pkg);
         persist();
         return active.contains(pkg);
+    }
+
+    public synchronized boolean addApprovedLeakTarget(String pkg) {
+        if (pkg == null || !pkg.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
+                || AppSafety.isCritical(context, pkg) || AppSafety.isSystemApp(context, pkg)
+                || !AppSafety.isUserFacing(context, pkg)
+                || !AppSafety.isEligibleForManualFreeze(context, pkg)
+                || AppSafety.isNeverFreeze(context, pkg) || AppSafety.isAutoProtected(context, pkg)) return false;
+        Set<String> selected = new HashSet<>(prefs.getStringSet("manual_freeze_selected", Collections.emptySet()));
+        selected.add(pkg);
+        return prefs.edit().putStringSet("manual_freeze_selected", selected)
+                .putBoolean("manual_freeze_enabled", true).commit();
     }
 
     public synchronized void restoreAll() {
@@ -132,7 +148,10 @@ public class ManualFreezeManager {
                     .putLong("manual_frozen_at_" + pkg, System.currentTimeMillis())
                     .putBoolean("manual_freeze_restricted_" + pkg, restricted)
                     .putString("manual_freeze_last_reason", pkg + ": congelado persistentemente").commit();
-            report(pkg, "Congelado: force-stop persistente" + (restricted ? " + standby restricted" : ""));
+            if (prefs.getBoolean("manual_freeze_aggressive_enabled", true)) strengthen(pkg);
+            report(pkg, "Congelado: force-stop" + (restricted ? " + standby restricted" : "")
+                    + (prefs.getBoolean("manual_freeze_aggressive_applied_" + pkg, false)
+                            ? " + AppOps de segundo plano" : ""));
         } catch (Throwable t) {
             RestrictionGuard.release(prefs, pkg, "manual");
             prefs.edit().putString("manual_freeze_last_reason", pkg + ": falha ao congelar").apply();
@@ -142,8 +161,19 @@ public class ManualFreezeManager {
     private void unfreeze(String pkg, boolean opened) {
         if (!active.contains(pkg) && !prefs.contains("manual_freeze_prev_bucket_" + pkg)) return;
         try {
+            // Restore AppOps BEFORE restoring standby and allowing a user launch.
+            if (!restoreAggressiveState(pkg)) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": restauração do segundo plano pendente; tentando novamente").apply();
+                return;
+            }
             String previous = prefs.getString("manual_freeze_prev_bucket_" + pkg, "10");
-            restoreBucket(pkg, previous);
+            if (prefs.getBoolean("manual_freeze_restricted_" + pkg, true)
+                    && !restoreBucket(pkg, previous)) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": não foi possível restaurar standby; pendente").apply();
+                return;
+            }
             active.remove(pkg);
             openedByUser.remove(pkg);
             persist();
@@ -157,6 +187,92 @@ public class ManualFreezeManager {
         } catch (Throwable t) {
             report(pkg, "Falha ao restaurar; nova tentativa será feita");
         }
+    }
+
+    /** Extra restriction only for explicitly selected manual targets, not any automatic tuning. */
+    private void strengthen(String pkg) {
+        if (!prefs.getBoolean("manual_freeze_aggressive_enabled", true)
+                || !active.contains(pkg) || !AppSafety.isEligibleForManualFreeze(context, pkg)
+                || AppSafety.isSystemApp(context, pkg) || AppSafety.isNeverFreeze(context, pkg)) return;
+        if (prefs.getBoolean("manual_freeze_aggressive_applied_" + pkg, false)) return;
+        if (prefs.contains("manual_freeze_prev_bg_" + pkg)
+                || prefs.contains("manual_freeze_prev_any_" + pkg)) {
+            if (!restoreAggressiveState(pkg)) return;
+        }
+        try {
+            String resumed = privileged.exec("dumpsys activity activities 2>/dev/null | grep -m1 -E 'mResumedActivity|topResumedActivity'");
+            if (resumed == null || !resumed.contains("/") || resumed.contains(pkg + "/")) return;
+            String bg = getAppOp(pkg, "RUN_IN_BACKGROUND");
+            String any = getAppOp(pkg, "RUN_ANY_IN_BACKGROUND");
+            if (bg.isEmpty() || any.isEmpty()) {
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": AppOps originais indisponíveis; força-parada preservada").apply();
+                return;
+            }
+            // Synchronous commit before touching system settings makes crash recovery possible.
+            if (!prefs.edit().putString("manual_freeze_prev_bg_" + pkg, bg)
+                    .putString("manual_freeze_prev_any_" + pkg, any).commit()) return;
+            boolean a = bg.equals("ignore") || RestrictionGuard.command(privileged,
+                    "appops set --user 0 " + pkg + " RUN_IN_BACKGROUND ignore");
+            boolean b = a && (any.equals("ignore") || RestrictionGuard.command(privileged,
+                    "appops set --user 0 " + pkg + " RUN_ANY_IN_BACKGROUND ignore"));
+            if (a && b && "ignore".equals(getAppOp(pkg, "RUN_IN_BACKGROUND"))
+                    && "ignore".equals(getAppOp(pkg, "RUN_ANY_IN_BACKGROUND"))) {
+                prefs.edit().putBoolean("manual_freeze_aggressive_applied_" + pkg, true)
+                        .putString("manual_freeze_last_reason", pkg + ": congelamento forte (força-parada + standby + AppOps)")
+                        .commit();
+            } else {
+                restoreAggressiveState(pkg);
+                prefs.edit().putString("manual_freeze_last_reason",
+                        pkg + ": força-parada ativa; AppOps não disponíveis nesta ROM").apply();
+            }
+        } catch (Throwable t) {
+            restoreAggressiveState(pkg);
+            prefs.edit().putString("manual_freeze_last_reason",
+                    pkg + ": AppOps forte indisponível (" + t.getClass().getSimpleName() + ")").apply();
+        }
+    }
+
+    private String getAppOp(String pkg, String operation) {
+        try {
+            String out = privileged.exec("appops get --user 0 " + pkg + " " + operation + " 2>&1");
+            if (out == null || out.toLowerCase(Locale.US).contains("error")
+                    || out.toLowerCase(Locale.US).contains("permission denial")) return "";
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(?m)^\\s*" + operation + ":\\s*(allow|ignore|deny|default)\\b").matcher(out);
+            if (m.find()) return m.group(1);
+            // Android returns "No operations" for a never-configured AppOp.
+            if (out.toLowerCase(Locale.US).contains("no operations")) return "default";
+        } catch (Throwable ignored) { }
+        return "";
+    }
+
+    /** Idempotent restoration, including upgrades where only one AppOp was altered. */
+    private boolean restoreAggressiveState(String pkg) {
+        String bg = prefs.getString("manual_freeze_prev_bg_" + pkg, "");
+        String any = prefs.getString("manual_freeze_prev_any_" + pkg, "");
+        if (bg.isEmpty() && any.isEmpty()) {
+            prefs.edit().remove("manual_freeze_aggressive_applied_" + pkg).apply();
+            return true;
+        }
+        try {
+            boolean okBg = bg.isEmpty() || (bg.matches("allow|ignore|deny|default")
+                    && (bg.equals(getAppOp(pkg, "RUN_IN_BACKGROUND"))
+                        || RestrictionGuard.command(privileged,
+                            "appops set --user 0 " + pkg + " RUN_IN_BACKGROUND " + bg)));
+            boolean okAny = any.isEmpty() || (any.matches("allow|ignore|deny|default")
+                    && (any.equals(getAppOp(pkg, "RUN_ANY_IN_BACKGROUND"))
+                        || RestrictionGuard.command(privileged,
+                            "appops set --user 0 " + pkg + " RUN_ANY_IN_BACKGROUND " + any)));
+            if (!(okBg && okAny)) return false;
+            if ((!bg.isEmpty() && !bg.equals(getAppOp(pkg, "RUN_IN_BACKGROUND")))
+                    || (!any.isEmpty() && !any.equals(getAppOp(pkg, "RUN_ANY_IN_BACKGROUND")))) return false;
+            SharedPreferences.Editor e = prefs.edit()
+                    .remove("manual_freeze_prev_bg_" + pkg)
+                    .remove("manual_freeze_prev_any_" + pkg)
+                    .remove("manual_freeze_aggressive_applied_" + pkg);
+            return e.commit();
+        } catch (Throwable ignored) { return false; }
     }
 
     private void releaseAutomaticOwnership(String pkg) {
@@ -209,10 +325,10 @@ public class ManualFreezeManager {
         return "10";
     }
 
-    private void restoreBucket(String pkg, String bucket) {
-        if (bucket == null || !bucket.matches("10|20|30|40|45|50")) bucket = "10";
-        try { RestrictionGuard.command(privileged, "am set-standby-bucket " + pkg + " " + bucket); }
-        catch (Throwable ignored) {}
+    private boolean restoreBucket(String pkg, String bucket) {
+        if (bucket == null || !bucket.matches("10|20|30|40|45|50")) return false;
+        try { return RestrictionGuard.command(privileged, "am set-standby-bucket " + pkg + " " + bucket); }
+        catch (Throwable ignored) { return false; }
     }
 
     private void report(String pkg, String action) {

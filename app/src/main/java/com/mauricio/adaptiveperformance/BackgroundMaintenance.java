@@ -311,7 +311,7 @@ public class BackgroundMaintenance {
         updateRestrictedText(restricted);
         if (newlyRestricted > 0) {
             ChangeNotifier.notifyChange(context, "Apps restringidos por inatividade",
-                    newlyRestricted + " app(s), incluindo apps de sistema não críticos, foram restringidos após mais de 3 dias sem uso.", 8);
+                    newlyRestricted + " app(s) instalados pelo usuário foram restringidos após mais de 3 dias sem uso.", 8);
         }
         if (newlyRestricted == 0 && prefs.getString("maintenance_log", "").isEmpty()) {
             log("Verificação de apps sem uso concluída; nenhuma nova restrição.");
@@ -322,7 +322,7 @@ public class BackgroundMaintenance {
         Set<String> restricted = new HashSet<>(prefs.getStringSet("auto_restricted", Collections.emptySet()));
         if (restricted.isEmpty()) return;
         for (String pkg : new ArrayList<>(restricted)) {
-            if (AppSafety.isAutoProtected(context, pkg) && !AppSafety.isEligibleForAdaptiveOptimization(context, pkg)) {
+            if (!isEligibleForAutoRestriction(pkg)) {
                 restoreAutoRestriction(pkg, restricted);
                 log("Exceção do usuário restaurada: " + label(pkg) + ".");
             }
@@ -341,6 +341,11 @@ public class BackgroundMaintenance {
     }
 
     private boolean isEligibleForAutoRestriction(String pkg) {
+        try {
+            ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+            if ((ai.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0)
+                return false;
+        } catch (PackageManager.NameNotFoundException missing) { return false; }
         return AppSafety.isEligibleForAdaptiveOptimization(context, pkg)
                 && !AppSafety.isNeverFreeze(context, pkg);
     }

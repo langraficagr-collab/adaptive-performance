@@ -4,6 +4,14 @@
 
 Adaptive Performance is an open-source Android application designed to monitor battery use, CPU, available RAM, thermals, storage health, background activity, and device responsiveness. Supported advanced controls use Shizuku (ADB shell privileges) instead of root; available features depend on the device and ROM.
 
+## Website chat — Adaptive virtual assistant
+
+The refreshed Portuguese/English chatbot follows the previous topic, provides more conversational, documented answers, suggested questions, verified links, session history, and opt-in read-aloud replies when supported by the browser.
+
+**Transparency:** it is a documentation-based virtual assistant, not a person or a server-backed generative AI. Questions are processed in the browser rather than sent to an AI service. Session history is local to the browser tab and can be cleared. The bot cannot access or control the user's device.
+
+**Testing:** `node tests/site-chat/test.js` checks intent matching, context, links, both page components, and simulated widget events.
+
 ## Available version: 1.11.15 — UI and reliability test · October 30, 2026
 
 **APK:** [Download Adaptive Performance v1.11.15](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.15/Adaptive-Performance-v1.11.15.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.15) · **versionCode 97**.

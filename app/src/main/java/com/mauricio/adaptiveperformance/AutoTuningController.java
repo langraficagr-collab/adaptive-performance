@@ -3,7 +3,7 @@ package com.mauricio.adaptiveperformance;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** Tests reversible options sequentially using the 2-minute A/B safety engine. */
+/** Tests reversible options sequentially using bounded 30-minute A/B evidence windows. */
 final class AutoTuningController {
     private final SharedPreferences prefs;
     AutoTuningController(SharedPreferences prefs) { this.prefs = prefs; }

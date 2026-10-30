@@ -949,21 +949,13 @@ public class OptimizationService extends Service {
                 nextLoopDelayMs = Math.max(nextLoopDelayMs, interactive ? 60_000L : 300_000L);
             }
         }
-        if (interactive && !BuildConfig.LEAN_MODE && !lowImpactMode
-                && "auto".equals(prefs.getString("user_mode", "auto"))
-                && !"probation".equals(prefs.getString("conservative_tune_stage", "baseline"))
-                && prefs.getInt("conservative_tune_phase", 0) < 26
-                && prefs.getLong("conservative_tune_completed_at", 0L) == 0L) {
-            // Baseline AND candidate need comparable samples, including while display is off.
-            nextLoopDelayMs = Math.min(nextLoopDelayMs, 30_000L);
-        }
         boolean emergency = tempC >= 42f
                 || (thermals.skin > 0 && thermals.skin >= 47f)
                 || (thermals.soc > 0 && thermals.soc >= 69f);
         // CPU budget always applies, including hot conditions: a frequent
         // profiler loop adds heat rather than taking heat away.
         long budgetDelay = appCostGuard.record(prefs, interactive,
-                emergency || thermalGuardActive);
+                emergency || thermalGuardActive, privileged);
         if (budgetDelay > 0L) nextLoopDelayMs = Math.max(nextLoopDelayMs, budgetDelay);
         // Do not let optimizer CPU throttling postpone active thermal protection.
         if (interactive && thermalGuardActive)
@@ -989,6 +981,11 @@ public class OptimizationService extends Service {
                     .putString("charging_low_impact_note", "Temperatura normal; modo normal")
                     .apply();
         }
+
+        nextLoopDelayMs = Math.max(nextLoopDelayMs, MonitoringPolicy.minimumDelay(
+                interactive, emergency || thermalGuardActive || cpuLoad >= 85d
+                        || adaptivePressureScore >= 4,
+                prefs.getBoolean("diagnostic_mode_active", false)));
     }
 
     private double availableMemoryPct() {

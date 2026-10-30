@@ -1113,6 +1113,7 @@ public class MainActivity extends Activity {
         c.addView(safeModeManualSwitch);
         c.addView(manualFreezeSwitch);
         c.addView(aggressiveFreezeSwitch);
+        c.addView(text("Método: Shizuku executa os comandos ADB shell (am force-stop, standby e AppOps) e verifica o encerramento do processo. Sem Shizuku/ADB autorizado não altera os apps.", 12, MUTED, false));
         c.addView(text("Atenção: o congelamento forte pode interromper notificações, alarmes e sincronização de apps selecionados. O estado anterior é restaurado ao abrir ou retirar o app da seleção.", 12, MUTED, false));
         c.addView(heatAdvisorSwitch);
         c.addView(text("Aquecimento + CPU alta em duas leituras: você decide pela notificação. Não há prova de causa única.", 12, MUTED, false));
@@ -1709,6 +1710,8 @@ public class MainActivity extends Activity {
         int sel=prefs.getStringSet("manual_freeze_selected",Collections.emptySet()).size();
         int active=prefs.getInt("manual_frozen_active_count",0);
         if(freezeStateText!=null) setTextIfChanged(freezeStateText, sel+" selecionado(s) • "+active+" congelado(s) agora\n"+
+                "Método: " + prefs.getString("manual_freeze_shell_method", "Aguardando Shizuku") + "\n"+
+                "Último comando: " + prefs.getString("manual_freeze_shell_last_status", "Aguardando verificação") + "\n"+
                 prefs.getString("heat_advisor_status", "Sugestões térmicas ativas • aguardando evidências") + "\n"+
                 prefs.getString("leak_advisor_status", "Vazamentos recorrentes: aguardando evidências") + "\n"+
                 prefs.getString("last_effectiveness_summary", ""));

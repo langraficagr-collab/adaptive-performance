@@ -78,7 +78,7 @@ public class FreezeSelectionActivity extends Activity {
         LinearLayout titles=new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         TextView title=tv("Selecionar apps para congelar",23,TEXT,true);
-        TextView sub=tv("Congelamento forte ao sair, com restauração ao abrir",13,MUTED,false);
+        TextView sub=tv("Shizuku/ADB: parada forçada ao sair; restaura ao abrir",13,MUTED,false);
         titles.addView(title); titles.addView(sub);
         top.addView(titles,new LinearLayout.LayoutParams(0,-2,1f));
         page.addView(top);

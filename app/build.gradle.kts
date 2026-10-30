@@ -16,8 +16,8 @@ android {
         buildConfigField("boolean", "LEAN_MODE", "false")
         buildConfigField("boolean", "CONSERVATIVE_MODE", "false")
         resValue("string", "app_name", "Adaptive Performance")
-        versionCode = 98
-        versionName = "1.11.16-strong-freeze"
+        versionCode = 99
+        versionName = "1.11.17-shizuku-adb-freeze"
     }
 
     flavorDimensions += "edition"

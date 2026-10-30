@@ -12,20 +12,16 @@ The refreshed Portuguese/English chatbot follows the previous topic, provides mo
 
 **Testing:** `node tests/site-chat/test.js` checks intent matching, context, links, both page components, and simulated widget events.
 
-## Available version: 1.11.16 — UI and reliability test · October 30, 2026
+## Available version: 1.11.17 — verified Shizuku / ADB shell freezing · October 30, 2026
 
-**APK:** [Download Adaptive Performance v1.11.16](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.16) · **versionCode 98**.
+**APK:** [Download Adaptive Performance 1.11.17](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.17/Adaptive-Performance-v1.11.17.apk) · [Release notes](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.17) · **versionCode 99**.
 
-**What's new:**
-
-- **Recent activity:** unified change, recovery, restriction and freeze history, independent of ML effectiveness scoring, with a full-history view.
-- **Inactivity restrictions:** removes tracking records for uninstalled apps without altering surviving apps' AppOps; displays counts, details and scan status. System apps are excluded from new automatic restrictions.
-- **Notifications:** explicit Android permission/channel status, settings shortcut and test button. The battery tuning loop no longer disables change alerts.
-- **Manual freeze:** stops approved selected apps after exiting the foreground, with protected-app safety checks and Shizuku requirements.
-- **Heat advisor:** repeated high CPU combined with high temperature may suggest an app to freeze, but requires explicit user approval. It does not prove per-app thermal causality.
-- **Battery safety:** heavy scans are postponed while charging or hot; actual battery gains require sustained controlled measurement.
-
-**Validation:** Gradle build installed on Android 16; 29 stale tracking entries removed in testing; Android notification received; recent-history and restricted-apps UI verified. A later inactivity scan was not observed through completion. APK is development-signed; in-place updates require a matching certificate.
+- **Shizuku ADB shell:** runs `am force-stop --user 0 <package>` from the Shizuku service using ADB shell UID 2000, or root UID 0 if the Shizuku service was started as root. No root is required in normal shell mode.
+- **Verified completion:** queries `pidof` after force-stop to confirm the main process exited; unverified or unauthorized commands are not reported as success.
+- **Retained strong freezing:** restricted standby and AppOps are applied only to manually selected apps where supported; previous values are restored when the user opens or deselects the app.
+- **Status:** the app shows Shizuku's real shell identity and last command result. This is process termination, not a sticky cgroup process suspension that may block relaunch.
+- **Safety:** protected system and critical packages remain excluded. Selected apps can miss notifications, alarms and background synchronization while frozen.
+- **Validation:** installed and tested on Android 16 with Shizuku UID 2000; Vibes restored on launch and was force-stopped again on exit, verified by an empty PID list and re-applied AppOps. Twelve Java policy checks passed.
 
 ### Strong manual freeze and recurrent RAM alerts — 1.11.16
 

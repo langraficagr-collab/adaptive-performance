@@ -174,6 +174,7 @@ public class OptimizationService extends Service {
             recoveryReady = false;
             startupReady = false;
             privileged = IPrivilegedService.Stub.asInterface(service);
+            ManualFreezeShizuku.ready(prefs, privileged);
             // Em modo automático, um override salvo pertence à execução anterior.
             // Remova-o ao reconectar; o primeiro ciclo reaplica proteção somente se a leitura real exigir.
             if (thermalLevelFromMode(prefs.getString("thermal_mode", "auto")) == 0 && thermalLevelApplied > 0) {
@@ -246,7 +247,8 @@ public class OptimizationService extends Service {
             storageHealthController = null;
             systemBatteryController = null;
             privileged = null;
-            prefs.edit().putBoolean("shizuku_bound", false).apply();
+            prefs.edit().putBoolean("shizuku_bound", false)
+                    .putString("manual_freeze_shell_method", "Shizuku/ADB shell desconectado").apply();
         }
     };
 

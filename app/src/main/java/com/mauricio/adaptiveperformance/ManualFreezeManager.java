@@ -18,11 +18,17 @@ public class ManualFreezeManager {
     }
 
     public synchronized void initialize() {
+        ManualFreezeShizuku.ready(prefs, privileged);
         active.addAll(prefs.getStringSet("manual_frozen_active", Collections.emptySet()));
         persist();
     }
 
     public synchronized void update(String foregroundPackage) {
+        if (!ManualFreezeShizuku.ready(prefs, privileged)) {
+            prefs.edit().putString("manual_freeze_last_reason",
+                    "Congelamento pausado: serviço Shizuku/ADB shell não autorizado").apply();
+            return;
+        }
         Set<String> selected = new HashSet<>(prefs.getStringSet("manual_freeze_selected", Collections.emptySet()));
         if (selected.removeIf(pkg -> AppSafety.isCritical(context, pkg))) {
             prefs.edit().putStringSet("manual_freeze_selected", new HashSet<>(selected)).commit();
@@ -62,6 +68,7 @@ public class ManualFreezeManager {
 
     /** Invoked only after explicit confirmation on an internal thermal notification. */
     public synchronized boolean freezeApprovedNow(String pkg) {
+        if (!ManualFreezeShizuku.ready(prefs, privileged)) return false;
         if (pkg == null || !pkg.matches("[A-Za-z0-9_.]+")
                 || AppSafety.isCritical(context, pkg)
                 || AppSafety.isSystemApp(context, pkg)
@@ -130,14 +137,14 @@ public class ManualFreezeManager {
 
             boolean restricted = RestrictionGuard.command(privileged,
                     "am set-standby-bucket " + pkg + " restricted");
-            boolean stopped = RestrictionGuard.command(privileged,
-                    "am force-stop --user 0 " + pkg);
+            // Explicit ADB command executed through the Shizuku service (UID 2000).
+            boolean stopped = ManualFreezeShizuku.forceStop(prefs, privileged, pkg);
 
             if (!stopped) {
                 restoreBucket(pkg, previousBucket);
                 RestrictionGuard.release(prefs, pkg, "manual");
                 prefs.edit().remove("manual_freeze_prev_bucket_" + pkg)
-                        .putString("manual_freeze_last_reason", pkg + ": force-stop falhou").commit();
+                        .putString("manual_freeze_last_reason", pkg + ": comando Shizuku/ADB não confirmado").commit();
                 return;
             }
 
@@ -149,7 +156,7 @@ public class ManualFreezeManager {
                     .putBoolean("manual_freeze_restricted_" + pkg, restricted)
                     .putString("manual_freeze_last_reason", pkg + ": congelado persistentemente").commit();
             if (prefs.getBoolean("manual_freeze_aggressive_enabled", true)) strengthen(pkg);
-            report(pkg, "Congelado: force-stop" + (restricted ? " + standby restricted" : "")
+            report(pkg, "Congelado via Shizuku/ADB shell: force-stop confirmado" + (restricted ? " + standby restricted" : "")
                     + (prefs.getBoolean("manual_freeze_aggressive_applied_" + pkg, false)
                             ? " + AppOps de segundo plano" : ""));
         } catch (Throwable t) {

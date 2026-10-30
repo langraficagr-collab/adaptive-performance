@@ -20,20 +20,16 @@ O chatbot foi renovado para conversar em português e inglês sobre as funções
 
 **Testes:** `node tests/site-chat/test.js` verifica o reconhecimento de perguntas, continuidade, links, componentes de ambas as páginas e simulações de eventos da interface.
 
-## Versão disponível: 1.11.16 — teste de interface e confiabilidade · 30/10/2026
+## Versão disponível: 1.11.17 — congelamento verificado via Shizuku / ADB shell · 30/10/2026
 
-**APK:** [Baixar Adaptive Performance v1.11.16](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.16/Adaptive-Performance-v1.11.16.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.16) · **versionCode 98**.
+**APK:** [Baixar Adaptive Performance 1.11.17](https://github.com/langraficagr-collab/adaptive-performance/releases/download/v1.11.17/Adaptive-Performance-v1.11.17.apk) · [Notas da versão](https://github.com/langraficagr-collab/adaptive-performance/releases/tag/v1.11.17) · **versionCode 99**.
 
-**Melhorias desta versão:**
-
-- **Atividade recente** registra reparos, restrições, congelamentos e alterações mesmo com pontuação de eficácia desativada, com histórico completo.
-- **Restrições por inatividade** removem cadastros de apps desinstalados sem alterar AppOps dos instalados; mostram total, detalhes e estado da varredura. Apps de sistema não entram em novas restrições.
-- **Notificações** mostram status de permissão e canal Android, botão de teste e acesso direto às configurações; os alertas de mudança não são desligados pelo ajuste automático.
-- **Congelamento manual** permite parada persistente de apps selecionados ao sair, protegendo aplicativos críticos, mediante privilégios Shizuku.
-- **Sugestões térmicas** exigem CPU elevada observada repetidamente e temperatura alta, com aprovação explícita antes de congelar. Não provam qual app aqueceu o dispositivo.
-- **Proteção da bateria:** varreduras pesadas são adiadas durante carga/aquecimento. A autonomia real exige medição em condições controladas.
-
-**Validação:** APK compilado com Gradle e instalado no Android 16; 29 registros obsoletos removidos no teste; notificação de teste recebida pelo Android; histórico e lista atualizados. Uma varredura posterior de inatividade estava em execução e não foi validada até sua conclusão. APK assinado com certificado de desenvolvimento; atualização direta requer assinatura compatível.
+- **ADB via Shizuku:** executa comandos `am force-stop --user 0 <pacote>` no serviço Shizuku com privilégios UID 2000 (ou UID 0 se o usuário usar Shizuku root). Não depende de root para o caso padrão.
+- **Verificação real:** após o force-stop, consulta `pidof` para confirmar que o processo principal encerrou. Se o serviço ou a verificação falhar, a operação não será marcada como concluída.
+- **Congelamento forte preservado:** aplica standby restrito e bloqueios AppOps somente aos apps selecionados, se permitido. Restaura os modos originais quando o usuário abre ou retira a seleção.
+- **Interface:** mostra o método Shizuku/ADB shell disponível e o resultado do último comando, sem confundir congelamento persistente com suspensão do processo por `freeze --sticky`.
+- **Proteções:** mantém exclusões de aplicativos críticos, sistema e lista pessoal. Congelar aplicativos escolhidos pode suspender alertas, alarmes e sincronização.
+- **Validação:** instalado e testado em Android 16; Shizuku UID 2000 confirmado; Vibes restaurado ao abrir e encerrado ao sair com `pidof` vazio e AppOps reaplicados. Doze testes Java de verificação foram aprovados.
 
 ### Congelamento forte e detecção de RAM recorrente — 1.11.16
 

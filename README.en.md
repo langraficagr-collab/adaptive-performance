@@ -155,3 +155,9 @@ CPU energy estimates are not actual per-app battery measurements; usage variatio
 
 ### Technical details of the published 1.11.0 — Adaptive Brain 2.0
 Ten incremental extensions, preserving prior behavior: contextual online ML with guarded observational feedback; bounded 32-edge next-app transition model; real battery/skin/SoC temperature trends and native ThermalHeadroom, with illustrative 5-minute projection; charging current and temperature observation (does not change charging power); 10-minute free-RAM trend; bounded 150-frame self-app frame sampling; self-CPU budget; reversible 6-hour optional preloading cooldown following strong, context-matched regressions; game/navigation/social/idle routines; local experiment results and diagnostic export. All automatic ML actions only inhibit optional preloading or reprioritize a recently-used eligible app. No synthetic OEM thermal status, app killing, cloud ML, new polling service, or guaranteed battery savings. Local package history may be included in Android backup if enabled.
+
+### Manual app cache prewarming (experimental)
+
+Open **Automatic optimization → Select apps, number and MB per app** to select installed apps, configure up to 8 candidates per cycle, and choose an individual file-reading budget of 8–128 MB. Total prewarming I/O is capped at 256 MB per cycle and can be reduced by available RAM, battery level, and temperature. This feature is **optional and disabled by default**, and manual selections apply on the next safe cycle (up to 15 minutes).
+
+**Important limitation:** this warms Android's reclaimable filesystem page cache. It cannot reserve or guarantee process RAM, prevent Android from evicting apps, or enforce hard per-app memory limits. Thermal and battery guardrails pause the feature as needed and disable it when measurements indicate a meaningful power or heat regression.

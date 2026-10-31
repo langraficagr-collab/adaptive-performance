@@ -317,13 +317,13 @@ final class AdaptivePreloadController {
         StringBuilder command = new StringBuilder();
         command.append("MAX_BYTES=").append(totalMb * 1048576L)
                 .append("; used=0; warmed=0; app_used=0; APP_MAX_BYTES=0; ");
-        command.append("read_one(){ f=\\\"$1\\\"; s=$(stat -c %s \\\"$f\\\" 2>/dev/null || echo 0); ");
-        command.append("[ \\\"$s\\\" -gt 0 ] || return; total_left=$((MAX_BYTES-used)); ");
+        command.append("read_one(){ f=\"$1\"; s=$(stat -c %s \"$f\" 2>/dev/null || echo 0); ");
+        command.append("[ \"$s\" -gt 0 ] || return; total_left=$((MAX_BYTES-used)); ");
         command.append("app_left=$((APP_MAX_BYTES-app_used)); ");
-        command.append("[ \\\"$total_left\\\" -gt 0 ] && [ \\\"$app_left\\\" -gt 0 ] || return; ");
-        command.append("take=$s; [ \\\"$total_left\\\" -lt \\\"$take\\\" ] && take=$total_left; ");
-        command.append("[ \\\"$app_left\\\" -lt \\\"$take\\\" ] && take=$app_left; ");
-        command.append("head -c \\\"$take\\\" \\\"$f\\\" >/dev/null 2>&1 && { ");
+        command.append("[ \"$total_left\" -gt 0 ] && [ \"$app_left\" -gt 0 ] || return; ");
+        command.append("take=$s; [ \"$total_left\" -lt \"$take\" ] && take=$total_left; ");
+        command.append("[ \"$app_left\" -lt \"$take\" ] && take=$app_left; ");
+        command.append("head -c \"$take\" \"$f\" >/dev/null 2>&1 && { ");
         command.append("used=$((used+take)); app_used=$((app_used+take)); warmed=$used; }; }; ");
         for (Map.Entry<String, Integer> entry : quotas.entrySet()) {
             String pkg = entry.getKey();
@@ -331,19 +331,19 @@ final class AdaptivePreloadController {
             command.append("APP_MAX_BYTES=").append(entry.getValue() * 1048576L)
                     .append("; app_used=0; before=$used; ");
             command.append("for f in $(cmd package path ").append(pkg)
-                    .append(" | sed 's/^package://'); do read_one \\\"$f\\\"; done; ");
+                    .append(" | sed 's/^package://'); do read_one \"$f\"; done; ");
             if (!conservative) {
                 command.append("for root in /sdcard/Android/data/").append(pkg)
                         .append("/files /sdcard/Android/obb/").append(pkg)
                         .append(" /sdcard/Android/media/").append(pkg).append("; do ");
-                command.append("[ \\\"$used\\\" -ge \\\"$MAX_BYTES\\\" ] && break; ");
-                command.append("[ -d \\\"$root\\\" ] || continue; ");
-                command.append("for f in $(find \\\"$root\\\" -maxdepth 2 -type f -size -64M ");
+                command.append("[ \"$used\" -ge \"$MAX_BYTES\" ] && break; ");
+                command.append("[ -d \"$root\" ] || continue; ");
+                command.append("for f in $(find \"$root\" -maxdepth 2 -type f -size -64M ");
                 command.append("-print 2>/dev/null | head -n 4); do ");
-                command.append("[ \\\"$used\\\" -ge \\\"$MAX_BYTES\\\" ] && break; ");
-                command.append("read_one \\\"$f\\\"; done; done; ");
+                command.append("[ \"$used\" -ge \"$MAX_BYTES\" ] && break; ");
+                command.append("read_one \"$f\"; done; done; ");
             }
-            command.append("[ \\\"$used\\\" -gt \\\"$before\\\" ] && echo WARMED_PKG=")
+            command.append("[ \"$used\" -gt \"$before\" ] && echo WARMED_PKG=")
                     .append(pkg).append("; ");
         }
         command.append("echo WARMED_BYTES=$warmed; echo LIMIT_BYTES=$MAX_BYTES");

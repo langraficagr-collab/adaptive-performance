@@ -63,6 +63,14 @@ jobs:
       - name: Verify monitoring and battery regression policies
         run: sh tests/monitoring/run.sh
 
+      - name: Verify cache preload safety budgets
+        run: |
+          mkdir -p /tmp/ap-cache-tests
+          javac -d /tmp/ap-cache-tests \
+            app/src/main/java/com/mauricio/adaptiveperformance/PreloadAllocationPolicy.java \
+            tests/preload/PreloadAllocationPolicyHarness.java
+          java -cp /tmp/ap-cache-tests com.mauricio.adaptiveperformance.PreloadAllocationPolicyHarness
+
       - name: Run Android Lint (full and conservative editions)
         run: gradle --no-daemon --stacktrace :app:lintFullDebug :app:lintConservativeDebug
 

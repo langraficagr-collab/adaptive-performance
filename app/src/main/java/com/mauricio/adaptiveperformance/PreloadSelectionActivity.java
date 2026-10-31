@@ -1,6 +1,7 @@
 package com.mauricio.adaptiveperformance;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -51,6 +52,7 @@ public final class PreloadSelectionActivity extends Activity {
     private EditText search;
     private Switch manualSwitch;
     private int limit;
+    private int intervalMinutes;
     private int visibleLimit = PAGE_SIZE;
     private boolean loaded;
 
@@ -85,6 +87,8 @@ public final class PreloadSelectionActivity extends Activity {
         selected.addAll(prefs.getStringSet("auto_preload_manual_apps", Collections.emptySet()));
         limit = Math.max(1, Math.min(PreloadAllocationPolicy.MAX_APPS,
                 prefs.getInt("auto_preload_manual_count", 2)));
+        intervalMinutes = ManualPreloadPolicy.intervalMinutes(
+                prefs.getInt("auto_preload_manual_interval_min", 5));
         for (String pkg : selected) {
             if (pkg != null && pkg.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+"))
                 quotas.put(pkg, prefs.getInt("auto_preload_quota_mb_" + pkg, 32));
@@ -106,11 +110,12 @@ public final class PreloadSelectionActivity extends Activity {
         TextView note = text(
                 "Selecione os apps, quantos pré-carregar e a cota de leitura em MB de cada um. " +
                 "Isto aquece arquivos no cache recuperável do Android, NÃO reserva RAM nem limita " +
-                "a memória do processo. O sistema pode liberar o cache. Há pausas por bateria, " +
-                "temperatura e RAM baixa.",
+                "a memória do processo. Carrega ao salvar e revisita no intervalo escolhido. " +
+                "O Android pode liberar o cache; temperaturas críticas, RAM e bateria crítica suspendem a leitura.",
                 "Select apps, how many to warm and each app's read budget in MB. " +
                 "This warms Android's reclaimable file cache; it does NOT reserve RAM or limit " +
-                "a process's memory. Android may reclaim the cache. Battery, thermal and low-RAM guards apply.",
+                "process memory. Warm on save and recheck at your chosen interval. Android can evict " +
+                "cached pages; critical heat, RAM, and battery still pause reads.",
                 13, MUTED);
         note.setPadding(0, dp(10), 0, dp(14));
         page.addView(note);
@@ -141,6 +146,25 @@ public final class PreloadSelectionActivity extends Activity {
             @Override public void onStopTrackingTouch(SeekBar bar) {}
         });
         page.addView(count);
+
+        TextView intervalLabel = text("Verificar cache a cada " + intervalMinutes + " minuto(s)",
+                "Recheck cache every " + intervalMinutes + " minute(s)", 14, ACCENT);
+        intervalLabel.setPadding(0, dp(12), 0, 0);
+        page.addView(intervalLabel);
+        SeekBar intervalBar = new SeekBar(this);
+        intervalBar.setMax(59);
+        intervalBar.setProgress(intervalMinutes - 1);
+        intervalBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                intervalMinutes = progress + 1;
+                intervalLabel.setText((UiLanguage.english(prefs)
+                        ? "Recheck cache every " : "Verificar cache a cada ")
+                        + intervalMinutes + " minuto(s)");
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        page.addView(intervalBar);
 
         search = new EditText(this);
         search.setSingleLine(true);
@@ -295,16 +319,37 @@ public final class PreloadSelectionActivity extends Activity {
                     prefs.getInt("auto_preload_quota_mb_" + pkg, 32))));
             edit.putInt("auto_preload_quota_mb_" + pkg, mb);
         }
+        boolean previouslyManual = prefs.getBoolean("auto_preload_manual_mode", false);
         boolean manual = manualSwitch.isChecked() && !valid.isEmpty();
         edit.putStringSet("auto_preload_manual_apps", valid)
                 .putInt("auto_preload_manual_count", limit)
+                .putInt("auto_preload_manual_interval_min", intervalMinutes)
                 .putBoolean("auto_preload_manual_mode", manual)
                 .putLong("auto_preload_cycle_at", 0L)
-                .putString("auto_preload_status", "Configuração de cache atualizada");
+                .putString("auto_preload_status", manual
+                        ? "Seleção salva; carregando cache agora…"
+                        : "Pré-carga manual desativada");
         if (manual) edit.putBoolean("auto_preload_enabled", true);
+        else if (previouslyManual) {
+            edit.putBoolean("auto_preload_enabled", false)
+                    .putStringSet("auto_preload_apps", Collections.emptySet())
+                    .putInt("auto_preload_count", 0)
+                    .putInt("auto_preload_budget_mb", 0);
+        }
         edit.apply();
-        Toast.makeText(this, UiLanguage.english(prefs) ? "Settings saved" :
-                "Configurações salvas", Toast.LENGTH_SHORT).show();
+        if (manual) {
+            try {
+                startService(new Intent(this, OptimizationService.class)
+                        .setAction(OptimizationService.ACTION_MANUAL_PRELOAD_REFRESH));
+            } catch (RuntimeException error) {
+                prefs.edit().putString("auto_preload_status",
+                        "Preferências salvas; abra o monitor para iniciar a pré-carga").apply();
+            }
+        }
+        Toast.makeText(this, UiLanguage.english(prefs)
+                ? (manual ? "Saved; warming cache now" : "Manual cache off")
+                : (manual ? "Salvo; pré-carregando agora" : "Cache manual desativado"),
+                Toast.LENGTH_SHORT).show();
         finish();
     }
 }

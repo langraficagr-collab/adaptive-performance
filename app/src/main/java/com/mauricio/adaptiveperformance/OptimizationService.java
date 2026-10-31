@@ -37,6 +37,8 @@ public class OptimizationService extends Service {
     public static final String ACTION_STORAGE_CLEAN = "com.mauricio.adaptiveperformance.STORAGE_CLEAN";
     public static final String ACTION_STORAGE_LARGE_SCAN = "com.mauricio.adaptiveperformance.STORAGE_LARGE_SCAN";
     public static final String ACTION_STORAGE_DELETE_LARGE = "com.mauricio.adaptiveperformance.STORAGE_DELETE_LARGE";
+    public static final String ACTION_MANUAL_PRELOAD_REFRESH =
+            "com.mauricio.adaptiveperformance.MANUAL_PRELOAD_REFRESH";
     public static final String ACTION_STORAGE_TRIM = "com.mauricio.adaptiveperformance.STORAGE_TRIM";
     public static final String ACTION_STORAGE_TRIM_ABORT = "com.mauricio.adaptiveperformance.STORAGE_TRIM_ABORT";
     public static final String ACTION_STORAGE_HEALTH_CHECK = "com.mauricio.adaptiveperformance.STORAGE_HEALTH_CHECK";
@@ -132,8 +134,15 @@ public class OptimizationService extends Service {
                 // polling cycle just because the display went dark.
                 screenWakeSamplePending.set(false);
                 handler.removeCallbacks(loop);
-                nextLoopDelayMs = 600_000L;
-                handler.postDelayed(loop, 600_000L);
+                boolean manualRefresh = !BuildConfig.CONSERVATIVE_MODE
+                        && prefs.getBoolean("auto_preload_manual_mode", false)
+                        && prefs.getBoolean("auto_preload_enabled", false);
+                long offDelay = manualRefresh
+                        ? ManualPreloadPolicy.intervalMinutes(
+                                prefs.getInt("auto_preload_manual_interval_min", 5)) * 60_000L
+                        : 600_000L;
+                nextLoopDelayMs = offDelay;
+                handler.postDelayed(loop, offDelay);
                 return;
             }
             if (wake) {
@@ -194,6 +203,15 @@ public class OptimizationService extends Service {
             systemBatteryController = new SystemBatteryController(OptimizationService.this, prefs, privileged);
             autoTuningController = new AutoTuningController(prefs);
             adaptivePreloadController = new AdaptivePreloadController(OptimizationService.this, prefs);
+            if (prefs.getBoolean("auto_preload_manual_mode", false)
+                    && prefs.getBoolean("auto_preload_enabled", false)) {
+                // A save may race with the Shizuku handshake: try immediately on bind.
+                prefs.edit().putLong("auto_preload_cycle_at", 0L).apply();
+                handler.post(() -> {
+                    if (sampleBusy.get()) screenWakeSamplePending.set(true);
+                    else { handler.removeCallbacks(loop); handler.post(loop); }
+                });
+            }
             storageHealthController = new StorageHealthController(OptimizationService.this, prefs, privileged);
             final SystemBatteryController initBattery = systemBatteryController;
             systemBatteryExecutor.execute(() -> {
@@ -384,7 +402,15 @@ public class OptimizationService extends Service {
                         // No periodic 10/30-second probes during screen-off.
                         // Genuine Android battery/thermal protection continues
                         // independently of this application's shell polling.
-                        if (pm != null && !pm.isInteractive()) {
+                        boolean userManualPreload = prefs.getBoolean("auto_preload_manual_mode", false)
+                                && prefs.getBoolean("auto_preload_enabled", false)
+                                && !BuildConfig.CONSERVATIVE_MODE;
+                        if (userManualPreload) {
+                            // The user's explicit interval schedules the next attempt.
+                            // The individual cache pass still enforces emergency safeguards.
+                            delay = Math.min(delay, ManualPreloadPolicy.intervalMinutes(
+                                    prefs.getInt("auto_preload_manual_interval_min", 5)) * 60_000L);
+                        } else if (pm != null && !pm.isInteractive()) {
                             delay = Math.max(delay, 600_000L);
                         }
                         handler.removeCallbacks(loop);
@@ -1747,6 +1773,16 @@ public class OptimizationService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
+        if (ACTION_MANUAL_PRELOAD_REFRESH.equals(action)) {
+            if (prefs.getBoolean("master", false)
+                    && prefs.getBoolean("auto_preload_manual_mode", false)
+                    && prefs.getBoolean("auto_preload_enabled", false)) {
+                prefs.edit().putLong("auto_preload_cycle_at", 0L).apply();
+                if (sampleBusy.get()) screenWakeSamplePending.set(true);
+                else { handler.removeCallbacks(loop); handler.post(loop); }
+            }
+            return START_STICKY;
+        }
         if (ACTION_MANUAL_FREEZE_REFRESH.equals(action)) {
             requestImmediateManualFreeze(null);
             return START_STICKY;

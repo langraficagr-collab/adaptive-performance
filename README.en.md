@@ -161,3 +161,9 @@ Ten incremental extensions, preserving prior behavior: contextual online ML with
 Open **Automatic optimization → Select apps, number and MB per app** to select installed apps, configure up to 8 candidates per cycle, and choose an individual file-reading budget of 8–128 MB. Total prewarming I/O is capped at 256 MB per cycle and can be reduced by available RAM, battery level, and temperature. This feature is **optional and disabled by default**, and manual selections apply on the next safe cycle (up to 15 minutes).
 
 **Important limitation:** this warms Android's reclaimable filesystem page cache. It cannot reserve or guarantee process RAM, prevent Android from evicting apps, or enforce hard per-app memory limits. Thermal and battery guardrails pause the feature as needed and disable it when measurements indicate a meaningful power or heat regression.
+
+
+### Immediate manual page-cache warmup (Full edition)
+Saving selected apps requests an immediate warmup if the monitor and Shizuku are active. The refresh interval is adjustable from 1 to 60 minutes (5 by default). Manual mode ignores optional ML/adaptive vetoes, but still pauses for critical battery/SoC heat, low RAM or critically low battery. Android may reclaim filesystem cache or terminate app processes at any time.
+
+With the screen off, the service attempts the selected cadence, but Android/Doze can delay background execution.

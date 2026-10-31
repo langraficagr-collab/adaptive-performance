@@ -35,10 +35,12 @@ final class AdaptivePreloadController {
                   float batteryTemperatureC, boolean interactive, boolean charging,
                   int batteryPct, boolean automaticMode, float powerW) {
         long now = System.currentTimeMillis();
+        boolean manualMode = !BuildConfig.CONSERVATIVE_MODE
+                && prefs.getBoolean("auto_preload_manual_mode", false);
         // Full edition also must not warm APKs during fast charging.
         boolean unsafeTemperature = batteryTemperatureC >= 38.0f
                 || (temperatureC > 0f && temperatureC >= 55f);
-        if (charging || unsafeTemperature) {
+        if (!manualMode && (charging || unsafeTemperature)) {
             String status = charging ? "Pré-carga pausada durante a carga"
                     : "Pré-carga pausada: aparelho aquecido";
             if (!prefs.getString("auto_preload_status", "").equals(status))
@@ -46,7 +48,12 @@ final class AdaptivePreloadController {
                         .putBoolean("auto_preload_monitor_pending", false).apply();
             return;
         }
-        if (prefs.getBoolean("auto_preload_monitor_pending", false)) {
+        if (manualMode && prefs.getBoolean("auto_preload_monitor_pending", false)) {
+            // Manual selection is persistent; automatic energy regression rollback
+            // must not silently turn off a feature explicitly requested by the user.
+            prefs.edit().putBoolean("auto_preload_monitor_pending", false).apply();
+        }
+        if (!manualMode && prefs.getBoolean("auto_preload_monitor_pending", false)) {
             boolean sameScreenState = prefs.getBoolean("auto_preload_monitor_interactive", interactive)
                     == interactive;
             float priorControlTemp = prefs.getFloat("auto_preload_monitor_control_temp", -1f);
@@ -74,7 +81,7 @@ final class AdaptivePreloadController {
                 return;
             }
         }
-        if (AdaptiveBrainV2.avoidOptionalPreload(prefs)) {
+        if (!manualMode && AdaptiveBrainV2.avoidOptionalPreload(prefs)) {
             String reason=prefs.getString("v2_preload_skip_reason","");
             String status="Pré-carga adiada pelo Adaptive Brain 2"
                     + (reason.isEmpty()?"":": "+reason);
@@ -82,7 +89,7 @@ final class AdaptivePreloadController {
                 prefs.edit().putString("auto_preload_status",status).apply();
             return;
         }
-        if (PersonalUsageML.avoidPreload(prefs)
+        if (!manualMode && PersonalUsageML.avoidPreload(prefs)
                 && System.currentTimeMillis() - prefs.getLong("ml_last_training_at",0L) <= 20L * 60L * 1000L) {
             if (!"Pré-carga pausada: previsão de uso/temperatura".equals(
                     prefs.getString("auto_preload_status", "")))
@@ -100,9 +107,20 @@ final class AdaptivePreloadController {
             setStatus("Pré-carga disponível somente no modo Automático", 0, now);
             return;
         }
+        if (manualMode) {
+            String hardPause = ManualPreloadPolicy.hardPause(temperatureC,
+                    batteryTemperatureC, availablePct, batteryPct);
+            if (hardPause != null) {
+                pauseManual("Pré-carga manual suspensa: " + hardPause, now);
+                return;
+            }
+        }
         long last = prefs.getLong("auto_preload_cycle_at", 0L);
-        if (last > 0L && now - last < CYCLE_INTERVAL_MS) return;
-        if (!interactive) {
+        if (manualMode) {
+            if (!ManualPreloadPolicy.due(now, last,
+                    prefs.getInt("auto_preload_manual_interval_min", 5))) return;
+        } else if (last > 0L && now - last < CYCLE_INTERVAL_MS) return;
+        if (!interactive && !manualMode) {
             setStatus("Aguardando a tela ficar ativa para pré-carregar", 0, now);
             return;
         }
@@ -115,11 +133,11 @@ final class AdaptivePreloadController {
             }
         }
         if (privileged == null) {
-            setStatus("Shizuku indisponível para pré-carregamento", 0, now);
+            if (manualMode) pauseManual("Shizuku indisponível para pré-carregamento", now);
+            else setStatus("Shizuku indisponível para pré-carregamento", 0, now);
             return;
         }
 
-        boolean manualMode = prefs.getBoolean("auto_preload_manual_mode", false);
         List<String> apps = manualMode ? selectedApps() : mostUsedApps(now);
         // Do not warm a new or unknown package: merely prioritize a transition
         // prediction IF the candidate is already in the 15-minute safe shortlist.
@@ -131,29 +149,34 @@ final class AdaptivePreloadController {
                 apps.add(0,predicted);
         }
         if (apps.isEmpty()) {
-            setStatus(manualMode ? "Nenhum aplicativo selecionado elegível"
-                    : "Nenhum app elegível usado nos últimos 15 minutos", 0, now);
+            if (manualMode) pauseManual("Nenhum aplicativo selecionado elegível", now);
+            else setStatus("Nenhum app elegível usado nos últimos 15 minutos", 0, now);
             return;
         }
 
         float thermalBudgetTemperature = temperatureC > 0f ? temperatureC : batteryTemperatureC;
         if (batteryTemperatureC > thermalBudgetTemperature) thermalBudgetTemperature = batteryTemperatureC;
-        int budgetMb = chooseBudgetMb(availablePct, BuildConfig.CONSERVATIVE_MODE
-                ? batteryTemperatureC : thermalBudgetTemperature);
-        if (automaticMode && !charging && batteryPct >= 0) {
+        int budgetMb = manualMode ? ManualPreloadPolicy.memoryBudgetMb(availablePct)
+                : chooseBudgetMb(availablePct, BuildConfig.CONSERVATIVE_MODE
+                        ? batteryTemperatureC : thermalBudgetTemperature);
+        if (!manualMode && automaticMode && !charging && batteryPct >= 0) {
             if (batteryPct <= 15) budgetMb = 0;
             else if (batteryPct <= 30) budgetMb = Math.min(budgetMb, 32);
             else if (batteryPct <= 50) budgetMb = Math.min(budgetMb, 64);
         }
-        if (batteryTemperatureC >= 40f || temperatureC >= 60f) budgetMb = Math.min(budgetMb, 32);
+        if (!manualMode && (batteryTemperatureC >= 40f || temperatureC >= 60f))
+            budgetMb = Math.min(budgetMb, 32);
         if (BuildConfig.CONSERVATIVE_MODE) {
             budgetMb = Math.min(budgetMb, CONSERVATIVE_BUDGET_MB);
         }
         if (budgetMb <= 0) {
-            setStatus(String.format(java.util.Locale.US,
-                    "Pré-carregamento pausado: RAM %.0f%% • %.1f°C", availablePct, temperatureC),
-                    0, now);
-            prefs.edit().putLong("auto_preload_cycle_at", now).apply();
+            String reason = String.format(java.util.Locale.US,
+                    "Pré-carregamento pausado: RAM %.0f%% • %.1f°C", availablePct, temperatureC);
+            if (manualMode) pauseManual(reason, now);
+            else {
+                setStatus(reason, 0, now);
+                prefs.edit().putLong("auto_preload_cycle_at", now).apply();
+            }
             return;
         }
 
@@ -168,7 +191,8 @@ final class AdaptivePreloadController {
         LinkedHashMap<String, Integer> allocation = PreloadAllocationPolicy.allocate(
                 apps, requested, appCount, budgetMb);
         if (allocation.isEmpty()) {
-            setStatus("Pré-carga pausada: orçamento de memória insuficiente", 0, now);
+            if (manualMode) pauseManual("Pré-carga pausada: orçamento insuficiente", now);
+            else setStatus("Pré-carga pausada: orçamento de memória insuficiente", 0, now);
             return;
         }
         int allocatedMb = 0;
@@ -211,7 +235,7 @@ final class AdaptivePreloadController {
                 .putLong("auto_preload_cycle_at", now)
                 .putString("auto_preload_status", preloadStatus)
                 .putString("auto_preload_last_result", normalizedResult);
-        resultEditor.putBoolean("auto_preload_monitor_pending", !preloadFailed)
+        resultEditor.putBoolean("auto_preload_monitor_pending", !manualMode && !preloadFailed)
                     .putBoolean("auto_preload_monitor_interactive", interactive)
                     .putFloat("auto_preload_monitor_control_temp", temperatureC)
                     .putFloat("auto_preload_monitor_battery_temp", batteryTemperatureC)
@@ -348,6 +372,14 @@ final class AdaptivePreloadController {
         }
         command.append("echo WARMED_BYTES=$warmed; echo LIMIT_BYTES=$MAX_BYTES");
         return command.toString();
+    }
+
+    private void pauseManual(String reason, long now) {
+        // Keep user selection and the last successful app list on temporary
+        // failure. This cannot prevent Android from reclaiming filesystem pages.
+        prefs.edit().putString("auto_preload_status", reason)
+                .putLong("auto_preload_cycle_at", now)
+                .putBoolean("auto_preload_monitor_pending", false).apply();
     }
 
     private void setStatus(String status, int count, long now) {

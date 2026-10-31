@@ -465,6 +465,19 @@ public class MainActivity extends Activity {
     }
 
     private void refreshRecentUsageSelection() {
+        if (prefs.getBoolean("auto_preload_manual_mode", false)) {
+            prefs.edit().putLong("auto_preload_cycle_at", 0L).apply();
+            try {
+                startService(new Intent(this, OptimizationService.class)
+                        .setAction(OptimizationService.ACTION_MANUAL_PRELOAD_REFRESH));
+                Toast.makeText(this, tr("Pré-carregamento manual solicitado agora."),
+                        Toast.LENGTH_SHORT).show();
+            } catch (RuntimeException error) {
+                Toast.makeText(this, tr("Inicie o monitor para pré-carregar."),
+                        Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
         if (!hasUsageAccess()) {
             Toast.makeText(this, tr("Permita o acesso ao uso dos apps para ativar o reconhecimento automático."), Toast.LENGTH_LONG).show();
             try {
@@ -498,10 +511,12 @@ public class MainActivity extends Activity {
     private String preloadedAppsText() {
         Set<String> packages = prefs.getStringSet("auto_preload_apps", Collections.emptySet());
         if (packages == null || packages.isEmpty()) {
-            return "Apps mantidos neste ciclo: nenhum";
+            return "Nenhum aplicativo pré-aquecido neste ciclo";
         }
 
-        int limit = BuildConfig.CONSERVATIVE_MODE ? 2 : 4;
+        int limit = BuildConfig.CONSERVATIVE_MODE ? 2
+                : (prefs.getBoolean("auto_preload_manual_mode", false)
+                ? Math.max(1, Math.min(8, prefs.getInt("auto_preload_manual_count", 2))) : 4);
         String title = BuildConfig.CONSERVATIVE_MODE
                 ? "APKs aquecidos neste ciclo (" : "Itens pré-carregados neste ciclo (";
         StringBuilder out = new StringBuilder(title)
@@ -519,14 +534,16 @@ public class MainActivity extends Activity {
             out.append("\n• ").append(label);
             shown++;
         }
-        return shown == 0 ? "Apps mantidos neste ciclo: nenhum" : out.toString();
+        return shown == 0 ? "Nenhum aplicativo pré-aquecido neste ciclo" : out.toString();
     }
 
     private void updatePreloadUi() {
         if (preloadStatusText == null) return;
         int count = prefs.getInt("auto_preload_count", 0);
         String tuneStatus = prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes");
-        int limit = BuildConfig.CONSERVATIVE_MODE ? 2 : 4;
+        int limit = BuildConfig.CONSERVATIVE_MODE ? 2
+                : (prefs.getBoolean("auto_preload_manual_mode", false)
+                ? Math.max(1, Math.min(8, prefs.getInt("auto_preload_manual_count", 2))) : 4);
         setTextIfChanged(preloadTuningText,
                 tuneStatus + (UiLanguage.english(prefs) ? " • preloaded apps: " : " • apps pré-carregados: ")
                 + count + "/" + limit);
@@ -573,24 +590,65 @@ public class MainActivity extends Activity {
         int recentWindow = 15;
         preloadTuningText = text(prefs.getString("auto_tune_status", "Preparando primeiro ciclo de testes") +
                 (UiLanguage.english(prefs) ? " • preloaded apps: " : " • apps pré-carregados: ")
-                + frequentCount +
-                (BuildConfig.CONSERVATIVE_MODE ? "/2" : "/4"), 12, CYAN, true);
+                + frequentCount + "/" + (BuildConfig.CONSERVATIVE_MODE ? 2 :
+                (prefs.getBoolean("auto_preload_manual_mode", false)
+                ? Math.max(1, Math.min(8, prefs.getInt("auto_preload_manual_count", 2))) : 4)),
+                12, CYAN, true);
         preloadTuningText.setPadding(dp(4), dp(6), dp(4), dp(4));
         c.addView(preloadTuningText);
 
         TextView recentHint = text(UiLanguage.english(prefs)
-                ? "Recent apps: only apps used during the last " + recentWindow
-                  + " minutes; optional preloading checks every 15 minutes when enabled."
-                : "Reconhecimento inteligente: considera somente os aplicativos usados nos últimos "
-                  + recentWindow + " minutos; a pré-carga opcional verifica a cada 15 minutos se ativada.", 12, MUTED, false);
+                ? (prefs.getBoolean("auto_preload_manual_mode", false)
+                    ? "Manual cache: warm immediately on save and recheck every "
+                        + ManualPreloadPolicy.intervalMinutes(
+                            prefs.getInt("auto_preload_manual_interval_min", 5)) + " minutes."
+                    : "Recent apps: the last " + recentWindow
+                        + " minutes; optional preloading checks every 15 minutes.")
+                : (prefs.getBoolean("auto_preload_manual_mode", false)
+                    ? "Cache manual: pré-carrega ao salvar e verifica a cada "
+                        + ManualPreloadPolicy.intervalMinutes(
+                            prefs.getInt("auto_preload_manual_interval_min", 5)) + " minuto(s)."
+                    : "Reconhecimento inteligente: considera os aplicativos usados nos últimos "
+                        + recentWindow + " minutos e verifica a cada 15 minutos."), 12, MUTED, false);
         recentHint.setPadding(dp(4), dp(2), dp(4), dp(8));
         c.addView(recentHint);
 
         String preloadLabel = BuildConfig.CONSERVATIVE_MODE
                 ? "Pré-aquecer até 2 APKs a cada 15 minutos"
-                : "Pré-carregar automaticamente os 4 apps mais usados";
+                : (prefs.getBoolean("auto_preload_manual_mode", false)
+                ? "Pré-aquecer aplicativos selecionados"
+                : "Pré-carregar automaticamente os 4 apps mais usados");
         Switch preloadSwitch = actionSwitch(preloadLabel, "auto_preload_enabled", false);
-        if (!BuildConfig.CONSERVATIVE_MODE) c.addView(preloadSwitch);
+        preloadSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            SharedPreferences.Editor edit = prefs.edit().putBoolean("auto_preload_enabled", enabled);
+            if (!enabled) {
+                edit.putStringSet("auto_preload_apps", Collections.emptySet())
+                        .putInt("auto_preload_count", 0)
+                        .putInt("auto_preload_budget_mb", 0)
+                        .putBoolean("auto_preload_monitor_pending", false)
+                        .putString("auto_preload_status", "Pré-carga desativada pelo usuário");
+            } else if (prefs.getBoolean("auto_preload_manual_mode", false)) {
+                edit.putLong("auto_preload_cycle_at", 0L);
+            }
+            edit.apply();
+            if (enabled && prefs.getBoolean("auto_preload_manual_mode", false)) {
+                try {
+                    startService(new Intent(this, OptimizationService.class)
+                            .setAction(OptimizationService.ACTION_MANUAL_PRELOAD_REFRESH));
+                } catch (RuntimeException ignored) { }
+            }
+        });
+        if (!BuildConfig.CONSERVATIVE_MODE) {
+            c.addView(preloadSwitch);
+            Button editCacheSelection = actionButton("Selecionar apps, quantidade e MB por app");
+            editCacheSelection.setOnClickListener(v ->
+                    startActivity(new Intent(this, PreloadSelectionActivity.class)));
+            c.addView(editCacheSelection);
+            c.addView(text("As cotas são limites de leitura para aquecimento do cache de arquivos, "
+                    + "não reservas de RAM ou limites de memória dos processos. "
+                    + "O Android pode liberar o cache a qualquer momento.",
+                    12, MUTED, false));
+        }
 
         preloadStatusText = text(prefs.getString("auto_preload_status",
                 "Pré-carregamento automático aguardando o próximo ciclo"), 12, TEAL, true);
@@ -604,7 +662,10 @@ public class MainActivity extends Activity {
         preloadAppsText.setBackground(bordered(CARD_2, Color.rgb(29,69,90), 14));
         c.addView(preloadAppsText);
 
-        Button refreshRecentApps = actionButton("Pré-carregar apps usados agora");
+        Button refreshRecentApps = actionButton(
+                prefs.getBoolean("auto_preload_manual_mode", false)
+                ? "Pré-carregar apps selecionados agora"
+                : "Pré-carregar apps usados agora");
         refreshRecentApps.setBackground(bordered(Color.rgb(18,44,60), Color.rgb(44,91,116), 16));
         refreshRecentApps.setOnClickListener(v -> refreshRecentUsageSelection());
         if (BuildConfig.CONSERVATIVE_MODE) {

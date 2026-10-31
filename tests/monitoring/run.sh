@@ -17,3 +17,8 @@ javac -d "$classes" tests/conservative-harness/android/content/SharedPreferences
 for harness in BatteryFirstHarness MonitoringHarness CostGuardHarness ConservativeHarness; do
     java -cp "$classes" "com.mauricio.adaptiveperformance.$harness"
 done
+
+# Manual cache policy regression runs without modifying the GitHub Actions workflow.
+javac -d "$classes" "$src/ManualPreloadPolicy.java" \
+    tests/preload/ManualPreloadPolicyHarness.java
+java -cp "$classes" com.mauricio.adaptiveperformance.ManualPreloadPolicyHarness

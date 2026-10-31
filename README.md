@@ -522,3 +522,15 @@ Observação: medições curtas ou prolongadas não isolam completamente a influ
 10. **Laboratório:** tela de amostras, previsões, observações estáveis provisórias, reversões, histórico e exportação de diagnóstico. Não considera testes curtos como prova de economia.
 
 O sistema não inicia novos cronômetros ou serviços contínuos. Usa o ciclo de monitoramento existente, modelagem local e controles reversíveis. Dados de apps e pesos ficam nas preferências; se backup do Android estiver habilitado, poderão participar dele. Todas as funcionalidades ficam desativáveis pelo usuário.
+
+### Pré-carregamento manual de apps (experimental)
+
+Em **Otimização automática → Selecionar apps, quantidade e MB por app**, é possível selecionar aplicativos instalados, definir até 8 candidatos por ciclo e uma cota individual de 8 a 128 MB para leitura de arquivos. O orçamento global máximo é de 256 MB por ciclo e pode ser reduzido por RAM disponível, bateria e temperatura. O recurso é **opcional e desativado por padrão**; ao ativar a seleção manual, o aplicativo volta a pré-aquecer no próximo ciclo seguro (até 15 minutos).
+
+**Limitação importante:** isto pré-aquece dados no cache recuperável de arquivos do Android. Não reserva nem garante memória RAM para processos, não impede o Android de encerrar aplicativos e não impõe limites rígidos de consumo de RAM por aplicativo. Para segurança energética, o app pausa a pré-carga durante a recarga, superaquecimento e pressão de memória, além de reverter a função se detectar piora relevante.
+
+
+### Cache manual imediato (edição Full)
+Ao salvar a seleção, o serviço inicia a pré-carga imediatamente se o monitor e o Shizuku estiverem ativos. O intervalo de novas verificações é configurável de 1 a 60 minutos (padrão 5). O modo manual não depende dos bloqueios preditivos/ML do modo automático, mas mantém os limites críticos de temperatura da bateria/processador, RAM e bateria. O Android continua podendo descartar o cache de arquivos ou encerrar processos, independentemente da seleção.
+
+Com a tela apagada, o serviço tenta respeitar o intervalo manual, mas o Android/Doze pode atrasar execuções.

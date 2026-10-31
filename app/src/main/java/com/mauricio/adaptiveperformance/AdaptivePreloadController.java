@@ -8,6 +8,8 @@ import android.content.SharedPreferences;
 import android.os.Build;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -117,10 +119,11 @@ final class AdaptivePreloadController {
             return;
         }
 
-        List<String> apps = mostUsedApps(now);
+        boolean manualMode = prefs.getBoolean("auto_preload_manual_mode", false);
+        List<String> apps = manualMode ? selectedApps() : mostUsedApps(now);
         // Do not warm a new or unknown package: merely prioritize a transition
         // prediction IF the candidate is already in the 15-minute safe shortlist.
-        if (automaticMode && prefs.getBoolean("v2_next_app_enabled",true)
+        if (!manualMode && automaticMode && prefs.getBoolean("v2_next_app_enabled",true)
                 && !RoutineProfileClassifier.neverWarm(prefs.getString("v2_routine",""))
                 && prefs.getInt("ml_training_samples",0)>=48) {
             String predicted=prefs.getString("v2_next_app","");
@@ -128,7 +131,8 @@ final class AdaptivePreloadController {
                 apps.add(0,predicted);
         }
         if (apps.isEmpty()) {
-            setStatus("Nenhum app elegível usado nos últimos 15 minutos", 0, now);
+            setStatus(manualMode ? "Nenhum aplicativo selecionado elegível"
+                    : "Nenhum app elegível usado nos últimos 15 minutos", 0, now);
             return;
         }
 
@@ -153,10 +157,24 @@ final class AdaptivePreloadController {
             return;
         }
 
-        int perAppMb = Math.max(16, budgetMb / Math.max(1, apps.size()));
-        String command = BuildConfig.CONSERVATIVE_MODE
-                ? buildConservativeCommand(apps, perAppMb)
-                : buildCommand(apps, perAppMb);
+        Map<String, Integer> requested = new LinkedHashMap<>();
+        int appCount = manualMode
+                ? prefs.getInt("auto_preload_manual_count", 2)
+                : (BuildConfig.CONSERVATIVE_MODE ? CONSERVATIVE_MAX_APPS : MAX_APPS);
+        for (String pkg : apps) {
+            requested.put(pkg, manualMode
+                    ? prefs.getInt("auto_preload_quota_mb_" + pkg, 32) : budgetMb);
+        }
+        LinkedHashMap<String, Integer> allocation = PreloadAllocationPolicy.allocate(
+                apps, requested, appCount, budgetMb);
+        if (allocation.isEmpty()) {
+            setStatus("Pré-carga pausada: orçamento de memória insuficiente", 0, now);
+            return;
+        }
+        int allocatedMb = 0;
+        for (int mb : allocation.values()) allocatedMb += mb;
+        String command = buildPreloadCommand(allocation, allocatedMb,
+                BuildConfig.CONSERVATIVE_MODE);
         String result;
         try {
             result = privileged.exec(command);
@@ -164,23 +182,30 @@ final class AdaptivePreloadController {
             result = "erro: " + error.getClass().getSimpleName();
         }
         String normalizedResult = result == null ? "" : result.trim();
-        // Both editions must confirm that at least one byte was warmed.
-        // A shell command that exits without output must not count as success.
         boolean preloadFailed = !normalizedResult.matches("(?s).*WARMED_BYTES=[1-9][0-9]*.*")
                 || normalizedResult.toLowerCase(java.util.Locale.US).matches(
                         "(?s).*(^erro:|permission denied|not found|exception|failed|error).*");
-        int warmedAppCount = preloadFailed ? 0 : apps.size();
+        LinkedHashSet<String> warmedPackages = new LinkedHashSet<>();
+        if (!preloadFailed) {
+            for (String line : normalizedResult.split("\\R")) {
+                if (line.startsWith("WARMED_PKG=")) {
+                    String packageName = line.substring("WARMED_PKG=".length()).trim();
+                    if (allocation.containsKey(packageName)) warmedPackages.add(packageName);
+                }
+            }
+        }
+        int warmedAppCount = warmedPackages.size();
         String preloadStatus = preloadFailed
                 ? "Falha/nenhum APK aquecido • " + normalizedResult
-                : (BuildConfig.CONSERVATIVE_MODE ? "APKs aquecidos " : "Pré-carregados ")
-                        + warmedAppCount + " app(s) • " + budgetMb
-                        + " MB máx. total • " + perAppMb + " MB/app";
+                : (BuildConfig.CONSERVATIVE_MODE ? "APKs aquecidos " : "Cache aquecido ")
+                        + warmedAppCount + "/" + allocation.size()
+                        + " app(s) • até " + allocatedMb + " MB de leitura"
+                        + (manualMode ? " • seleção manual" : " • recentes");
         SharedPreferences.Editor resultEditor = prefs.edit()
-                .putStringSet("auto_preload_apps", new LinkedHashSet<>(
-                        preloadFailed ? new ArrayList<String>() : apps))
+                .putStringSet("auto_preload_apps", warmedPackages)
                 .putInt("auto_preload_count", warmedAppCount)
-                .putInt("auto_preload_budget_mb", preloadFailed ? 0 : budgetMb)
-                .putInt("auto_preload_per_app_mb", perAppMb)
+                .putInt("auto_preload_budget_mb", preloadFailed ? 0 : allocatedMb)
+                .putInt("auto_preload_per_app_mb", allocatedMb / Math.max(1, allocation.size()))
                 .putFloat("auto_preload_ram_pct", (float) availablePct)
                 .putFloat("auto_preload_temperature_c", temperatureC)
                 .putLong("auto_preload_cycle_at", now)
@@ -237,6 +262,30 @@ final class AdaptivePreloadController {
         return result;
     }
 
+    private List<String> selectedApps() {
+        Set<String> saved = prefs.getStringSet("auto_preload_manual_apps", Collections.emptySet());
+        if (saved == null || saved.isEmpty()) return new ArrayList<>();
+        List<String> apps = new ArrayList<>();
+        for (String pkg : saved) {
+            if (pkg == null || !pkg.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")
+                    || !AppSafety.isEligibleForAdaptiveOptimization(context, pkg)
+                    || !AppSafety.isUserFacing(context, pkg)
+                    || AppSafety.isSystemApp(context, pkg)) continue;
+            apps.add(pkg);
+        }
+        apps.sort((a, b) -> {
+            long ageA = prefs.getLong("app_last_foreground_at_" +
+                    Integer.toHexString(a.hashCode()), 0L);
+            long ageB = prefs.getLong("app_last_foreground_at_" +
+                    Integer.toHexString(b.hashCode()), 0L);
+            int recency = Long.compare(ageB, ageA);
+            return recency != 0 ? recency : a.compareTo(b);
+        });
+        if (apps.size() > PreloadAllocationPolicy.MAX_APPS)
+            return new ArrayList<>(apps.subList(0, PreloadAllocationPolicy.MAX_APPS));
+        return apps;
+    }
+
     private long recentTime(UsageStats stat) {
         long value = stat.getTotalTimeInForeground();
         if (Build.VERSION.SDK_INT >= 29) value = Math.max(value, stat.getTotalTimeVisible());
@@ -259,52 +308,43 @@ final class AdaptivePreloadController {
         return Math.max(16, budget);
     }
 
-    private String buildConservativeCommand(List<String> apps, int perAppMb) {
-        int perAppBytes = perAppMb * 1048576;
-        int totalBytes = perAppBytes * Math.max(1, apps.size());
+    /**
+     * Read at most the per-app budget and the global budget. This only warms APK
+     * and optional file page cache, never pins the application process in RAM.
+     */
+    private String buildPreloadCommand(Map<String, Integer> quotas, int totalMb,
+                                       boolean conservative) {
         StringBuilder command = new StringBuilder();
-        command.append("MAX_BYTES=").append(totalBytes)
-                .append("; APP_MAX_BYTES=").append(perAppBytes)
-                .append("; used=0; warmed=0; app_used=0; ");
-        command.append("read_one(){ f=\"$1\"; s=$(stat -c %s \"$f\" 2>/dev/null || echo 0); ");
-        command.append("[ \"$s\" -gt 0 ] || return; total_left=$((MAX_BYTES-used)); ");
+        command.append("MAX_BYTES=").append(totalMb * 1048576L)
+                .append("; used=0; warmed=0; app_used=0; APP_MAX_BYTES=0; ");
+        command.append("read_one(){ f=\\\"$1\\\"; s=$(stat -c %s \\\"$f\\\" 2>/dev/null || echo 0); ");
+        command.append("[ \\\"$s\\\" -gt 0 ] || return; total_left=$((MAX_BYTES-used)); ");
         command.append("app_left=$((APP_MAX_BYTES-app_used)); ");
-        command.append("[ \"$total_left\" -gt 0 ] && [ \"$app_left\" -gt 0 ] || return; ");
-        command.append("remain=$total_left; [ \"$app_left\" -lt \"$remain\" ] && remain=$app_left; ");
-        command.append("if [ \"$s\" -gt \"$remain\" ]; then n=$(( (remain+1048575)/1048576 )); ");
-        command.append("dd if=\"$f\" of=/dev/null bs=1M count=\"$n\" 2>/dev/null; ");
-        command.append("used=$((used+remain)); app_used=$((app_used+remain)); warmed=$used; ");
-        command.append("else cat \"$f\" >/dev/null 2>/dev/null; used=$((used+s)); ");
-        command.append("app_used=$((app_used+s)); warmed=$used; fi; }; ");
-        for (String pkg : apps) {
-            command.append("app_used=0; for f in $(cmd package path ").append(pkg)
-                    .append(" | sed 's/^package://'); do read_one \"$f\"; done; ");
-        }
-        command.append("echo WARMED_BYTES=$warmed; echo LIMIT_BYTES=$MAX_BYTES");
-        return command.toString();
-    }
-
-    private String buildCommand(List<String> apps, int perAppMb) {
-        int bytes = perAppMb * 1048576;
-        StringBuilder command = new StringBuilder();
-        command.append("MAX_BYTES=").append(bytes).append("; used=0; warmed=0; ");
-        command.append("read_one(){ f=\"$1\"; s=$(stat -c %s \"$f\" 2>/dev/null || echo 0); ");
-        command.append("[ \"$s\" -gt 0 ] || return; remain=$((MAX_BYTES-used)); ");
-        command.append("[ \"$remain\" -gt 0 ] || return; ");
-        command.append("if [ \"$s\" -gt \"$remain\" ]; then n=$(( (remain+1048575)/1048576 )); ");
-        command.append("dd if=\"$f\" of=/dev/null bs=1M count=\"$n\" 2>/dev/null; used=$MAX_BYTES; warmed=$MAX_BYTES; ");
-        command.append("else cat \"$f\" >/dev/null 2>/dev/null; used=$((used+s)); warmed=$used; fi; }; ");
-        for (String pkg : apps) {
+        command.append("[ \\\"$total_left\\\" -gt 0 ] && [ \\\"$app_left\\\" -gt 0 ] || return; ");
+        command.append("take=$s; [ \\\"$total_left\\\" -lt \\\"$take\\\" ] && take=$total_left; ");
+        command.append("[ \\\"$app_left\\\" -lt \\\"$take\\\" ] && take=$app_left; ");
+        command.append("head -c \\\"$take\\\" \\\"$f\\\" >/dev/null 2>&1 && { ");
+        command.append("used=$((used+take)); app_used=$((app_used+take)); warmed=$used; }; }; ");
+        for (Map.Entry<String, Integer> entry : quotas.entrySet()) {
+            String pkg = entry.getKey();
+            if (!pkg.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) continue;
+            command.append("APP_MAX_BYTES=").append(entry.getValue() * 1048576L)
+                    .append("; app_used=0; before=$used; ");
             command.append("for f in $(cmd package path ").append(pkg)
-                    .append(" | sed 's/^package://'); do read_one \"$f\"; done; ");
-            command.append("for root in /sdcard/Android/data/").append(pkg)
-                    .append("/files /sdcard/Android/obb/").append(pkg)
-                    .append(" /sdcard/Android/media/").append(pkg).append("; do ");
-            command.append("[ \"$used\" -ge \"$MAX_BYTES\" ] && break; ");
-            command.append("[ -d \"$root\" ] || continue; ");
-            // Limit directory traversal and stop warming once the I/O budget is consumed.
-            command.append("for f in $(find \"$root\" -maxdepth 2 -type f -size -64M -print 2>/dev/null | head -n 4); do ");
-            command.append("[ \"$used\" -ge \"$MAX_BYTES\" ] && break; read_one \"$f\"; done; done; ");
+                    .append(" | sed 's/^package://'); do read_one \\\"$f\\\"; done; ");
+            if (!conservative) {
+                command.append("for root in /sdcard/Android/data/").append(pkg)
+                        .append("/files /sdcard/Android/obb/").append(pkg)
+                        .append(" /sdcard/Android/media/").append(pkg).append("; do ");
+                command.append("[ \\\"$used\\\" -ge \\\"$MAX_BYTES\\\" ] && break; ");
+                command.append("[ -d \\\"$root\\\" ] || continue; ");
+                command.append("for f in $(find \\\"$root\\\" -maxdepth 2 -type f -size -64M ");
+                command.append("-print 2>/dev/null | head -n 4); do ");
+                command.append("[ \\\"$used\\\" -ge \\\"$MAX_BYTES\\\" ] && break; ");
+                command.append("read_one \\\"$f\\\"; done; done; ");
+            }
+            command.append("[ \\\"$used\\\" -gt \\\"$before\\\" ] && echo WARMED_PKG=")
+                    .append(pkg).append("; ");
         }
         command.append("echo WARMED_BYTES=$warmed; echo LIMIT_BYTES=$MAX_BYTES");
         return command.toString();

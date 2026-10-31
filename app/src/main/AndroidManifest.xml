@@ -58,6 +58,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".PreloadSelectionActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".HealthHistoryActivity"
             android:exported="false" />
 
